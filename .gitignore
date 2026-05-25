@@ -1,0 +1,13 @@
+.build/
+.swiftpm/
+DerivedData/
+dist/
+models/
+
+# API keys and local model/runtime state must stay local.
+.env
+.env.*
+!.env.example
+
+*.xcuserstate
+.DS_Store
