@@ -22,18 +22,28 @@ enum ScreenshotCaptureError: LocalizedError {
     }
 }
 
+struct ScreenContextCaptureResult {
+    let pngData: Data?
+    let diagnostic: String?
+}
+
 enum ScreenshotCapture {
     static func captureMainDisplayPNG() async throws -> Data {
         try await captureMainDisplayPNG(outputScale: .point1x)
     }
 
-    static func captureMainDisplayContextPNGIfAuthorized() async -> Data? {
-        guard CGPreflightScreenCaptureAccess() else {
-            return nil
+    static func captureMainDisplayContextPNGIfAvailable() async -> ScreenContextCaptureResult {
+        if CGPreflightScreenCaptureAccess() {
+            do {
+                let data = try await captureWithScreenCaptureKit(outputScale: .point1x)
+                return ScreenContextCaptureResult(pngData: data, diagnostic: "ScreenCaptureKit")
+            } catch {
+                return captureContextWithScreencaptureFallback(prefix: "ScreenCaptureKit failed: \(error.localizedDescription)")
+            }
         }
 
-        // Text translation context is opportunistic; it must not open a TCC prompt during Cmd+C.
-        return try? await captureWithScreenCaptureKit(outputScale: .point1x)
+        // Automatic text context should use existing permission paths, but must not open a TCC prompt during Cmd+C.
+        return captureContextWithScreencaptureFallback(prefix: "Screen Recording preflight denied")
     }
 
     static func captureMainDisplayContextPNG() async throws -> Data {
@@ -120,6 +130,18 @@ enum ScreenshotCapture {
             throw ScreenshotCaptureError.captureFailed
         }
         return try resizedPNGDataIfNeeded(data, outputScale: outputScale)
+    }
+
+    private static func captureContextWithScreencaptureFallback(prefix: String) -> ScreenContextCaptureResult {
+        do {
+            let data = try captureWithSystemScreencapture(outputScale: .point1x)
+            return ScreenContextCaptureResult(pngData: data, diagnostic: "screencapture fallback")
+        } catch {
+            return ScreenContextCaptureResult(
+                pngData: nil,
+                diagnostic: "\(prefix); screencapture fallback failed: \(error.localizedDescription)"
+            )
+        }
     }
 
     private static func resizedPNGDataIfNeeded(_ data: Data, outputScale: OutputScale) throws -> Data {

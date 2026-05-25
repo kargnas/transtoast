@@ -14,7 +14,7 @@ Copy Translator is a macOS menu-bar app that translates copied text after pressi
 - Screenshot translation uses an OpenRouter multimodal model. The default is `google/gemini-2.5-flash-lite`.
 - OpenRouter text translation automatically attaches the current screen as 1x visual context through the configured vision model when Screen Recording is already trusted.
 - OpenRouter text translation keeps the copied selection as the only translation target and may show a small contextual description for ambiguous short selections.
-- Request logs show request count, token usage, duplicate suspects, selected model, and attached image dimensions.
+- Request logs show request count, token usage, duplicate suspects, selected model, attached image dimensions, or the screen-context skip reason.
 
 ## Requirements
 

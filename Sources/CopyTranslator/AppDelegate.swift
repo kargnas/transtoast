@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         ProcessInfo.processInfo.disableAutomaticTermination("CopyTranslator must keep monitoring clipboard and shortcuts without a regular window.")
         NSApp.setActivationPolicy(.accessory)
+        configureMainMenu()
         createKeepAliveWindow()
         configureStatusItem()
         startKeyboardMonitor()
@@ -67,6 +68,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.toolTip = "CopyTranslator"
         statusItem = item
         rebuildMenu()
+    }
+
+    private func configureMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu(title: "CopyTranslator")
+        appMenu.addItem(menuItem(title: "Quit CopyTranslator", action: #selector(quit), key: "q", target: self))
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(menuItem(title: "Cut", action: #selector(NSText.cut(_:)), key: "x"))
+        editMenu.addItem(menuItem(title: "Copy", action: #selector(NSText.copy(_:)), key: "c"))
+        editMenu.addItem(menuItem(title: "Paste", action: #selector(NSText.paste(_:)), key: "v"))
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(menuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), key: "a"))
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     private static func makeStatusIcon() -> NSImage {
@@ -107,6 +130,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
         return "\(bitmap.pixelsWide)x\(bitmap.pixelsHigh) px, \(formatter.string(fromByteCount: Int64(data.count)))"
+    }
+
+    private static func imageInfo(for data: Data?, diagnostic: String?) -> String? {
+        guard let data else {
+            if let diagnostic, !diagnostic.isEmpty {
+                return "none (\(diagnostic))"
+            }
+            return nil
+        }
+
+        let info = imageInfo(for: data) ?? "attached"
+        guard let diagnostic, !diagnostic.isEmpty else {
+            return info
+        }
+        return "\(info), \(diagnostic)"
     }
 
     private func startKeyboardMonitor() {
@@ -283,13 +321,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             do {
                 let settings = settingsStore.settings
-                let screenContextPNGData = await contextImagePNGDataIfNeeded(settings: settings)
-                let imageInfo = Self.imageInfo(for: screenContextPNGData)
+                let screenContext = await contextImagePNGDataIfNeeded(settings: settings)
+                let imageInfo = Self.imageInfo(for: screenContext.pngData, diagnostic: screenContext.diagnostic)
                 let result = try await translationService.translateText(
                     text,
                     settings: settings,
                     credentials: credentialsProvider.credentials(),
-                    contextImagePNGData: screenContextPNGData
+                    contextImagePNGData: screenContext.pngData
                 )
                 show(result: result, title: sourceTitle, inputText: text, imageInfo: imageInfo)
             } catch {
@@ -298,12 +336,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func contextImagePNGDataIfNeeded(settings: TranslatorSettings) async -> Data? {
+    private func contextImagePNGDataIfNeeded(settings: TranslatorSettings) async -> ScreenContextCaptureResult {
         guard settings.provider == .openRouter else {
-            return nil
+            return ScreenContextCaptureResult(pngData: nil, diagnostic: nil)
         }
 
-        return await ScreenshotCapture.captureMainDisplayContextPNGIfAuthorized()
+        return await ScreenshotCapture.captureMainDisplayContextPNGIfAvailable()
     }
 
     @MainActor
@@ -598,6 +636,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func actionItem(title: String, action: Selector) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
+        return item
+    }
+
+    private func menuItem(title: String, action: Selector, key: String, target: AnyObject? = nil) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = [.command]
+        item.target = target
         return item
     }
 
