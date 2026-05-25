@@ -72,6 +72,7 @@ final class RequestLogWindowController: NSWindowController {
         root.addArrangedSubview(headerRow)
 
         summaryField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        summaryField.isSelectable = true
         root.addArrangedSubview(summaryField)
 
         textView.isEditable = false

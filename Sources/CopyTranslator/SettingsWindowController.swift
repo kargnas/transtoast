@@ -153,8 +153,10 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
         permissionStatusField.lineBreakMode = .byWordWrapping
         permissionStatusField.maximumNumberOfLines = 3
+        permissionStatusField.isSelectable = true
         lastResultField.lineBreakMode = .byWordWrapping
         lastResultField.maximumNumberOfLines = 4
+        lastResultField.isSelectable = true
     }
 
     private func configurePopup(_ popup: NSPopUpButton, cases: [(String, String)], action: Selector) {

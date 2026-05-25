@@ -41,7 +41,7 @@ final class KeyboardMonitor {
         }
 
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handle(KeySnapshot(event: event))
+            self?.handle(KeySnapshot(event: event), monitorsCopyShortcut: false)
             return event
         }
     }
@@ -59,6 +59,10 @@ final class KeyboardMonitor {
     }
 
     private func handle(_ event: KeySnapshot) {
+        handle(event, monitorsCopyShortcut: true)
+    }
+
+    private func handle(_ event: KeySnapshot, monitorsCopyShortcut: Bool) {
         guard !event.isRepeat else {
             return
         }
@@ -70,7 +74,7 @@ final class KeyboardMonitor {
             && !flags.contains(.option)
             && !flags.contains(.control)
 
-        if commandOnly, event.keyCode == 8 {
+        if monitorsCopyShortcut, commandOnly, event.keyCode == 8 {
             if detector.registerPress(at: event.timestamp) {
                 onDoubleCopy()
             }
