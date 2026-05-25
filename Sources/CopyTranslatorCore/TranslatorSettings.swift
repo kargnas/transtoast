@@ -57,11 +57,7 @@ public enum ToastPosition: String, CaseIterable, Codable, Sendable {
 }
 
 public struct TranslatorSettings: Codable, Equatable, Sendable {
-    public static let defaultOpenRouterModel = "google/gemini-3.1-flash-lite"
-    public static let legacyDefaultOpenRouterModels: Set<String> = [
-        "~google/gemini-flash-latest",
-        "google/gemini-2.5-flash-lite",
-    ]
+    public static let defaultOpenRouterModel = "google/gemini-2.5-flash-lite"
 
     public var provider: TranslationProvider
     public var hyMT2Model: HyMT2Model
@@ -121,17 +117,20 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         toastDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .toastDuration) ?? 6
     }
 
-    public mutating func migrateLegacyDefaultOpenRouterModels() -> Bool {
-        var changed = false
-        if Self.legacyDefaultOpenRouterModels.contains(openRouterTextModel) {
-            openRouterTextModel = Self.defaultOpenRouterModel
-            changed = true
-        }
-        if Self.legacyDefaultOpenRouterModels.contains(openRouterVisionModel) {
-            openRouterVisionModel = Self.defaultOpenRouterModel
-            changed = true
-        }
-        return changed
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+
+        // Persist only user overrides so future code default changes apply automatically.
+        try container.encodeIfDifferent(provider, from: defaults.provider, forKey: .provider)
+        try container.encodeIfDifferent(hyMT2Model, from: defaults.hyMT2Model, forKey: .hyMT2Model)
+        try container.encodeIfDifferent(localHyMT2BackendPath, from: defaults.localHyMT2BackendPath, forKey: .localHyMT2BackendPath)
+        try container.encodeIfDifferent(openRouterTextModel, from: defaults.openRouterTextModel, forKey: .openRouterTextModel)
+        try container.encodeIfDifferent(openRouterVisionModel, from: defaults.openRouterVisionModel, forKey: .openRouterVisionModel)
+        try container.encodeIfDifferent(includeScreenContextForLLM, from: defaults.includeScreenContextForLLM, forKey: .includeScreenContextForLLM)
+        try container.encodeIfDifferent(targetLanguage, from: defaults.targetLanguage, forKey: .targetLanguage)
+        try container.encodeIfDifferent(toastPosition, from: defaults.toastPosition, forKey: .toastPosition)
+        try container.encodeIfDifferent(toastDuration, from: defaults.toastDuration, forKey: .toastDuration)
     }
 }
 
@@ -149,5 +148,14 @@ private extension String {
     var nilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private extension KeyedEncodingContainer {
+    mutating func encodeIfDifferent<T: Encodable & Equatable>(_ value: T, from defaultValue: T, forKey key: Key) throws {
+        guard value != defaultValue else {
+            return
+        }
+        try encode(value, forKey: key)
     }
 }

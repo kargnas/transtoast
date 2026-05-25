@@ -13,20 +13,20 @@ final class SettingsStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        var didMigrate = false
         if let data = defaults.data(forKey: key),
-           var decoded = try? JSONDecoder().decode(TranslatorSettings.self, from: data) {
-            didMigrate = decoded.migrateLegacyDefaultOpenRouterModels()
+           let decoded = try? JSONDecoder().decode(TranslatorSettings.self, from: data) {
             settings = decoded
         } else {
             settings = TranslatorSettings()
         }
-        if didMigrate {
-            save()
-        }
     }
 
     private func save() {
+        guard settings != TranslatorSettings() else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+
         guard let data = try? JSONEncoder().encode(settings) else {
             return
         }
