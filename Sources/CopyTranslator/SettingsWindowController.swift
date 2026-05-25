@@ -5,6 +5,16 @@ import CoreGraphics
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
+    private enum SettingRow: Int, CaseIterable {
+        case provider
+        case hyMT2Model
+        case targetLanguage
+        case toastPosition
+        case localBackendPath
+        case openRouterTextModel
+        case openRouterVisionModel
+    }
+
     private let settingsStore: SettingsStore
     private let onSettingsChanged: () -> Void
     private let onTestTranslation: () -> Void
@@ -24,6 +34,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     private let openRouterVisionModelField = NSTextField()
     private let permissionStatusField = NSTextField(wrappingLabelWithString: "")
     private let lastResultField = NSTextField(wrappingLabelWithString: "No translation yet.")
+    private var resetButtons: [SettingRow: NSButton] = [:]
 
     init(
         settingsStore: SettingsStore,
@@ -47,7 +58,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         self.onPermissionOverlayRequest = onPermissionOverlayRequest
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 550),
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 550),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -74,6 +85,10 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         applyTextFields()
     }
 
+    func controlTextDidChange(_ notification: Notification) {
+        applyTextFields()
+    }
+
     private func makeContentView() -> NSView {
         let root = NSStackView()
         root.orientation = .vertical
@@ -85,13 +100,13 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         title.font = .boldSystemFont(ofSize: 17)
         root.addArrangedSubview(title)
 
-        root.addArrangedSubview(row(label: "Text Provider", control: providerPopup))
-        root.addArrangedSubview(row(label: "Local Hy-MT2 Model", control: hyMT2ModelPopup))
-        root.addArrangedSubview(row(label: "Target Language", control: languagePopup))
-        root.addArrangedSubview(row(label: "Toast Position", control: toastPositionPopup))
-        root.addArrangedSubview(row(label: "Local Backend Path", control: localBackendField))
-        root.addArrangedSubview(row(label: "OpenRouter Text Model", control: openRouterTextModelField))
-        root.addArrangedSubview(row(label: "OpenRouter Vision Model", control: openRouterVisionModelField))
+        root.addArrangedSubview(row(label: "Text Provider", control: providerPopup, setting: .provider))
+        root.addArrangedSubview(row(label: "Local Hy-MT2 Model", control: hyMT2ModelPopup, setting: .hyMT2Model))
+        root.addArrangedSubview(row(label: "Target Language", control: languagePopup, setting: .targetLanguage))
+        root.addArrangedSubview(row(label: "Toast Position", control: toastPositionPopup, setting: .toastPosition))
+        root.addArrangedSubview(row(label: "Local Backend Path", control: localBackendField, setting: .localBackendPath))
+        root.addArrangedSubview(row(label: "OpenRouter Text Model", control: openRouterTextModelField, setting: .openRouterTextModel))
+        root.addArrangedSubview(row(label: "OpenRouter Vision Model", control: openRouterVisionModelField, setting: .openRouterVisionModel))
         root.addArrangedSubview(row(label: "Permissions", control: permissionStatusField))
         root.addArrangedSubview(row(label: "Last Result", control: lastResultField))
 
@@ -161,6 +176,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         openRouterTextModelField.stringValue = settingsStore.settings.openRouterTextModel
         openRouterVisionModelField.stringValue = settingsStore.settings.openRouterVisionModel
         permissionStatusField.stringValue = permissionStatusText()
+        refreshDefaultButtons()
     }
 
     private func permissionStatusText() -> String {
@@ -178,7 +194,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
     }
 
-    private func row(label: String, control: NSControl) -> NSView {
+    private func row(label: String, control: NSControl, setting: SettingRow? = nil) -> NSView {
         let labelView = NSTextField(labelWithString: label)
         labelView.alignment = .right
         labelView.widthAnchor.constraint(equalToConstant: 150).isActive = true
@@ -186,11 +202,28 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         control.translatesAutoresizingMaskIntoConstraints = false
         control.widthAnchor.constraint(equalToConstant: 310).isActive = true
 
-        let stack = NSStackView(views: [labelView, control])
+        var views: [NSView] = [labelView, control]
+        if let setting {
+            views.append(resetButton(for: setting))
+        }
+
+        let stack = NSStackView(views: views)
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 12
         return stack
+    }
+
+    private func resetButton(for setting: SettingRow) -> NSButton {
+        let button = NSButton(title: "기본값으로 변경", target: self, action: #selector(resetSettingToDefault))
+        button.bezelStyle = .rounded
+        button.setButtonType(.momentaryPushIn)
+        button.tag = setting.rawValue
+        button.isHidden = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.widthAnchor.constraint(equalToConstant: 120).isActive = true
+        resetButtons[setting] = button
+        return button
     }
 
     private func button(title: String, action: Selector) -> NSButton {
@@ -209,7 +242,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             return
         }
         settingsStore.settings.provider = provider
-        onSettingsChanged()
+        settingsDidChange()
     }
 
     @objc private func hyMT2ModelChanged() {
@@ -218,7 +251,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             return
         }
         settingsStore.settings.hyMT2Model = model
-        onSettingsChanged()
+        settingsDidChange()
     }
 
     @objc private func languageChanged() {
@@ -226,7 +259,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             return
         }
         settingsStore.settings.targetLanguage = value
-        onSettingsChanged()
+        settingsDidChange()
     }
 
     @objc private func toastPositionChanged() {
@@ -235,7 +268,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             return
         }
         settingsStore.settings.toastPosition = position
-        onSettingsChanged()
+        settingsDidChange()
     }
 
     @objc private func textFieldSubmitted() {
@@ -247,7 +280,51 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         settingsStore.settings.localHyMT2BackendPath = backendPath.isEmpty ? nil : backendPath
         settingsStore.settings.openRouterTextModel = openRouterTextModelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         settingsStore.settings.openRouterVisionModel = openRouterVisionModelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        settingsDidChange()
+    }
+
+    @objc private func resetSettingToDefault(_ sender: NSButton) {
+        guard let row = SettingRow(rawValue: sender.tag) else {
+            return
+        }
+
+        let defaults = TranslatorSettings()
+        switch row {
+        case .provider:
+            settingsStore.settings.provider = defaults.provider
+        case .hyMT2Model:
+            settingsStore.settings.hyMT2Model = defaults.hyMT2Model
+        case .targetLanguage:
+            settingsStore.settings.targetLanguage = defaults.targetLanguage
+        case .toastPosition:
+            settingsStore.settings.toastPosition = defaults.toastPosition
+        case .localBackendPath:
+            settingsStore.settings.localHyMT2BackendPath = defaults.localHyMT2BackendPath
+        case .openRouterTextModel:
+            settingsStore.settings.openRouterTextModel = defaults.openRouterTextModel
+        case .openRouterVisionModel:
+            settingsStore.settings.openRouterVisionModel = defaults.openRouterVisionModel
+        }
+
+        refreshControls()
         onSettingsChanged()
+    }
+
+    private func settingsDidChange() {
+        refreshDefaultButtons()
+        onSettingsChanged()
+    }
+
+    private func refreshDefaultButtons() {
+        let settings = settingsStore.settings
+        let defaults = TranslatorSettings()
+        resetButtons[.provider]?.isHidden = settings.provider == defaults.provider
+        resetButtons[.hyMT2Model]?.isHidden = settings.hyMT2Model == defaults.hyMT2Model
+        resetButtons[.targetLanguage]?.isHidden = settings.targetLanguage == defaults.targetLanguage
+        resetButtons[.toastPosition]?.isHidden = settings.toastPosition == defaults.toastPosition
+        resetButtons[.localBackendPath]?.isHidden = settings.localHyMT2BackendPath == defaults.localHyMT2BackendPath
+        resetButtons[.openRouterTextModel]?.isHidden = settings.openRouterTextModel == defaults.openRouterTextModel
+        resetButtons[.openRouterVisionModel]?.isHidden = settings.openRouterVisionModel == defaults.openRouterVisionModel
     }
 
     @objc private func runTextTest() {
