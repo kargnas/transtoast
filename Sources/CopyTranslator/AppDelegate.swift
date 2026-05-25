@@ -310,12 +310,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func show(result: TranslationResult, title: String, inputText: String, imageInfo: String?) {
         requestLogStore.add(source: title, input: inputText, result: result, imageInfo: imageInfo)
         requestLogWindowController?.reload()
-        settingsWindowController?.updateLastResult("\(title): \(result.text)")
+        let resultSummary = if let description = result.description {
+            "\(title): \(result.text)\n\(description)"
+        } else {
+            "\(title): \(result.text)"
+        }
         toastManager.show(
             title: "\(title) · \(result.model)",
             message: result.text,
+            description: result.description,
             settings: settingsStore.settings
         )
+        settingsWindowController?.updateLastResult(resultSummary)
     }
 
     @MainActor

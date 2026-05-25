@@ -21,10 +21,10 @@ final class ToastManager {
     private let margin: CGFloat = 24
     private let gap: CGFloat = 12
 
-    func show(title: String, message: String, settings: TranslatorSettings) {
+    func show(title: String, message: String, description: String? = nil, settings: TranslatorSettings) {
         print("TOAST [\(title)] \(message)")
         fflush(stdout)
-        let entry = makeEntry(title: title, message: message)
+        let entry = makeEntry(title: title, message: message, description: description)
         entries.append(entry)
         stackView.addArrangedSubview(entry.view)
         refresh(position: settings.toastPosition)
@@ -99,7 +99,7 @@ final class ToastManager {
         return window
     }
 
-    private func makeEntry(title: String, message: String) -> ToastEntry {
+    private func makeEntry(title: String, message: String, description: String?) -> ToastEntry {
         let id = UUID()
         let card = NSVisualEffectView()
         card.material = .hudWindow
@@ -121,7 +121,18 @@ final class ToastManager {
         messageLabel.maximumNumberOfLines = 5
         messageLabel.lineBreakMode = .byWordWrapping
 
-        let content = NSStackView(views: [titleLabel, messageLabel])
+        let descriptionText = description?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var labels: [NSView] = [titleLabel, messageLabel]
+        if let descriptionText, !descriptionText.isEmpty {
+            let descriptionLabel = NSTextField(wrappingLabelWithString: descriptionText)
+            descriptionLabel.font = .systemFont(ofSize: 12)
+            descriptionLabel.textColor = .tertiaryLabelColor
+            descriptionLabel.maximumNumberOfLines = 3
+            descriptionLabel.lineBreakMode = .byWordWrapping
+            labels.append(descriptionLabel)
+        }
+
+        let content = NSStackView(views: labels)
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = contentSpacing
@@ -140,7 +151,11 @@ final class ToastManager {
         let contentWidth = width - (horizontalPadding * 2)
         let titleHeight = title.height(constrainedTo: contentWidth, font: .boldSystemFont(ofSize: 13))
         let messageHeight = message.height(constrainedTo: contentWidth, font: .systemFont(ofSize: 14), maximumLines: 5)
-        let height = max(minHeight, titleHeight + messageHeight + contentSpacing + (verticalPadding * 2))
+        let descriptionHeight = descriptionText?
+            .height(constrainedTo: contentWidth, font: .systemFont(ofSize: 12), maximumLines: 3) ?? 0
+        let visibleLabelCount = labels.count
+        let spacingHeight = CGFloat(max(0, visibleLabelCount - 1)) * contentSpacing
+        let height = max(minHeight, titleHeight + messageHeight + descriptionHeight + spacingHeight + (verticalPadding * 2))
         card.heightAnchor.constraint(equalToConstant: height).isActive = true
         return ToastEntry(id: id, view: card, height: height)
     }

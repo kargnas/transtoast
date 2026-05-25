@@ -18,6 +18,15 @@ struct OpenRouterScreenContextTests {
             let userMessage = try #require(messages.last)
             let content = try #require(userMessage["content"] as? [[String: Any]])
             #expect(content.contains { $0["type"] as? String == "image_url" })
+            let prompt = try #require(content.compactMap { $0["text"] as? String }.first)
+            #expect(prompt.contains("Do not translate the full sentence visible in the screen image."))
+            #expect(prompt.contains("Translate exactly the text inside <selected_text>."))
+
+            let responseFormat = try #require(body["response_format"] as? [String: Any])
+            let jsonSchema = try #require(responseFormat["json_schema"] as? [String: Any])
+            let schema = try #require(jsonSchema["schema"] as? [String: Any])
+            let properties = try #require(schema["properties"] as? [String: Any])
+            #expect(properties.keys.contains("description"))
 
             return openRouterResponse("화면 컨텍스트 번역")
         })
@@ -34,6 +43,36 @@ struct OpenRouterScreenContextTests {
         #expect(result.usage?.promptTokens == 11)
         #expect(result.usage?.completionTokens == 7)
         #expect(result.usage?.totalTokens == 18)
+    }
+
+    @Test func openRouterTextParsesContextDescriptionSeparately() async throws {
+        let settings = TranslatorSettings(
+            provider: .openRouter,
+            openRouterTextModel: "openrouter/text-model",
+            openRouterVisionModel: "openrouter/vision-model"
+        )
+        let service = TranslationService(session: stubbedOpenRouterSession { request in
+            let body = try #require(request.jsonBody)
+            let messages = try #require(body["messages"] as? [[String: Any]])
+            let userMessage = try #require(messages.last)
+            let content = try #require(userMessage["content"] as? [[String: Any]])
+            let prompt = try #require(content.compactMap { $0["text"] as? String }.first)
+            #expect(prompt.contains("translate the pronoun \"it\" literally as \"그것\""))
+            return openRouterResponse(
+                "그것",
+                description: "이 문장에서 '그것'은 복사하려는 문장 전체를 의미합니다."
+            )
+        })
+
+        let result = try await service.translateText(
+            "it",
+            settings: settings,
+            credentials: TranslatorCredentials(openRouterAPIKey: "test-key", huggingFaceToken: nil),
+            contextImagePNGData: Data([0x89, 0x50, 0x4E, 0x47])
+        )
+
+        #expect(result.text == "그것")
+        #expect(result.description == "이 문장에서 '그것'은 복사하려는 문장 전체를 의미합니다.")
     }
 
     @Test func openRouterTextUsesTextModelWhenNoScreenContextExists() async throws {
@@ -73,24 +112,28 @@ private func stubbedOpenRouterSession(
     return URLSession(configuration: configuration)
 }
 
-private func openRouterResponse(_ translation: String) -> Data {
-    let escaped = translation.replacingOccurrences(of: "\"", with: "\\\"")
-    return Data("""
-    {
-      "choices": [
-        {
-          "message": {
-            "content": "{\\"translation\\":\\"\(escaped)\\"}"
-          }
-        }
-      ],
-      "usage": {
-        "prompt_tokens": 11,
-        "completion_tokens": 7,
-        "total_tokens": 18
-      }
-    }
-    """.utf8)
+private func openRouterResponse(_ translation: String, description: String? = nil) -> Data {
+    let contentObject: [String: Any] = [
+        "translation": translation,
+        "description": description ?? NSNull(),
+    ]
+    let contentData = try! JSONSerialization.data(withJSONObject: contentObject)
+    let content = String(data: contentData, encoding: .utf8)!
+    let payload: [String: Any] = [
+        "choices": [
+            [
+                "message": [
+                    "content": content,
+                ],
+            ],
+        ],
+        "usage": [
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "total_tokens": 18,
+        ],
+    ]
+    return try! JSONSerialization.data(withJSONObject: payload)
 }
 
 private final class OpenRouterStubURLProtocol: URLProtocol, @unchecked Sendable {

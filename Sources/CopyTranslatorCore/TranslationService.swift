@@ -2,12 +2,14 @@ import Foundation
 
 public struct TranslationResult: Equatable, Sendable {
     public let text: String
+    public let description: String?
     public let providerTitle: String
     public let model: String
     public let usage: TranslationUsage?
 
-    public init(text: String, providerTitle: String, model: String, usage: TranslationUsage? = nil) {
+    public init(text: String, description: String? = nil, providerTitle: String, model: String, usage: TranslationUsage? = nil) {
         self.text = text
+        self.description = description?.nilIfBlank
         self.providerTitle = providerTitle
         self.model = model
         self.usage = usage
@@ -102,7 +104,8 @@ public final class TranslationService: @unchecked Sendable {
         let key = try require(credentials.openRouterAPIKey, named: "OPENROUTER_API_KEY")
         let prompt = """
         Extract every visible piece of text in this screenshot and translate it into \(settings.targetLanguage).
-        Return only the translation. Preserve line breaks when they help readability.
+        Return JSON with "translation" only containing the translation text and "description" set to null.
+        Preserve line breaks when they help readability.
         """
 
         let body: [String: Any] = [
@@ -136,6 +139,7 @@ public final class TranslationService: @unchecked Sendable {
         let response = try await postOpenRouter(body: body, apiKey: key)
         return TranslationResult(
             text: response.translation,
+            description: response.description,
             providerTitle: TranslationProvider.openRouter.title,
             model: settings.openRouterVisionModel,
             usage: response.usage
@@ -182,14 +186,11 @@ public final class TranslationService: @unchecked Sendable {
         let model = contextImagePNGData == nil
             ? settings.openRouterTextModel
             : settings.openRouterVisionModel
-        let prompt = """
-        Translate the following selected or copied text into \(settings.targetLanguage). Return only the translated result.
-
-        If a screen image is attached, use it only as visual context for nearby UI labels, product names, sentence boundaries, and ambiguous short text.
-
-        Text:
-        \(text)
-        """
+        let prompt = openRouterTextPrompt(
+            text: text,
+            targetLanguage: settings.targetLanguage,
+            hasScreenContext: contextImagePNGData != nil
+        )
         let userContent: Any
         if let contextImagePNGData {
             userContent = [
@@ -228,6 +229,7 @@ public final class TranslationService: @unchecked Sendable {
         let response = try await postOpenRouter(body: body, apiKey: key)
         return TranslationResult(
             text: response.translation,
+            description: response.description,
             providerTitle: settings.provider.title,
             model: model,
             usage: response.usage
@@ -372,10 +374,14 @@ public final class TranslationService: @unchecked Sendable {
               let parsed = try? JSONSerialization.jsonObject(with: contentData) as? [String: Any],
               let translation = parsed["translation"] as? String
         else {
-            return OpenRouterCompletion(translation: clean(content), usage: usage)
+            return OpenRouterCompletion(translation: clean(content), description: nil, usage: usage)
         }
 
-        return OpenRouterCompletion(translation: clean(translation), usage: usage)
+        return OpenRouterCompletion(
+            translation: clean(translation),
+            description: clean(parsed["description"] as? String),
+            usage: usage
+        )
     }
 
     private func extractOpenRouterUsage(from dictionary: [String: Any]) -> TranslationUsage? {
@@ -410,8 +416,43 @@ public final class TranslationService: @unchecked Sendable {
         return value
     }
 
+    private func openRouterTextPrompt(text: String, targetLanguage: String, hasScreenContext: Bool) -> String {
+        let contextInstruction = hasScreenContext
+            ? """
+            A screen image is attached. Use it only to understand the selected fragment's local sentence, referent, part of speech, tone, casing, UI label, or product name. The image is context, not the translation target.
+            """
+            : "No screen image is attached."
+
+        return """
+        Translate the selected or copied text into \(targetLanguage).
+
+        Critical rules:
+        - Translate exactly the text inside <selected_text>. Do not translate the full sentence visible in the screen image.
+        - If <selected_text> is a word or fragment inside a larger sentence, return only that word or fragment's translation.
+        - Use surrounding screen context only to choose the right meaning and to write the optional description.
+        - Put only the translated text in "translation". Put contextual details only in "description".
+        - Set "description" to null unless the selected text is ambiguous, pronominal, deictic, or needs screen context to be understood.
+        - When a screen image is attached and <selected_text> is a pronoun or deictic word such as "it", "this", "that", or "they", "description" must be a short \(targetLanguage) sentence that explains the referent from the visible context.
+        - If the visible context is a sentence and the exact referent is implicit, explain the most likely referent in that sentence instead of returning null.
+        - For Korean, translate "twice" as "두번" when it means two times.
+        - For Korean, translate the pronoun "it" literally as "그것"; when <selected_text> is exactly "it" and a screen image is attached, "description" must never be null.
+        - For "Copy this brand new sentence twice to translate it.", use "그것" as the translation and a description like "이 문장에서 '그것'은 복사하려는 문장 전체를 의미합니다."
+        - If <selected_text> is exactly "it" but the attached image does not show a reliable referent, still return "그것" and describe it as the most likely object from the surrounding visible sentence.
+
+        \(contextInstruction)
+
+        <selected_text>
+        \(text)
+        </selected_text>
+        """
+    }
+
     private func clean(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func clean(_ text: String?) -> String? {
+        text?.nilIfBlank
     }
 
     private func maxTokens(for model: String) -> Int {
@@ -437,8 +478,11 @@ public final class TranslationService: @unchecked Sendable {
                         "translation": [
                             "type": "string",
                         ],
+                        "description": [
+                            "type": ["string", "null"],
+                        ],
                     ],
-                    "required": ["translation"],
+                    "required": ["translation", "description"],
                     "additionalProperties": false,
                 ],
             ],
@@ -448,5 +492,13 @@ public final class TranslationService: @unchecked Sendable {
 
 private struct OpenRouterCompletion {
     let translation: String
+    let description: String?
     let usage: TranslationUsage?
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
