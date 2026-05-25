@@ -1,0 +1,66 @@
+# Other Mac Setup
+
+Use this checklist on another Mac after the private GitHub repository is available to your account.
+
+## Requirements
+
+- macOS 15 or later.
+- Xcode 26 or later.
+- Swift 6.2 or later.
+- `uv` for the local Hy-MT2 backend.
+- GitHub CLI signed in to an account that can read the private repository.
+
+## Clone
+
+```zsh
+gh repo clone kargnas/copy-translator
+cd copy-translator
+```
+
+## Configure Secrets
+
+```zsh
+cp .env.example .env.local
+open -e .env.local
+```
+
+Fill in local secrets:
+
+```zsh
+OPENROUTER_API_KEY=...
+HF_TOKEN=...
+```
+
+Do not commit `.env.local`.
+
+## Build And Install
+
+```zsh
+./scripts/install-app.zsh --open
+```
+
+To install somewhere other than `/Applications`:
+
+```zsh
+./scripts/install-app.zsh --install-dir "$HOME/Applications" --open
+```
+
+## Permissions
+
+Open these panes after the first install, then relaunch CopyTranslator:
+
+```zsh
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+```
+
+CopyTranslator needs Input Monitoring or Accessibility for `Cmd+C` twice, and Screen Recording for screenshot context and screenshot translation.
+
+## Package For Manual Transfer
+
+```zsh
+./scripts/package-app.zsh
+```
+
+This writes `dist/CopyTranslator.zip`.

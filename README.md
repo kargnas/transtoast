@@ -11,8 +11,9 @@ Copy Translator is a macOS menu-bar app that translates copied text after pressi
   - `tencent/Hy-MT2-30B-A3B` local inference by default.
   - `tencent/Hy-MT2-1.8B` local inference.
   - Any OpenRouter chat model ID.
-- Screenshot translation uses an OpenRouter multimodal model. The default is `google/gemini-3.1-flash-lite`.
+- Screenshot translation uses an OpenRouter multimodal model. The default is `google/gemini-2.5-flash-lite`.
 - OpenRouter text translation automatically attaches the current screen as 1x visual context through the configured vision model when Screen Recording is already trusted.
+- OpenRouter text translation keeps the copied selection as the only translation target and may show a small contextual description for ambiguous short selections.
 - Request logs show request count, token usage, duplicate suspects, selected model, and attached image dimensions.
 
 ## Requirements
@@ -76,6 +77,14 @@ Use the menu-bar icon to open options, request logs, provider/model selectors, p
 open dist/CopyTranslator.app --args --show-settings
 ```
 
+To build and install the app on this Mac:
+
+```sh
+./scripts/install-app.zsh --open
+```
+
+For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
+
 When **Text Provider** is **OpenRouter LLM**, Copy Translator automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local Hy-MT2 translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
 
 Open **Request Logs...** from the menu-bar icon to inspect recent translation requests. The log keeps the last 200 requests and shows whether token usage came from the provider response or an app-side estimate. OpenRouter requests report provider token usage when the response includes it; local Hy-MT2 requests use an estimate.
@@ -114,10 +123,13 @@ Useful checks:
 swift build
 printf '{"text":"Hello world","target_language":"Korean","model_id":"tencent/Hy-MT2-1.8B"}' | uv run scripts/hy_mt2_translate.py
 ./scripts/build-app.zsh
+./scripts/install-app.zsh --install-dir "$HOME/Applications"
+./scripts/package-app.zsh
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world"
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --hy-mt2-model tencent/Hy-MT2-1.8B
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --provider openrouter
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --screenshot-once
+node scripts/openrouter_prompt_probe.mjs --capture
 ```
 
 For UI verification, run the app, open TextEdit or another text field, copy text twice with `Cmd+C`, and confirm that a translation toast appears. Then use `Shift+Cmd+2` and confirm that a screenshot translation toast appears.
