@@ -2,15 +2,18 @@ import CopyTranslatorCore
 import Foundation
 import Testing
 
-@Test func defaultsToLocalHyMT230BAndKorean() {
+@Test func defaultsToLocalModelAutoSourceAndKorean() {
     let settings = TranslatorSettings()
 
     #expect(settings.provider == .localHyMT2)
     #expect(settings.hyMT2Model == .hyMT2_30B)
+    #expect(settings.localModelID == LocalModelRegistry.defaultModelID)
     #expect(settings.openRouterTextModel == "google/gemini-2.5-flash-lite")
     #expect(settings.openRouterVisionModel == "google/gemini-2.5-flash-lite")
     #expect(settings.includeScreenContextForLLM == false)
+    #expect(settings.sourceLanguage == TranslationLanguage.auto)
     #expect(settings.targetLanguage == "Korean")
+    #expect(settings.hasCompletedLocalModelSelection == false)
     #expect(settings.toastPosition == .bottomRight)
 }
 
@@ -31,6 +34,7 @@ import Testing
 
     #expect(settings.provider == .openRouter)
     #expect(settings.hyMT2Model == .hyMT2_18B)
+    #expect(settings.localModelID == "hymt2-transformers-1.8b")
     #expect(settings.includeScreenContextForLLM == true)
 }
 
@@ -52,6 +56,7 @@ import Testing
     #expect(object["provider"] as? String == "openRouter")
     #expect(object["openRouterTextModel"] as? String == "custom/text-model")
     #expect(object["openRouterVisionModel"] == nil)
+    #expect(object["sourceLanguage"] == nil)
     #expect(object["targetLanguage"] == nil)
 }
 
