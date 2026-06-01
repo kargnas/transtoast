@@ -208,7 +208,7 @@ struct BenchmarkResult {
     ok: bool,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct TranslationPreviewState {
     mode: String,
     #[serde(rename = "sourceLanguage")]
@@ -363,7 +363,8 @@ fn perform_settings_action(
 #[tauri::command]
 fn load_translation_preview(app: AppHandle) -> Result<TranslationPreviewState, String> {
     let settings = load_effective_settings(&app).unwrap_or_else(|_| default_settings());
-    Ok(sample_translation_preview(&settings))
+    read_translation_preview_state(&app)
+        .map(|state| state.unwrap_or_else(|| sample_translation_preview(&settings)))
 }
 
 #[tauri::command]
@@ -469,7 +470,7 @@ pub fn run() {
                     .decorations(false)
                     .transparent(true)
                     .always_on_top(true)
-                    .focused(true)
+                    .focused(false)
                     .build()
                     .map(|window| {
                         let _ = window.set_position(placement.position);
@@ -745,6 +746,29 @@ fn focused_text_caret_bounds() -> Option<ScreenRect> {
 #[cfg(not(target_os = "macos"))]
 fn focused_text_caret_bounds() -> Option<ScreenRect> {
     None
+}
+
+fn read_translation_preview_state(
+    app: &AppHandle,
+) -> Result<Option<TranslationPreviewState>, String> {
+    let path = translation_preview_path(app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let data = fs::read_to_string(&path)
+        .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+    let mut state: TranslationPreviewState = serde_json::from_str(&data)
+        .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+    state.mode = normalized_translation_mode(&state.mode).to_string();
+    Ok(Some(state))
+}
+
+fn translation_preview_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("translation-preview.json"))
+        .map_err(|error| format!("Could not resolve app data directory: {error}"))
 }
 
 fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {

@@ -13,10 +13,13 @@ SIGN_IDENTITY="${COPY_TRANSLATOR_CODE_SIGN_IDENTITY:-}"
 
 cd "$ROOT"
 swift build -c release
+npm run build >/dev/null
+cargo build --manifest-path "$ROOT/src-tauri/Cargo.toml" --release >/dev/null
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp ".build/release/$APP_NAME" "$MACOS_DIR/$APP_NAME"
+cp "$ROOT/src-tauri/target/release/copy-translator-tauri" "$MACOS_DIR/copy-translator-tauri"
 cp "$ROOT/scripts/hy_mt2_translate.py" "$RESOURCES_DIR/hy_mt2_translate.py"
 mkdir -p "$RESOURCES_DIR/runtimes"
 cp "$ROOT"/scripts/runtimes/*.py "$RESOURCES_DIR/runtimes/"

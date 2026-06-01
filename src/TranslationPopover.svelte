@@ -17,6 +17,11 @@
 
   const languagePair = $derived(`${shortLanguage(preview.sourceLanguage)} → ${shortLanguage(preview.targetLanguage)}`);
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
+  const loadingMessage = $derived(
+    preview.originalText === "[screen screenshot]"
+      ? "스크린샷을 캡처하고 번역하고 있어요."
+      : "클립보드의 텍스트를 번역하고 있어요."
+  );
   const compactMode = $derived(visibleMode === "translated" || visibleMode === "original");
   const tallMode = $derived(debugMode || visibleMode === "loading" || visibleMode === "error");
 
@@ -93,7 +98,7 @@
           <span class="status-dot"></span>
           <span>번역 중...</span>
         </div>
-        <p class="copying">클립보드의 텍스트를 번역하고 있어요.</p>
+        <p class="copying">{loadingMessage}</p>
         <div class="progress-track" aria-hidden="true"><span class="progress-fill"></span></div>
         <footer class="bubble-footer">
           <span class="language"><Languages size={14} />{languagePair}</span>

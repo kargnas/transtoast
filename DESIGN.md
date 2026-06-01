@@ -3,7 +3,7 @@
 ## Source of truth
 - Status: Active
 - Last refreshed: 2026-06-01
-- Primary product surfaces: macOS menu-bar translator, translation toast/overlay, settings window, permission helper, local model setup, request logs.
+- Primary product surfaces: macOS menu-bar translator, Tauri translation popover, settings window, permission helper, local model setup, request logs.
 - Evidence reviewed:
   - `design/image.png` and `design/guide.html`: component board for translation overlays, settings window, tokens, spacing, typography, color, radius, motion.
   - `Sources/CopyTranslator/SettingsWindowController.swift`: current AppKit settings behavior, groups, reset-to-default controls, diagnostics.
@@ -46,7 +46,7 @@
 - Imagery/iconography: use symbol-style icons for settings sidebar and action buttons; do not use stock imagery in app surfaces.
 
 ## Components
-- Existing components to reuse: `TranslatorSettings`, `SettingsStore` semantics, `TranslationLanguage`, `LocalModelRegistry`, current permission checks, diagnostics actions, current toast/translation result behavior including loading/success/error states. Toast position is fallback only when the keyboard caret/selection bounds are unavailable.
+- Existing components to reuse: `TranslatorSettings`, `SettingsStore` semantics, `TranslationLanguage`, `LocalModelRegistry`, current permission checks, diagnostics actions, and translation result behavior including loading/success/error states. Toast position is fallback only when the keyboard caret/selection bounds are unavailable.
 - New/changed components: Tauri 2 settings shell, Svelte settings sidebar, grouped setting rows, reset buttons, Rust settings command layer, Tauri/Svelte translation popover surface.
 - Variants and states: default vs overridden setting rows, ready/not-granted permission states, saved/saving, success/error action notices, disabled reset buttons, translation loading/done/original/error states. Translation state switchers are debug-only and must not appear in the default popup.
 - Token/component ownership: `design/guide.html` remains visual token reference; `src/app.css` owns Tauri web implementation tokens; Rust owns setting defaults and persistence normalization.
@@ -84,5 +84,5 @@
 - Test/screenshot expectations: run build/check/tests; run UI, capture screenshot, crop settings and translation surfaces, compare against `design/image.png` references and generated mockup/reference.
 
 ## Open questions
-- [ ] Full app-shell migration owner / impact: decide when Tauri replaces AppKit menu bar, toast, permission helper, local model setup, and request log windows.
+- [ ] Full app-shell migration owner / impact: decide whether the AppKit menu-bar shell itself should remain native while user-facing helper and translation windows stay in Tauri.
 - [ ] Storage compatibility owner / impact: decide whether Tauri production should read/write existing macOS UserDefaults binary `Data` key directly or keep the new JSON override store during migration.

@@ -3,12 +3,22 @@ import ApplicationServices
 import CopyTranslatorCore
 import CoreGraphics
 
+private struct TranslationPreviewPayload: Encodable {
+    var mode: String
+    var sourceLanguage: String
+    var targetLanguage: String
+    var originalText: String
+    var translatedText: String
+    var errorText: String?
+    var providerTitle: String
+    var model: String
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
     private let translationService = TranslationService()
-    private let toastManager = ToastManager()
     private let requestLogStore = RequestLogStore()
     private var statusItem: NSStatusItem?
     private var keyboardMonitor: KeyboardMonitor?
@@ -16,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenshotHotKey: ScreenshotHotKey?
     private var keepAliveWindow: NSWindow?
     private var tauriSurfaceProcesses: [String: Process] = [:]
+    private var translationPopoverProcess: Process?
     private var lastClipboardTriggerAt: Date?
     private var isUserQuitting = false
     private var hasStarted = false
@@ -43,11 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startKeyboardMonitor()
         startScreenshotHotKey()
         startPasteboardMonitor()
-        toastManager.show(
-            title: "CopyTranslator",
-            message: "Ready. Press Cmd+C twice to translate clipboard text.",
-            settings: settingsStore.settings
-        )
+        print("CopyTranslator ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
         if CommandLine.arguments.contains("--show-settings") {
             showSettingsWindow()
@@ -178,11 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let status = screenshotHotKey?.start() ?? OSStatus(-1)
         if status != noErr {
-            toastManager.show(
-                title: "Screenshot Shortcut",
-                message: "Could not register Shift+Cmd+2. Carbon status: \(status)",
-                settings: settingsStore.settings
-            )
+            print("Could not register Shift+Cmd+2. Carbon status: \(status)")
         }
     }
 
@@ -302,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func translateScreenshot() {
-        toastManager.show(title: "Screenshot", message: "Capturing and translating screenshot...", settings: settingsStore.settings)
+        showTranslationLoading(originalText: "[screen screenshot]", sourceTitle: "Screenshot")
         Task { [weak self] in
             guard let self else {
                 return
@@ -327,7 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ text: String,
         sourceTitle: String
     ) {
-        toastManager.show(title: sourceTitle, message: "Translating...", settings: settingsStore.settings)
+        showTranslationLoading(originalText: text, sourceTitle: sourceTitle)
         Task { [weak self] in
             guard let self else {
                 return
@@ -361,21 +364,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func show(result: TranslationResult, title: String, inputText: String, imageInfo: String?) {
         requestLogStore.add(source: title, input: inputText, result: result, imageInfo: imageInfo)
-        toastManager.show(
-            title: "\(title) · \(result.model)",
-            message: result.text,
-            description: result.description,
-            settings: settingsStore.settings
-        )
+        showTranslationResult(result, inputText: inputText)
     }
 
     @MainActor
     private func show(error: Error, title: String) {
-        toastManager.show(
-            title: "\(title) Error",
-            message: error.localizedDescription,
-            settings: settingsStore.settings
-        )
+        showTranslationError(error, sourceTitle: title)
     }
 
     @objc private func setProvider(_ sender: NSMenuItem) {
@@ -461,11 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try process.run()
         } catch {
-            toastManager.show(
-                title: "Settings",
-                message: "Could not open Tauri \(surface): \(error.localizedDescription)",
-                settings: settingsStore.settings
-            )
+            print("Could not open Tauri \(surface): \(error.localizedDescription)")
             return false
         }
 
@@ -474,11 +464,148 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    private func showTranslationLoading(originalText: String, sourceTitle: String) {
+        let settings = settingsStore.settings
+        let languages = resolvedLanguages(for: originalText, settings: settings)
+        showTranslationPopover(TranslationPreviewPayload(
+            mode: "loading",
+            sourceLanguage: languages.sourceLanguage,
+            targetLanguage: languages.targetLanguage,
+            originalText: originalText,
+            translatedText: "",
+            errorText: nil,
+            providerTitle: settings.provider.title,
+            model: activeModelTitle(settings: settings)
+        ), sourceTitle: sourceTitle)
+    }
+
+    private func showTranslationResult(_ result: TranslationResult, inputText: String) {
+        let settings = settingsStore.settings
+        let languages = resolvedLanguages(for: inputText, settings: settings)
+        showTranslationPopover(TranslationPreviewPayload(
+            mode: "translated",
+            sourceLanguage: result.sourceLanguage ?? result.detectedSourceLanguage ?? languages.sourceLanguage,
+            targetLanguage: result.targetLanguage ?? languages.targetLanguage,
+            originalText: inputText,
+            translatedText: result.text,
+            errorText: nil,
+            providerTitle: result.providerTitle,
+            model: result.model
+        ), sourceTitle: result.providerTitle)
+    }
+
+    private func showTranslationError(_ error: Error, sourceTitle: String) {
+        let settings = settingsStore.settings
+        showTranslationPopover(TranslationPreviewPayload(
+            mode: "error",
+            sourceLanguage: settings.sourceLanguage,
+            targetLanguage: settings.targetLanguage,
+            originalText: sourceTitle,
+            translatedText: "",
+            errorText: error.localizedDescription,
+            providerTitle: settings.provider.title,
+            model: activeModelTitle(settings: settings)
+        ), sourceTitle: sourceTitle)
+    }
+
+    private func showTranslationPopover(_ payload: TranslationPreviewPayload, sourceTitle: String) {
+        do {
+            try writeTranslationPreviewPayload(payload)
+        } catch {
+            print("Could not write translation preview for \(sourceTitle): \(error.localizedDescription)")
+            return
+        }
+
+        guard launchTranslationPopover(mode: payload.mode) else {
+            print("Could not launch Tauri translation popover for \(sourceTitle).")
+            return
+        }
+    }
+
+    private func writeTranslationPreviewPayload(_ payload: TranslationPreviewPayload) throws {
+        try SharedAppStorage.ensureDirectoryExists()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(payload).write(
+            to: SharedAppStorage.fileURL("translation-preview.json"),
+            options: [.atomic]
+        )
+    }
+
+    private func launchTranslationPopover(mode: String) -> Bool {
+        if let process = translationPopoverProcess, process.isRunning {
+            process.terminate()
+        }
+        translationPopoverProcess = nil
+
+        guard let executableURL = resolveTauriSettingsExecutableURL() else {
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = [
+            "--translation-preview",
+            "--translation-preview-state=\(mode)",
+        ]
+        let workspaceRootURL = resolveWorkspaceRootURL()
+        process.currentDirectoryURL = workspaceRootURL
+
+        var environment = ProcessInfo.processInfo.environment
+        if let workspaceRootURL {
+            environment["COPY_TRANSLATOR_WORKSPACE_ROOT"] = workspaceRootURL.path
+        }
+        process.environment = environment
+        process.terminationHandler = { [weak self] finishedProcess in
+            Task { @MainActor in
+                if self?.translationPopoverProcess === finishedProcess {
+                    self?.translationPopoverProcess = nil
+                }
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            print("Could not open Tauri translation popover: \(error.localizedDescription)")
+            return false
+        }
+
+        translationPopoverProcess = process
+        return true
+    }
+
+    private func resolvedLanguages(
+        for text: String,
+        settings: TranslatorSettings
+    ) -> ResolvedTranslationLanguages {
+        TranslationLanguageResolver.resolve(
+            text: text,
+            sourceLanguage: settings.sourceLanguage,
+            targetLanguage: settings.targetLanguage
+        )
+    }
+
+    private func activeModelTitle(settings: TranslatorSettings) -> String {
+        switch settings.provider {
+        case .localHyMT2:
+            LocalModelRegistry.model(
+                id: settings.localModelID,
+                customModelsPath: settings.customLocalModelsPath
+            )?.title ?? settings.localModelID
+        case .openRouter:
+            settings.openRouterTextModel
+        }
+    }
+
     private func resolveTauriSettingsExecutableURL() -> URL? {
         let explicitExecutablePath = argumentValue(after: "--tauri-settings-executable")
         var candidates: [URL] = []
         if let explicitExecutablePath, !explicitExecutablePath.isEmpty {
             candidates.append(URL(fileURLWithPath: explicitExecutablePath))
+        }
+        if let executableDirectoryURL = Bundle.main.executableURL?.deletingLastPathComponent() {
+            candidates.append(executableDirectoryURL.appendingPathComponent("copy-translator-tauri"))
         }
         if let workspaceRootURL = resolveWorkspaceRootURL() {
             candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/copy-translator-tauri"))
@@ -555,31 +682,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openInputMonitoringSettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
         NSWorkspace.shared.open(url)
-        toastManager.show(
-            title: "Input Monitoring Settings",
-            message: "Enable Input Monitoring for this app if Cmd+C detection does not fire.",
-            settings: settingsStore.settings
-        )
+        print("Opened Input Monitoring settings.")
     }
 
     @objc private func openAccessibilitySettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
-        toastManager.show(
-            title: "Accessibility Settings",
-            message: "Enable Accessibility for this app if Input Monitoring is not enough for Cmd+C detection.",
-            settings: settingsStore.settings
-        )
+        print("Opened Accessibility settings.")
     }
 
     @objc private func openScreenRecordingSettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
         NSWorkspace.shared.open(url)
-        toastManager.show(
-            title: "Screen Recording Settings",
-            message: "Enable Screen Recording for this app to translate screenshots.",
-            settings: settingsStore.settings
-        )
+        print("Opened Screen Recording settings.")
     }
 
     @objc private func requestKeyboardPermission() {
@@ -595,11 +710,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let isAccessibilityTrusted = AXIsProcessTrusted()
 
         if canListenToEvents || isAccessibilityTrusted {
-            toastManager.show(
-                title: "Keyboard Permission",
-                message: "Global keyboard monitoring is available.",
-                settings: settingsStore.settings
-            )
+            print("Global keyboard monitoring is available.")
             return
         }
 
@@ -609,11 +720,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = AXIsProcessTrustedWithOptions(options)
         }
 
-        toastManager.show(
-            title: "Keyboard Permission Needed",
-            message: "Enable Input Monitoring or Accessibility for CopyTranslator, then relaunch the app. Without it, Cmd+C twice cannot be observed from other apps.",
-            settings: settingsStore.settings
-        )
+        print("Keyboard permission needed. Enable Input Monitoring or Accessibility for CopyTranslator, then relaunch the app.")
     }
 
     @objc private func quit() {
