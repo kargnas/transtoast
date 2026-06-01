@@ -31,6 +31,7 @@ final class RequestLogStore {
     private(set) var entries: [RequestLogEntry] = []
     private let maxEntries = 200
     private let duplicateWindow: TimeInterval = 2
+    private let storageURL = SharedAppStorage.fileURL("request-logs.json")
 
     @discardableResult
     func add(
@@ -70,11 +71,13 @@ final class RequestLogStore {
         if entries.count > maxEntries {
             entries.removeFirst(entries.count - maxEntries)
         }
+        save()
         return entry
     }
 
     func clear() {
         entries.removeAll()
+        save()
     }
 
     var summary: RequestLogSummary {
@@ -105,6 +108,59 @@ final class RequestLogStore {
             return 0
         }
         return max(1, Int(ceil(Double(trimmed.count) / 4.0)))
+    }
+
+    private func save() {
+        let file = RequestLogFile(entries: entries.map(RequestLogDiskEntry.init))
+        do {
+            try SharedAppStorage.ensureDirectoryExists()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(file)
+            try data.write(to: storageURL, options: .atomic)
+        } catch {
+            print("Could not save request logs: \(error.localizedDescription)")
+        }
+    }
+}
+
+private struct RequestLogFile: Encodable {
+    let entries: [RequestLogDiskEntry]
+}
+
+private struct RequestLogDiskEntry: Encodable {
+    let id: String
+    let timestamp: String
+    let source: String
+    let providerTitle: String
+    let model: String
+    let inputPreview: String
+    let outputPreview: String
+    let promptTokens: Int
+    let completionTokens: Int
+    let totalTokens: Int
+    let usageSource: String
+    let isDuplicateSuspect: Bool
+    let imageInfo: String?
+    let fingerprint: String
+
+    init(_ entry: RequestLogEntry) {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        id = entry.id.uuidString
+        timestamp = formatter.string(from: entry.timestamp)
+        source = entry.source
+        providerTitle = entry.providerTitle
+        model = entry.model
+        inputPreview = entry.inputPreview
+        outputPreview = entry.outputPreview
+        promptTokens = entry.promptTokens
+        completionTokens = entry.completionTokens
+        totalTokens = entry.totalTokens
+        usageSource = entry.usageSource
+        isDuplicateSuspect = entry.isDuplicateSuspect
+        imageInfo = entry.imageInfo
+        fingerprint = entry.fingerprint
     }
 }
 

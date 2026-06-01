@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+mod surfaces;
+
 use std::collections::BTreeMap;
 #[cfg(target_os = "macos")]
 use std::ffi::CString;
@@ -7,6 +9,7 @@ use std::fs;
 use std::os::raw::{c_char, c_void};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use surfaces::{open_surface_window, AppSurface};
 use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 const TRANSLATION_WINDOW_WIDTH: f64 = 356.0;
@@ -29,12 +32,18 @@ struct Settings {
     open_router_text_model: String,
     #[serde(rename = "openRouterVisionModel")]
     open_router_vision_model: String,
+    #[serde(rename = "includeScreenContextForLLM")]
+    include_screen_context_for_llm: bool,
     #[serde(rename = "sourceLanguage")]
     source_language: String,
     #[serde(rename = "targetLanguage")]
     target_language: String,
+    #[serde(rename = "hasCompletedLocalModelSelection")]
+    has_completed_local_model_selection: bool,
     #[serde(rename = "toastPosition")]
     toast_position: ToastPosition,
+    #[serde(rename = "toastDuration")]
+    toast_duration: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -80,12 +89,18 @@ struct StoredSettings {
     open_router_text_model: Option<String>,
     #[serde(rename = "openRouterVisionModel")]
     open_router_vision_model: Option<String>,
+    #[serde(rename = "includeScreenContextForLLM")]
+    include_screen_context_for_llm: Option<bool>,
     #[serde(rename = "sourceLanguage")]
     source_language: Option<String>,
     #[serde(rename = "targetLanguage")]
     target_language: Option<String>,
+    #[serde(rename = "hasCompletedLocalModelSelection")]
+    has_completed_local_model_selection: Option<bool>,
     #[serde(rename = "toastPosition")]
     toast_position: Option<ToastPosition>,
+    #[serde(rename = "toastDuration")]
+    toast_duration: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -130,6 +145,66 @@ struct PermissionStatus {
 struct ActionResult {
     title: String,
     message: String,
+    ok: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct RequestLogFile {
+    entries: Vec<RequestLogEntryState>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct RequestLogEntryState {
+    id: String,
+    timestamp: String,
+    source: String,
+    #[serde(rename = "providerTitle")]
+    provider_title: String,
+    model: String,
+    #[serde(rename = "inputPreview")]
+    input_preview: String,
+    #[serde(rename = "outputPreview")]
+    output_preview: String,
+    #[serde(rename = "promptTokens")]
+    prompt_tokens: i64,
+    #[serde(rename = "completionTokens")]
+    completion_tokens: i64,
+    #[serde(rename = "totalTokens")]
+    total_tokens: i64,
+    #[serde(rename = "usageSource")]
+    usage_source: String,
+    #[serde(rename = "isDuplicateSuspect")]
+    is_duplicate_suspect: bool,
+    #[serde(rename = "imageInfo")]
+    image_info: Option<String>,
+    fingerprint: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RequestLogSummaryState {
+    #[serde(rename = "requestCount")]
+    request_count: usize,
+    #[serde(rename = "duplicateSuspectCount")]
+    duplicate_suspect_count: usize,
+    #[serde(rename = "promptTokens")]
+    prompt_tokens: i64,
+    #[serde(rename = "completionTokens")]
+    completion_tokens: i64,
+    #[serde(rename = "totalTokens")]
+    total_tokens: i64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RequestLogsState {
+    entries: Vec<RequestLogEntryState>,
+    summary: RequestLogSummaryState,
+    #[serde(rename = "storagePath")]
+    storage_path: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct BenchmarkResult {
+    output: String,
     ok: bool,
 }
 
@@ -260,26 +335,14 @@ fn perform_settings_action(
             legacy_cli_args(&settings, &["--screenshot-once"]),
             "Screenshot Translation",
         ),
-        "showRequestLogs" => Ok(action_result(
-            "Request Logs",
-            &spawn_legacy_window(&app, &["--show-request-logs"])?,
-            true,
-        )),
-        "showStackedToasts" => Ok(action_result(
-            "Stacked Toasts",
-            &spawn_legacy_window(&app, &["--show-stacked-toasts"])?,
-            true,
-        )),
-        "showLocalModelSetup" => Ok(action_result(
-            "Model Setup",
-            &spawn_legacy_window(&app, &["--show-local-model-setup"])?,
-            true,
-        )),
-        "openPermissionHelper" => Ok(action_result(
-            "Permission Helper",
-            &spawn_legacy_window(&app, &["--show-permission-helper"])?,
-            true,
-        )),
+        "showRequestLogs" => open_surface_action(&app, AppSurface::RequestLogs, "Request Logs"),
+        "showStackedToasts" => open_surface_action(&app, AppSurface::ToastStack, "Stacked Toasts"),
+        "showLocalModelSetup" => {
+            open_surface_action(&app, AppSurface::LocalModelSetup, "Model Setup")
+        }
+        "openPermissionHelper" => {
+            open_surface_action(&app, AppSurface::PermissionHelper, "Permission Helper")
+        }
         "openInputMonitoring" => open_privacy_url(
             "Input Monitoring",
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
@@ -301,6 +364,72 @@ fn perform_settings_action(
 fn load_translation_preview(app: AppHandle) -> Result<TranslationPreviewState, String> {
     let settings = load_effective_settings(&app).unwrap_or_else(|_| default_settings());
     Ok(sample_translation_preview(&settings))
+}
+
+#[tauri::command]
+fn open_app_surface(app: AppHandle, surface: String) -> Result<ActionResult, String> {
+    let surface =
+        AppSurface::from_key(&surface).ok_or_else(|| format!("Unknown app surface: {surface}"))?;
+    open_surface_action(&app, surface, surface.key())
+}
+
+#[tauri::command]
+fn complete_local_model_setup(app: AppHandle, settings: Settings) -> Result<SettingsState, String> {
+    let mut settings = normalize_settings(settings);
+    settings.has_completed_local_model_selection = true;
+    write_settings(&app, settings)?;
+    state_from_disk(&app)
+}
+
+#[tauri::command]
+fn prepare_custom_local_models(app: AppHandle) -> Result<SettingsState, String> {
+    let mut settings = load_effective_settings(&app)?;
+    if settings.custom_local_models_path.is_none() {
+        settings.custom_local_models_path =
+            Some("~/.config/copy-translator/local-models.json".to_string());
+        write_settings(&app, settings)?;
+    }
+    state_from_disk(&app)
+}
+
+#[tauri::command]
+fn run_local_model_benchmark(
+    app: AppHandle,
+    settings: Settings,
+    source_language: String,
+    target_language: String,
+) -> Result<BenchmarkResult, String> {
+    let mut settings = normalize_settings(settings);
+    settings.provider = TranslationProvider::LocalHyMT2;
+    settings.source_language = source_language;
+    settings.target_language = target_language;
+    let args = legacy_cli_args(
+        &settings,
+        &["--benchmark-local-models", "--sample-limit", "9"],
+    );
+    let binary = legacy_binary_path(&app)?;
+    let output = Command::new(&binary)
+        .args(&args)
+        .output()
+        .map_err(|error| format!("Could not run {}: {error}", binary.display()))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    Ok(BenchmarkResult {
+        output: first_non_empty(&stdout, &stderr),
+        ok: output.status.success(),
+    })
+}
+
+#[tauri::command]
+fn load_request_logs(app: AppHandle) -> Result<RequestLogsState, String> {
+    request_logs_state(&app)
+}
+
+#[tauri::command]
+fn clear_request_logs(app: AppHandle) -> Result<RequestLogsState, String> {
+    write_request_log_file(&app, &RequestLogFile::default())?;
+    request_logs_state(&app)
 }
 
 pub fn run() {
@@ -345,6 +474,13 @@ pub fn run() {
                     .map(|window| {
                         let _ = window.set_position(placement.position);
                     })?;
+            } else if let Some(surface) = startup_surface() {
+                if surface != AppSurface::Settings {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                }
+                open_surface_window(app.handle(), surface)?;
             }
             Ok(())
         })
@@ -353,10 +489,29 @@ pub fn run() {
             save_settings,
             reset_setting,
             perform_settings_action,
+            open_app_surface,
+            complete_local_model_setup,
+            prepare_custom_local_models,
+            run_local_model_benchmark,
+            load_request_logs,
+            clear_request_logs,
             load_translation_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running CopyTranslator Tauri app");
+}
+
+fn startup_surface() -> Option<AppSurface> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = arg.strip_prefix("--surface=") {
+            return AppSurface::from_key(value);
+        }
+        if arg == "--surface" {
+            return args.next().and_then(|value| AppSurface::from_key(&value));
+        }
+    }
+    None
 }
 
 fn translation_preview_request() -> Option<TranslationPreviewRequest> {
@@ -671,14 +826,23 @@ fn apply_stored_settings(stored: StoredSettings) -> Settings {
     if let Some(value) = stored.open_router_vision_model {
         settings.open_router_vision_model = value;
     }
+    if let Some(value) = stored.include_screen_context_for_llm {
+        settings.include_screen_context_for_llm = value;
+    }
     if let Some(value) = stored.source_language {
         settings.source_language = value;
     }
     if let Some(value) = stored.target_language {
         settings.target_language = value;
     }
+    if let Some(value) = stored.has_completed_local_model_selection {
+        settings.has_completed_local_model_selection = value;
+    }
     if let Some(value) = stored.toast_position {
         settings.toast_position = value;
+    }
+    if let Some(value) = stored.toast_duration {
+        settings.toast_duration = value;
     }
     normalize_settings(settings)
 }
@@ -727,12 +891,21 @@ impl StoredSettings {
             open_router_vision_model: (settings.open_router_vision_model
                 != defaults.open_router_vision_model)
                 .then(|| settings.open_router_vision_model.clone()),
+            include_screen_context_for_llm: (settings.include_screen_context_for_llm
+                != defaults.include_screen_context_for_llm)
+                .then_some(settings.include_screen_context_for_llm),
             source_language: (settings.source_language != defaults.source_language)
                 .then(|| settings.source_language.clone()),
             target_language: (settings.target_language != defaults.target_language)
                 .then(|| settings.target_language.clone()),
+            has_completed_local_model_selection: (settings.has_completed_local_model_selection
+                != defaults.has_completed_local_model_selection)
+                .then_some(settings.has_completed_local_model_selection),
             toast_position: (settings.toast_position != defaults.toast_position)
                 .then(|| settings.toast_position.clone()),
+            toast_duration: ((settings.toast_duration - defaults.toast_duration).abs()
+                > f64::EPSILON)
+                .then_some(settings.toast_duration),
         }
     }
 
@@ -744,9 +917,12 @@ impl StoredSettings {
             && self.custom_local_models_path.is_none()
             && self.open_router_text_model.is_none()
             && self.open_router_vision_model.is_none()
+            && self.include_screen_context_for_llm.is_none()
             && self.source_language.is_none()
             && self.target_language.is_none()
+            && self.has_completed_local_model_selection.is_none()
             && self.toast_position.is_none()
+            && self.toast_duration.is_none()
     }
 }
 
@@ -765,9 +941,12 @@ fn default_settings() -> Settings {
         custom_local_models_path: None,
         open_router_text_model: "google/gemini-2.5-flash-lite".to_string(),
         open_router_vision_model: "google/gemini-2.5-flash-lite".to_string(),
+        include_screen_context_for_llm: false,
         source_language: "Auto".to_string(),
         target_language: "Korean".to_string(),
+        has_completed_local_model_selection: false,
         toast_position: ToastPosition::BottomRight,
+        toast_duration: 6.0,
     }
 }
 
@@ -778,6 +957,9 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     settings.open_router_vision_model = settings.open_router_vision_model.trim().to_string();
     settings.source_language = settings.source_language.trim().to_string();
     settings.target_language = settings.target_language.trim().to_string();
+    if !settings.toast_duration.is_finite() || settings.toast_duration <= 0.0 {
+        settings.toast_duration = default_settings().toast_duration;
+    }
     settings
 }
 
@@ -957,13 +1139,13 @@ fn run_legacy_cli(app: &AppHandle, args: Vec<String>, title: &str) -> Result<Act
     Ok(action_result(title, &message, output.status.success()))
 }
 
-fn spawn_legacy_window(app: &AppHandle, args: &[&str]) -> Result<String, String> {
-    let binary = legacy_binary_path(app)?;
-    Command::new(&binary)
-        .args(args)
-        .spawn()
-        .map_err(|error| format!("Could not open {}: {error}", binary.display()))?;
-    Ok("Legacy app window opened for this migration step.".to_string())
+fn open_surface_action(
+    app: &AppHandle,
+    surface: AppSurface,
+    title: &str,
+) -> Result<ActionResult, String> {
+    open_surface_window(app, surface)?;
+    Ok(action_result(title, "Tauri window opened.", true))
 }
 
 fn legacy_binary_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1010,12 +1192,81 @@ fn first_non_empty(primary: &str, fallback: &str) -> String {
     }
 }
 
+fn request_logs_state(app: &AppHandle) -> Result<RequestLogsState, String> {
+    let file = read_request_log_file(app)?;
+    let summary = request_log_summary(&file.entries);
+    Ok(RequestLogsState {
+        entries: file.entries,
+        summary,
+        storage_path: request_logs_path(app)?.display().to_string(),
+    })
+}
+
+fn read_request_log_file(app: &AppHandle) -> Result<RequestLogFile, String> {
+    let path = request_logs_path(app)?;
+    if !path.exists() {
+        return Ok(RequestLogFile::default());
+    }
+    let data = fs::read_to_string(&path)
+        .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+    serde_json::from_str(&data)
+        .map_err(|error| format!("Could not parse {}: {error}", path.display()))
+}
+
+fn write_request_log_file(app: &AppHandle, file: &RequestLogFile) -> Result<(), String> {
+    let path = request_logs_path(app)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+    }
+    let data = serde_json::to_string_pretty(file)
+        .map_err(|error| format!("Could not encode request logs: {error}"))?;
+    fs::write(&path, data).map_err(|error| format!("Could not write {}: {error}", path.display()))
+}
+
+fn request_logs_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("request-logs.json"))
+        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+}
+
+fn request_log_summary(entries: &[RequestLogEntryState]) -> RequestLogSummaryState {
+    RequestLogSummaryState {
+        request_count: entries.len(),
+        duplicate_suspect_count: entries
+            .iter()
+            .filter(|entry| entry.is_duplicate_suspect)
+            .count(),
+        prompt_tokens: entries.iter().map(|entry| entry.prompt_tokens).sum(),
+        completion_tokens: entries.iter().map(|entry| entry.completion_tokens).sum(),
+        total_tokens: entries.iter().map(|entry| entry.total_tokens).sum(),
+    }
+}
+
 fn open_privacy_url(title: &str, url: &str) -> Result<ActionResult, String> {
-    Command::new("open")
-        .arg(url)
-        .spawn()
-        .map_err(|error| format!("Could not open System Settings: {error}"))?;
+    open_external_url(url).map_err(|error| format!("Could not open System Settings: {error}"))?;
     Ok(action_result(title, "System Settings opened.", true))
+}
+
+fn open_external_url(url: &str) -> std::io::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(url).spawn().map(|_| ())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", url])
+            .spawn()
+            .map(|_| ())
+    }
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        Command::new("xdg-open").arg(url).spawn().map(|_| ())
+    }
 }
 
 fn request_keyboard_prompt() -> Result<ActionResult, String> {

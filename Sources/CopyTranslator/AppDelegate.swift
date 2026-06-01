@@ -15,11 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pasteboardMonitor: PasteboardMonitor?
     private var screenshotHotKey: ScreenshotHotKey?
     private var keepAliveWindow: NSWindow?
-    private var tauriSettingsProcess: Process?
-    private var settingsWindowController: SettingsWindowController?
-    private var localModelSetupWindowController: LocalModelSetupWindowController?
-    private var requestLogWindowController: RequestLogWindowController?
-    private var permissionOverlayWindowController: PermissionOverlayWindowController?
+    private var tauriSurfaceProcesses: [String: Process] = [:]
     private var lastClipboardTriggerAt: Date?
     private var isUserQuitting = false
     private var hasStarted = false
@@ -57,19 +53,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showSettingsWindow()
         }
         if CommandLine.arguments.contains("--show-permission-helper") {
-            showPermissionOverlay()
+            showPermissionHelper()
         }
         if CommandLine.arguments.contains("--show-local-model-setup") {
-            showLocalModelSetupWindow()
+            showLocalModelSetup()
         }
         if CommandLine.arguments.contains("--show-request-logs") {
-            showRequestLogsWindow()
+            showRequestLogs()
         }
         if CommandLine.arguments.contains("--show-stacked-toasts") {
             showStackedTestToasts()
         }
         if !settingsStore.settings.hasCompletedLocalModelSelection {
-            showLocalModelSetupWindow()
+            showLocalModelSetup()
         }
     }
 
@@ -332,7 +328,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sourceTitle: String
     ) {
         toastManager.show(title: sourceTitle, message: "Translating...", settings: settingsStore.settings)
-        settingsWindowController?.updateLastResult("\(sourceTitle): Translating...")
         Task { [weak self] in
             guard let self else {
                 return
@@ -366,24 +361,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func show(result: TranslationResult, title: String, inputText: String, imageInfo: String?) {
         requestLogStore.add(source: title, input: inputText, result: result, imageInfo: imageInfo)
-        requestLogWindowController?.reload()
-        let resultSummary = if let description = result.description {
-            "\(title): \(result.text)\n\(description)"
-        } else {
-            "\(title): \(result.text)"
-        }
         toastManager.show(
             title: "\(title) · \(result.model)",
             message: result.text,
             description: result.description,
             settings: settingsStore.settings
         )
-        settingsWindowController?.updateLastResult(resultSummary)
     }
 
     @MainActor
     private func show(error: Error, title: String) {
-        settingsWindowController?.updateLastResult("\(title) Error: \(error.localizedDescription)")
         toastManager.show(
             title: "\(title) Error",
             message: error.localizedDescription,
@@ -433,59 +420,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
     }
 
-    @objc private func promptLocalHyMT2Backend() {
-        promptModel(
-            title: "Local Backend",
-            informativeText: "Enter the local backend script path. Leave the default empty to auto-detect the backend for the selected local model.",
-            currentValue: settingsStore.settings.localHyMT2BackendPath ?? ""
-        ) { [weak self] value in
-            self?.settingsStore.settings.localHyMT2BackendPath = value
-            self?.rebuildMenu()
-        }
-    }
-
-    @objc private func promptOpenRouterTextModel() {
-        promptModel(
-            title: "OpenRouter Text Model",
-            informativeText: "Enter an OpenRouter model id.",
-            currentValue: settingsStore.settings.openRouterTextModel
-        ) { [weak self] value in
-            self?.settingsStore.settings.openRouterTextModel = value
-            self?.rebuildMenu()
-        }
-    }
-
-    @objc private func promptOpenRouterVisionModel() {
-        promptModel(
-            title: "OpenRouter Vision Model",
-            informativeText: "Enter an OpenRouter multimodal model id.",
-            currentValue: settingsStore.settings.openRouterVisionModel
-        ) { [weak self] value in
-            self?.settingsStore.settings.openRouterVisionModel = value
-            self?.rebuildMenu()
-        }
-    }
-
-    @objc private func runTestTranslation() {
-        performTextTranslation("The quick brown fox jumps over the lazy dog.", sourceTitle: "Test")
-    }
-
     @objc private func showSettingsWindow() {
-        if !CommandLine.arguments.contains("--show-legacy-settings"),
-           openRenewedSettingsWindow() {
-            return
-        }
-
-        showLegacySettingsWindow()
+        _ = openTauriSurface("settings")
     }
 
-    private func openRenewedSettingsWindow() -> Bool {
-        if let process = tauriSettingsProcess {
+    private func openTauriSurface(_ surface: String) -> Bool {
+        if let process = tauriSurfaceProcesses[surface] {
             if process.isRunning {
                 activateRunningApplication(processIdentifier: process.processIdentifier)
                 return true
             }
-            tauriSettingsProcess = nil
+            tauriSurfaceProcesses[surface] = nil
         }
 
         guard let executableURL = resolveTauriSettingsExecutableURL() else {
@@ -494,6 +439,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let process = Process()
         process.executableURL = executableURL
+        if surface != "settings" {
+            process.arguments = ["--surface", surface]
+        }
         let workspaceRootURL = resolveWorkspaceRootURL()
         process.currentDirectoryURL = workspaceRootURL
 
@@ -504,8 +452,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         process.environment = environment
         process.terminationHandler = { [weak self] finishedProcess in
             Task { @MainActor in
-                if self?.tauriSettingsProcess === finishedProcess {
-                    self?.tauriSettingsProcess = nil
+                if self?.tauriSurfaceProcesses[surface] === finishedProcess {
+                    self?.tauriSurfaceProcesses[surface] = nil
                 }
             }
         }
@@ -515,13 +463,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             toastManager.show(
                 title: "Settings",
-                message: "Could not open renewed settings: \(error.localizedDescription)",
+                message: "Could not open Tauri \(surface): \(error.localizedDescription)",
                 settings: settingsStore.settings
             )
             return false
         }
 
-        tauriSettingsProcess = process
+        tauriSurfaceProcesses[surface] = process
         activateRunningApplication(processIdentifier: process.processIdentifier)
         return true
     }
@@ -592,68 +540,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showLegacySettingsWindow() {
-        if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController(
-                settingsStore: settingsStore,
-                onSettingsChanged: { [weak self] in
-                    self?.rebuildMenu()
-                },
-                onTestTranslation: { [weak self] in
-                    self?.runTestTranslation()
-                },
-                onStackedToasts: { [weak self] in
-                    self?.showStackedTestToasts()
-                },
-                onRequestLogs: { [weak self] in
-                    self?.showRequestLogsWindow()
-                },
-                onScreenshotTranslation: { [weak self] in
-                    self?.translateScreenshot()
-                },
-                onLocalModelSetup: { [weak self] in
-                    self?.showLocalModelSetupWindow()
-                },
-                onPermissionOverlayRequest: { [weak self] in
-                    self?.showPermissionOverlay()
-                }
-            )
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindowController?.showWindow(nil)
+    @objc private func showLocalModelSetup() {
+        _ = openTauriSurface("local-model-setup")
     }
 
-    @objc private func showLocalModelSetupWindow() {
-        if localModelSetupWindowController == nil {
-            localModelSetupWindowController = LocalModelSetupWindowController(
-                settingsStore: settingsStore,
-                credentialsProvider: credentialsProvider,
-                translationService: translationService,
-                onSettingsChanged: { [weak self] in
-                    self?.rebuildMenu()
-                }
-            )
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        localModelSetupWindowController?.showWindow(nil)
-    }
-
-    @objc private func showRequestLogsWindow() {
-        if requestLogWindowController == nil {
-            requestLogWindowController = RequestLogWindowController(logStore: requestLogStore)
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        requestLogWindowController?.showWindow(nil)
+    @objc private func showRequestLogs() {
+        _ = openTauriSurface("request-logs")
     }
 
     private func showStackedTestToasts() {
-        for index in 1...3 {
-            toastManager.show(
-                title: "Stack Test \(index)",
-                message: "This toast verifies stacked placement.",
-                settings: settingsStore.settings
-            )
-        }
+        _ = openTauriSurface("toast-stack")
     }
 
     @objc private func openInputMonitoringSettings() {
@@ -690,41 +586,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         reportKeyboardPermissionStatus(requestIfMissing: true)
     }
 
-    @objc private func showPermissionOverlay() {
-        if permissionOverlayWindowController == nil {
-            permissionOverlayWindowController = PermissionOverlayWindowController(
-                appURL: resolveAppBundleURL(),
-                openInputMonitoring: { [weak self] in
-                    self?.openInputMonitoringSettings()
-                },
-                openAccessibility: { [weak self] in
-                    self?.openAccessibilitySettings()
-                },
-                openScreenRecording: { [weak self] in
-                    self?.openScreenRecordingSettings()
-                },
-                requestKeyboardPrompt: { [weak self] in
-                    self?.requestKeyboardPermission()
-                }
-            )
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        permissionOverlayWindowController?.showWindow(nil)
-    }
-
-    private func resolveAppBundleURL() -> URL {
-        let bundleURL = Bundle.main.bundleURL
-        if bundleURL.pathExtension == "app" {
-            return bundleURL
-        }
-
-        let distURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("dist/CopyTranslator.app")
-        if FileManager.default.fileExists(atPath: distURL.path) {
-            return distURL
-        }
-
-        return bundleURL
+    @objc private func showPermissionHelper() {
+        _ = openTauriSurface("permission-helper")
     }
 
     private func reportKeyboardPermissionStatus(requestIfMissing: Bool) {
@@ -756,35 +619,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quit() {
         isUserQuitting = true
         NSApp.terminate(nil)
-    }
-
-    private func promptModel(
-        title: String,
-        informativeText: String,
-        currentValue: String,
-        onSave: @escaping (String) -> Void
-    ) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = informativeText
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-
-        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
-        input.stringValue = currentValue
-        alert.accessoryView = input
-
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return
-        }
-
-        let value = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else {
-            return
-        }
-
-        onSave(value)
     }
 
     private func disabledTitle(_ title: String) -> NSMenuItem {

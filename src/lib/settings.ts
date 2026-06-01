@@ -19,9 +19,12 @@ export type Settings = {
   customLocalModelsPath: string | null;
   openRouterTextModel: string;
   openRouterVisionModel: string;
+  includeScreenContextForLLM: boolean;
   sourceLanguage: string;
   targetLanguage: string;
+  hasCompletedLocalModelSelection: boolean;
   toastPosition: ToastPosition;
+  toastDuration: number;
 };
 
 export type SettingOption = {
@@ -66,9 +69,12 @@ export const fallbackState: SettingsState = {
     customLocalModelsPath: null,
     openRouterTextModel: "google/gemini-2.5-flash-lite",
     openRouterVisionModel: "google/gemini-2.5-flash-lite",
+    includeScreenContextForLLM: false,
     sourceLanguage: "Auto",
     targetLanguage: "Korean",
-    toastPosition: "bottomRight"
+    hasCompletedLocalModelSelection: false,
+    toastPosition: "bottomRight",
+    toastDuration: 6
   },
   defaults: {
     provider: "localHyMT2",
@@ -77,9 +83,12 @@ export const fallbackState: SettingsState = {
     customLocalModelsPath: null,
     openRouterTextModel: "google/gemini-2.5-flash-lite",
     openRouterVisionModel: "google/gemini-2.5-flash-lite",
+    includeScreenContextForLLM: false,
     sourceLanguage: "Auto",
     targetLanguage: "Korean",
-    toastPosition: "bottomRight"
+    hasCompletedLocalModelSelection: false,
+    toastPosition: "bottomRight",
+    toastDuration: 6
   },
   overrides: {
     provider: false,
@@ -148,3 +157,39 @@ export const fallbackState: SettingsState = {
 export function cloneFallbackState(): SettingsState {
   return structuredClone(fallbackState);
 }
+
+export type RequestLogEntry = {
+  id: string;
+  timestamp: string;
+  source: string;
+  providerTitle: string;
+  model: string;
+  inputPreview: string;
+  outputPreview: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  usageSource: string;
+  isDuplicateSuspect: boolean;
+  imageInfo: string | null;
+  fingerprint: string;
+};
+
+export type RequestLogSummary = {
+  requestCount: number;
+  duplicateSuspectCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+};
+
+export type RequestLogsState = {
+  entries: RequestLogEntry[];
+  summary: RequestLogSummary;
+  storagePath: string;
+};
+
+export type BenchmarkResult = {
+  output: string;
+  ok: boolean;
+};

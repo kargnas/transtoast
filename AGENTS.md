@@ -6,15 +6,16 @@ CopyTranslator is a macOS menu-bar translator. Keep the app native-feeling, fast
 
 ## Project Shape
 
-- SwiftPM app remains the production shell until the Tauri shell fully replaces it.
+- SwiftPM app remains the macOS menu-bar shell until the Tauri shell fully replaces it.
 - Bundle identifier must stay `as.kargn.copy-translator`.
 - macOS target: macOS 15+, Swift 6.2 tools.
+- Tauri surfaces are the product UI layer. Do not add new AppKit auxiliary windows.
 - Keep secrets out of Git. Never commit `.env.local`, token caches, or credential-bearing logs.
 
 ## Layout
 
 - `Sources/CopyTranslatorCore/`: platform-light translation logic, settings defaults, model registry, language handling.
-- `Sources/CopyTranslator/`: current AppKit shell, menu bar app, monitors, settings, permissions, request logs.
+- `Sources/CopyTranslator/`: macOS shell, menu bar app, monitors, and platform adapters.
 - `Tests/CopyTranslatorTests/`: Swift tests.
 - `scripts/`: build/install/package helpers and local model runtimes.
 - `src/`: Svelte settings UI for the Tauri migration.
@@ -65,6 +66,17 @@ The settings UI must cover current AppKit behavior before adding new behavior:
 
 Do not edit credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/copy-translator/.env`.
 
+## Platform And Surface Rules
+
+- Treat Tauri/Rust/Svelte as the shared UI architecture for macOS and future Windows support.
+- Define every app window as a named Tauri surface with stable label, route, title, size, and behavior. Keep this registry in Rust so macOS and Windows use the same contract.
+- Keep app state in shared app-data JSON files with code-default plus override semantics. Swift shell code may read/write that shared state, but should not introduce a second settings source such as a new `UserDefaults` key.
+- Use platform adapters only for OS capabilities: global keyboard monitoring, screenshot capture, privacy/settings URLs, app activation, packaging, and shell integration.
+- For cross-platform actions, route through small Rust helpers that branch on `target_os` instead of embedding macOS-only command strings in Svelte.
+- Do not create or resurrect AppKit helper windows for settings, local model setup, request logs, permission helper, or diagnostics previews. These belong in Tauri surfaces.
+- If a capability is macOS-only today, expose it through the shared Tauri action/status contract and return an explicit unsupported state on Windows until the Windows adapter exists.
+- Keep visual styling platform-neutral except where native chrome owns it. Window title bars, shadows, privacy panes, and OS prompts are platform-owned.
+
 ## Design Rules
 
 - Before building or restructuring a screen, create a visual mockup with Codex image generation.
@@ -81,7 +93,7 @@ Do not edit credentials in the settings UI. `CredentialsProvider` owns `.env.loc
 
 ## Layout Rules
 
-- AppKit screens use `NSStackView` + Auto Layout. Avoid hardcoded frames except initial window rects.
+- Swift/AppKit code should stay shell-level. Do not build new settings or diagnostic screens there.
 - Tauri/Svelte screens use stable grid/flex dimensions. Text must not overflow controls at minimum window size.
 - Keep labels and controls scannable in two-column grouped rows.
 - Keep minimum settings window size large enough to show controls without clipping.
