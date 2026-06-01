@@ -68,14 +68,16 @@ Development builds are signed with a stable local Apple Development identity whe
 ## Run
 
 ```sh
-swift run CopyTranslator
+./scripts/run-dev.zsh
 ```
 
 Use the menu-bar icon to open options, request logs, provider/model selectors, permission helpers, and Quit. For local UI verification, you can launch the settings window directly:
 
 ```sh
-open dist/CopyTranslator.app --args --show-settings
+./scripts/run-dev.zsh --show-settings
 ```
+
+Development app runs intentionally use the signed `dist/CopyTranslator.app` bundle. This keeps Screen Recording, Accessibility, and Input Monitoring permissions tied to the stable `as.kargn.copy-translator` bundle id instead of SwiftPM's ad-hoc debug executable identity.
 
 To build and install the app on this Mac:
 
@@ -85,25 +87,32 @@ To build and install the app on this Mac:
 
 For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
 
-When **Text Provider** is **OpenRouter LLM**, Copy Translator automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local Hy-MT2 translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
+When **Text Provider** is **OpenRouter LLM**, Copy Translator automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
 
-Open **Request Logs...** from the menu-bar icon to inspect recent translation requests. The log keeps the last 200 requests and shows whether token usage came from the provider response or an app-side estimate. OpenRouter requests report provider token usage when the response includes it; local Hy-MT2 requests use an estimate.
+Open **Request Logs...** from the menu-bar icon to inspect recent translation requests. The log keeps the last 200 requests and shows whether token usage came from the provider response or an app-side estimate. OpenRouter requests report provider token usage when the response includes it; local model requests use an estimate.
 
 ## Local Model Backend
 
-The app calls a bundled copy of this local backend:
+The default local model is `hymt2-mlx-1.8b-4bit`, which calls:
+
+```sh
+uv run scripts/runtimes/mlx_lm_translate.py
+```
+
+Legacy Hy-MT2 Transformers models still use:
 
 ```sh
 uv run scripts/hy_mt2_translate.py
 ```
 
-The backend accepts JSON on standard input:
+All local backends accept JSON on standard input:
 
 ```json
 {
-  "text": "今天天气真好。",
-  "target_language": "English",
-  "model_id": "tencent/Hy-MT2-1.8B"
+  "text": "The deployment failed.",
+  "source_language": "English",
+  "target_language": "Korean",
+  "model_id": "mlx-community/Hy-MT2-1.8B-4bit"
 }
 ```
 
@@ -111,9 +120,13 @@ It prints:
 
 ```json
 {
-  "translation": "The weather is really nice today."
+  "translation": "배포가 실패했습니다."
 }
 ```
+
+See [docs/local-runtimes.md](docs/local-runtimes.md) for custom model JSON and backend protocol details.
+
+On first launch, **Local Model Setup** opens with a benchmark-based comparison table before it asks the user to run any fresh test. The table summarizes the models already tested on this project, including recommended, supported, heavy, planned-adapter, fragile-dependency, runtime-issue, and rejected candidates.
 
 ## Verification
 
@@ -121,12 +134,13 @@ Useful checks:
 
 ```sh
 swift build
-printf '{"text":"Hello world","target_language":"Korean","model_id":"tencent/Hy-MT2-1.8B"}' | uv run scripts/hy_mt2_translate.py
+printf '{"text":"Hello world","source_language":"English","target_language":"Korean","model_id":"mlx-community/Hy-MT2-1.8B-4bit"}' | uv run scripts/runtimes/mlx_lm_translate.py
 ./scripts/build-app.zsh
 ./scripts/install-app.zsh --install-dir "$HOME/Applications"
 ./scripts/package-app.zsh
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world"
-dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --hy-mt2-model tencent/Hy-MT2-1.8B
+dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --local-model hymt2-mlx-1.8b-4bit
+dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --list-local-models
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --provider openrouter
 dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --screenshot-once
 node scripts/openrouter_prompt_probe.mjs --capture

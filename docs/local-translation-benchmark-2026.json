@@ -1,0 +1,516 @@
+{
+  "created_at_utc": "2026-05-31T18:26:49Z",
+  "host": {
+    "os": "macOS",
+    "note": "Measured locally from /Users/kargnas/projects/copy-translator with uv-managed Python environments."
+  },
+  "task": {
+    "source_language": "English",
+    "target_language": "Korean",
+    "inputs": [
+      "The deployment failed because the database URL was missing.",
+      "Please summarize the release notes before the meeting.",
+      "twice"
+    ],
+    "quality_method": "Manual sanity check for adequacy, Korean fluency, and exact short-term handling."
+  },
+  "candidate_families_seen_2026": [
+    {
+      "family": "Hy-MT1.5",
+      "examples": [
+        "tencent/HY-MT1.5-1.8B",
+        "tencent/Hy-MT1.5-1.8B-2bit",
+        "mlx-community/HY-MT1.5-1.8B-4bit",
+        "AngelSlim/Hy-MT1.5-1.8B-1.25bit-GGUF"
+      ],
+      "reason": "2026 multilingual MT family with quantized, GGUF, ONNX, and MLX exports. Tested MLX 4-bit representative."
+    },
+    {
+      "family": "Hy-MT2",
+      "examples": [
+        "mlx-community/Hy-MT2-1.8B-4bit",
+        "unsloth/Hy-MT2-1.8B-GGUF",
+        "mradermacher/Hy-MT2-1.8B-GGUF",
+        "unsloth/Hy-MT2-7B-GGUF"
+      ],
+      "reason": "2026 Tencent MT2 family. Tested both MLX 4-bit and GGUF IQ4_XS representatives; skipped 7B as same family and heavier."
+    },
+    {
+      "family": "LFM2 Korean-English MT",
+      "examples": [
+        "gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF",
+        "gyunggyung/LFM2-KoEn-Tuning"
+      ],
+      "reason": "GitHub project created 2026-01-03 with 1.2B Korean-English GGUF artifacts. Tested Q4_K_M representative."
+    },
+    {
+      "family": "NLLB quantized exports",
+      "examples": [
+        "Timteamteem/CTranslate2-nllb-200-int8",
+        "lopatnov/nllb-200-distilled-600M-onnx",
+        "lopatnov/nllb-200-1.3B-onnx"
+      ],
+      "reason": "2026 local CPU export family. Tested CTranslate2 int8 representative."
+    },
+    {
+      "family": "QuickMT CTranslate2 en-ko",
+      "examples": [
+        "quickmt/quickmt-en-ko"
+      ],
+      "reason": "2026 English-to-Korean CTranslate2/SentencePiece model with 185M parameters. Tested direct CTranslate2 path."
+    },
+    {
+      "family": "TranslateGemma",
+      "examples": [
+        "google/translategemma-4b-it derivatives",
+        "mlx-community/translategemma-4b-it-4bit_immersive-translate",
+        "zanish-labs/translategemma-4b-it-Q2_K-gguf",
+        "aoiandroid/translategemma-4b-coreml-palettized"
+      ],
+      "reason": "2026 Google translation model family. Tested MLX 4-bit representative; heavier and worse short-term handling than Hy-MT2."
+    },
+    {
+      "family": "Gemma/Kanana Korean-English LoRA",
+      "examples": [
+        "harveykim/gemma-3-1b-aihub-ko-en-lora",
+        "harveykim/kanana-1.5-2.1b-aihub-ko-en-lora"
+      ],
+      "reason": "2026 ko/en on-device LoRA family. Gemma tested and rejected; Kanana failed to load with current Transformers validation."
+    },
+    {
+      "family": "MADLAD400 local exports",
+      "examples": [
+        "aufklarer/MADLAD400-3B-MT-MLX",
+        "tonythethompson/madlad400-3b-mt-onnx"
+      ],
+      "reason": "2026 ONNX/MLX export family. Tested MLX int4 with mlx-lm; failed because this port needs a custom MADLAD runtime rather than generic mlx-lm."
+    },
+    {
+      "family": "Marian/OPUS 2026 fine-tunes and ONNX/CT2 exports",
+      "examples": [
+        "R4kSo1997/opus-mt-en-ko-onnx-int8",
+        "ooeoeo/opus-mt-tc-big-en-ko-ct2-float16",
+        "WindstormLabs/translate-tc-big-en-ko",
+        "WindstormLabs/origin-Helsinki-NLP-opus-mt-tc-big-en-ko"
+      ],
+      "reason": "Small bilingual models and 2026 repackaged/fine-tuned variants. Tested multiple en-ko CT2/ONNX representatives; outputs were unusable except QuickMT, tracked separately."
+    },
+    {
+      "family": "ACGN/specialized translation projects",
+      "examples": [
+        "soundstarrain/Murasaki-project"
+      ],
+      "reason": "2026 GitHub project for ACGN translation. Not tested for CopyTranslator default because it is domain-specific, not a light general English-to-Korean local model."
+    },
+    {
+      "family": "Large/older GGUF translation models updated in 2026",
+      "examples": [
+        "tensorblock/nayohan_llama3-8b-it-translation-sharegpt-en-ko-GGUF",
+        "tensorblock/kwoncho_Llama-3.2-3B-KO-EN-Translation-GGUF",
+        "TARARARAK/gpt-oss-20b-finetuned-korean-translation_*"
+      ],
+      "reason": "Seen in HF search, but created before 2026 or much heavier (3B/8B/20B) and not lighter than tested Hy-MT2/LFM2 representatives; KO-EN-only variants do not match default English-to-Korean target."
+    },
+    {
+      "family": "GitHub notebooks/evaluation repos without app-ready weights",
+      "examples": [
+        "songhahyun/seq2seq-transformer",
+        "estincelle/Translator_models_experiments_english--korean",
+        "minovermax/ko-entity-fidelity"
+      ],
+      "reason": "Found in 2026 GitHub search. They are training/evaluation notebooks or analysis repos, not downloadable light local model artifacts for CopyTranslator."
+    }
+  ],
+  "results": [
+    {
+      "model": "Timteamteem/CTranslate2-nllb-200-int8",
+      "family": "NLLB CTranslate2 int8",
+      "runtime": "ctranslate2 cpu int8",
+      "download_seconds_first_run": 65.95,
+      "load_seconds": 0.74,
+      "peak_rss_mb": 1554.1,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "배포는 데이터베이스 URL가 없어서 실패했습니다.",
+          "seconds": 0.21
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 발표 메모를 요약해 주세요.",
+          "seconds": 0.166
+        },
+        {
+          "input": "twice",
+          "output": "두 번",
+          "seconds": 0.055
+        }
+      ],
+      "quality": "medium",
+      "verdict": "Very fast and light enough after download, but Korean wording is slightly awkward. Good fallback candidate."
+    },
+    {
+      "model": "mlx-community/HY-MT1.5-1.8B-4bit",
+      "family": "Hy-MT1.5 MLX 4bit",
+      "runtime": "mlx-lm apple silicon",
+      "download_seconds_first_run": 102.93,
+      "load_seconds": 102.93,
+      "peak_rss_mb": 1867.0,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "배포가 실패된 이유는 데이터베이스 URL이 누락되었기 때문입니다.",
+          "seconds": 0.677
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 발표된 공개 노트를 요약해 주세요.",
+          "seconds": 0.138
+        },
+        {
+          "input": "twice",
+          "output": "두 번",
+          "seconds": 0.083
+        }
+      ],
+      "quality": "medium_high",
+      "verdict": "Best first-run candidate so far for this app: fast generation, acceptable memory, Korean more natural than NLLB. Need warm-load retest before integration."
+    },
+    {
+      "model": "mlx-community/Hy-MT2-1.8B-4bit",
+      "family": "Hy-MT2 MLX 4bit",
+      "runtime": "mlx-lm apple silicon",
+      "download_seconds_first_run": 97.93,
+      "load_seconds": 97.93,
+      "peak_rss_mb": 2382.5,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.329
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 릴리스 노트를 요약해 주세요.",
+          "seconds": 0.135
+        },
+        {
+          "input": "twice",
+          "output": "두 번",
+          "seconds": 0.078
+        }
+      ],
+      "quality": "high",
+      "verdict": "Best quality so far. Slightly higher memory than Hy-MT1.5/NLLB but still local-friendly under 2.4 GB RSS; very fast after load."
+    },
+    {
+      "model": "mlx-community/translategemma-4b-it-4bit_immersive-translate",
+      "family": "TranslateGemma 4B MLX 4bit",
+      "runtime": "mlx-lm apple silicon",
+      "download_seconds_first_run": 202.1,
+      "load_seconds": 202.1,
+      "peak_rss_mb": 5150.6,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "배포가 실패한 이유는 데이터베이스 URL이 누락되었기 때문입니다.",
+          "seconds": 0.747
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 릴리스 노트 내용을 요약해주세요.",
+          "seconds": 0.276
+        },
+        {
+          "input": "twice",
+          "output": "트와이스",
+          "seconds": 0.187
+        }
+      ],
+      "quality": "medium",
+      "verdict": "Reject for this app. Good sentence translations but 5.15 GB RSS and wrong short-word translation."
+    },
+    {
+      "model": "ooeoeo/opus-mt-tc-big-en-ko-ct2-float16",
+      "family": "OPUS/Marian CTranslate2 en-ko",
+      "runtime": "ctranslate2 cpu",
+      "download_seconds_first_run": 52.69,
+      "load_seconds": 0.25,
+      "peak_rss_mb": 1617.8,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "프로세스、403 well2.8:46ther。",
+          "seconds": 0.054
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "잘 오염 물질  잘 해충.",
+          "seconds": 0.053
+        },
+        {
+          "input": "twice",
+          "output": "킹",
+          "seconds": 0.027
+        }
+      ],
+      "quality": "fail",
+      "verdict": "Reject. Extremely fast but output is unusable; likely tokenizer/export mismatch or bad conversion."
+    },
+    {
+      "model": "R4kSo1997/opus-mt-en-ko-onnx-int8",
+      "family": "OPUS/Marian ONNX int8 en-ko",
+      "runtime": "onnxruntime int8",
+      "load_seconds": 75.52,
+      "peak_rss_mb": 1308.1,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "프로세스、403 well2.8:46ther。",
+          "seconds": 0.035
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "잘 오염 물질  잘 해충.",
+          "seconds": 0.042
+        },
+        {
+          "input": "twice",
+          "output": "킹",
+          "seconds": 0.023
+        }
+      ],
+      "quality": "fail",
+      "verdict": "Reject. Lowest memory among tested export models, but output is unusable."
+    },
+    {
+      "model": "harveykim/gemma-3-1b-aihub-ko-en-lora",
+      "family": "Gemma 3 1B Korean-English LoRA",
+      "runtime": "transformers + peft",
+      "load_seconds": 194.39,
+      "peak_rss_mb": 2572.7,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "출력은 한국어만으로 출력되었습니다.",
+          "seconds": 4.908
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "출력은 회의 전에 발표 자료를 요약해주세요.",
+          "seconds": 0.534
+        },
+        {
+          "input": "twice",
+          "output": "한국어만 출력해주세요.",
+          "seconds": 0.849
+        }
+      ],
+      "quality": "fail",
+      "verdict": "Reject. Prompt-following failure and high load time/memory for the quality."
+    },
+    {
+      "model": "harveykim/kanana-1.5-2.1b-aihub-ko-en-lora",
+      "family": "Kanana 2.1B Korean-English LoRA",
+      "runtime": "transformers + peft",
+      "load_error": "StrictDataclassClassValidationError: hidden size 1792 is not a multiple of attention heads 24",
+      "quality": "medium_high_with_caveats",
+      "verdict": "Retry succeeded with pinned dependency matrix and raw Instruction/Input/Response prompt. Not default-worthy: CC-BY-NC adapter, fragile runtime pins, and over-translation on isolated short word.",
+      "retry_status": "runs_with_transformers_4_46_3_peft_0_19_1_raw_instruction",
+      "retry_reference": "docs/local-translation-retry-2026.json",
+      "load_seconds": 28.34,
+      "peak_rss_mb": 813.9,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 1.67
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 출시 노트를 요약해 주세요.",
+          "seconds": 0.4
+        },
+        {
+          "input": "twice",
+          "output": "두 번이나 그랬어요.",
+          "seconds": 0.618
+        }
+      ]
+    },
+    {
+      "model": "mlx-community/Hy-MT2-1.8B-4bit",
+      "family": "Hy-MT2 MLX 4bit warm cache",
+      "runtime": "mlx-lm apple silicon",
+      "load_seconds": 0.75,
+      "peak_rss_mb": 1508.2,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.171
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 릴리스 노트를 요약해 주세요.",
+          "seconds": 0.134
+        },
+        {
+          "input": "twice",
+          "output": "두 번",
+          "seconds": 0.079
+        }
+      ],
+      "quality": "high",
+      "verdict": "Warm-cache retest. Same quality as first run, lower RSS than cold download run, fastest high-quality local candidate."
+    },
+    {
+      "model": "unsloth/Hy-MT2-1.8B-GGUF/Hy-MT2-1.8B-IQ4_XS.gguf",
+      "family": "Hy-MT2 GGUF IQ4_XS",
+      "runtime": "llama.cpp cpu",
+      "download_seconds_first_run": 103.34,
+      "load_seconds": 0.18,
+      "peak_rss_mb": 1413.6,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.609
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 릴리스 노트를 요약해 주세요.",
+          "seconds": 0.557
+        },
+        {
+          "input": "twice",
+          "output": "두 번",
+          "seconds": 0.083
+        }
+      ],
+      "quality": "high",
+      "verdict": "Very good llama.cpp option: lower memory than MLX first run, correct outputs, but sentence inference slower than MLX warm run."
+    },
+    {
+      "model": "gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF/lfm2-1.2b-koen-mt-v8-rl-10k-merged-Q4_K_M.gguf",
+      "family": "LFM2-KoEn GGUF Q4_K_M",
+      "runtime": "llama.cpp cpu",
+      "download_seconds_first_run": 77.11,
+      "load_seconds": 0.32,
+      "peak_rss_mb": 1566.3,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.201
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 릴리스 노트를 요약해 주십시오.",
+          "seconds": 0.183
+        },
+        {
+          "input": "twice",
+          "output": "두 번",
+          "seconds": 0.07
+        }
+      ],
+      "quality": "high",
+      "verdict": "Strong 2026 GitHub/HF candidate. Fast, correct on samples, modest memory. License is LFM Open License rather than Apache/CC, so integration needs license review."
+    },
+    {
+      "model": "quickmt/quickmt-en-ko",
+      "family": "QuickMT CTranslate2 en-ko",
+      "runtime": "quickmt ctranslate2 cpu",
+      "download_seconds_first_run": 37.04,
+      "load_seconds": 0.16,
+      "peak_rss_mb": 1243.4,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.032
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 릴리스 정보를 요약하십시오.",
+          "seconds": 0.026
+        },
+        {
+          "input": "twice",
+          "output": "두번 째",
+          "seconds": 0.022
+        }
+      ],
+      "quality": "medium_high",
+      "verdict": "Fastest and lowest-memory viable model, but short isolated word handling failed. Good fallback only if short-text handling is fixed or routed elsewhere."
+    },
+    {
+      "model": "WindstormLabs/translate-tc-big-en-ko/lora-ct2-int8",
+      "family": "Windstorm/WindyWord OPUS-MT CTranslate2 int8 en-ko",
+      "runtime": "ctranslate2 cpu int8",
+      "download_seconds_first_run": 86.85,
+      "load_seconds": 0.09,
+      "peak_rss_mb": 764.1,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "프로세스、403 well2.8:46ther。",
+          "seconds": 0.05
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "잘 오염 물질  잘 해충.",
+          "seconds": 0.049
+        },
+        {
+          "input": "twice",
+          "output": "킹",
+          "seconds": 0.018
+        }
+      ],
+      "quality": "fail",
+      "verdict": "Reject. 2026 packaged CT2 int8 variant reproduces the same unusable OPUS output as other OPUS exports."
+    },
+    {
+      "model": "aufklarer/MADLAD400-3B-MT-MLX/int4",
+      "family": "MADLAD400 3B MLX int4",
+      "runtime": "mlx-lm attempted",
+      "download_seconds_first_run": 176.0,
+      "peak_rss_mb": 1528.0,
+      "load_error": "MLX error: Failed to load the default metallib. library not found",
+      "quality": "not_run",
+      "verdict": "Generic mlx-lm was the wrong runtime. Official soniqo/speech-swift CLI built, but failed at MLX Swift metallib load on this host; keep deferred.",
+      "retry_status": "official_swift_runtime_build_succeeded_then_mlx_metallib_runtime_failed",
+      "retry_reference": "docs/local-translation-retry-2026.json"
+    }
+  ],
+  "current_recommendation": {
+    "model": "mlx-community/Hy-MT2-1.8B-4bit",
+    "reason": "Best quality/speed balance after warm-cache retest: load 0.75s, peak RSS about 1.5 GB, and all sample translations correct.",
+    "alternatives": [
+      "gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF Q4_K_M is also strong but needs license review.",
+      "unsloth/Hy-MT2-1.8B-GGUF IQ4_XS is a good llama.cpp route but slower than MLX on sentence samples.",
+      "quickmt/quickmt-en-ko is fastest/lightest but failed the isolated short-word test."
+    ],
+    "caveat": "Search is grouped by distinct model/runtime families to avoid duplicate variants. New 2026 uploads can appear after this run and should be re-queried before a release decision."
+  },
+  "updated_at_utc": "2026-05-31T18:55:00Z",
+  "sources_checked": [
+    "https://huggingface.co/api/models?search=translation%20korean&sort=lastModified&direction=-1&limit=50",
+    "https://huggingface.co/quickmt/quickmt-en-ko",
+    "https://huggingface.co/aufklarer/MADLAD400-3B-MT-MLX",
+    "https://huggingface.co/unsloth/Hy-MT2-1.8B-GGUF",
+    "https://huggingface.co/gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF",
+    "https://github.com/gyunggyung/LFM2-KoEn-Tuning",
+    "https://huggingface.co/WindstormLabs/translate-tc-big-en-ko",
+    "https://huggingface.co/tonythethompson/madlad400-3b-mt-onnx",
+    "https://github.com/soundstarrain/Murasaki-project",
+    "https://huggingface.co/api/models?search=en-ko%20translation&sort=lastModified&direction=-1&limit=20",
+    "https://huggingface.co/api/models?search=ko-en%20translation&sort=lastModified&direction=-1&limit=20",
+    "https://huggingface.co/api/models?search=Hy-MT2&sort=lastModified&direction=-1&limit=20",
+    "https://api.github.com/search/repositories?q=translation+korean+model+created:%3E2025-01-01",
+    "https://api.github.com/search/repositories?q=en-ko+translation+model+created:%3E2025-01-01",
+    "https://api.github.com/search/repositories?q=ko-en+translation+model+created:%3E2025-01-01"
+  ]
+}

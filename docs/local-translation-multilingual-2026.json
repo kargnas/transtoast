@@ -1,0 +1,615 @@
+{
+  "created_at_utc": "2026-06-01T01:41:09Z",
+  "purpose": "Expanded local translation tests across languages, text types, and lengths.",
+  "language_pairs_covered": [
+    "Arabic->Korean",
+    "Chinese->Korean",
+    "English->Chinese",
+    "English->Japanese",
+    "English->Korean",
+    "English->Spanish",
+    "French->Korean",
+    "Indonesian->Korean",
+    "Japanese->Korean",
+    "Korean->English",
+    "Spanish->Korean"
+  ],
+  "lengths_covered": [
+    "long",
+    "medium",
+    "sentence",
+    "short_ui",
+    "technical",
+    "word"
+  ],
+  "runs": [
+    {
+      "case": "hymt2-mlx",
+      "model": "mlx-community/Hy-MT2-1.8B-4bit",
+      "runtime": "mlx-lm",
+      "load_seconds": 1.09,
+      "results": [
+        {
+          "id": "en_word",
+          "length": "word",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 5,
+          "input": "twice",
+          "translation": "두 번",
+          "seconds": 0.331
+        },
+        {
+          "id": "en_ui_short",
+          "length": "short_ui",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 14,
+          "input": "Retry download",
+          "translation": "다시 다운로드 시도",
+          "seconds": 0.127
+        },
+        {
+          "id": "en_technical_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 59,
+          "input": "The deployment failed because the database URL was missing.",
+          "translation": "배포가 실패했습니다. 왜냐하면 데이터베이스 URL이 누락되었기 때문입니다.",
+          "seconds": 0.2
+        },
+        {
+          "id": "en_code_log",
+          "length": "technical",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 94,
+          "input": "Set DATABASE_URL before running `swift test`; otherwise the migration step exits with code 78.",
+          "translation": "`swift test`를 실행하기 전에 DATABASE_URL을 설정하세요; 그렇지 않으면 마이그레이션 단계가 78번 코드로 종료됩니다.",
+          "seconds": 0.256
+        },
+        {
+          "id": "en_medium_release",
+          "length": "medium",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 117,
+          "input": "Please summarize the release notes before the meeting, and call out any breaking changes that affect the desktop app.",
+          "translation": "회의 전에 릴리스 노트를 요약해 주시고, 데스크톱 앱에 영향을 미치는任何 중대한 변경 사항을 지적해 주세요.",
+          "seconds": 0.275
+        },
+        {
+          "id": "en_long_product",
+          "length": "long",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 332,
+          "input": "The new offline mode keeps a local cache of recent translations so users can keep working while the network is unstable. When connectivity returns, the app syncs usage metadata without uploading the original copied text. Administrators can disable the cache from the settings file, and the change takes effect after the next launch.",
+          "translation": "새로운 오프라인 모드는 네트워크가 불안정한 상태에서도 사용자가 작업을 계속할 수 있도록 최근 번역본의 로컬 캐시를 유지합니다. 연결이 복구되면 앱은 원본 복사본을 업로드하지 않고 사용 메타데이터를 동기화합니다. 관리자들은 설정 파일에서 캐시를 비활성화할 수 있으며, 이 변경은 다음 실행 후에 효력이 발생합니다.",
+          "seconds": 0.566
+        },
+        {
+          "id": "ja_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Japanese",
+          "target_language": "Korean",
+          "input_chars": 28,
+          "input": "ネットワークが不安定なため、翻訳を一時的に保存しました。",
+          "translation": "네트워크가 불안정하기 때문에, 번역을 일시적으로 저장했습니다.",
+          "seconds": 0.176
+        },
+        {
+          "id": "zh_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Chinese",
+          "target_language": "Korean",
+          "input_chars": 19,
+          "input": "由于数据库地址缺失，部署流程已经停止。",
+          "translation": "데이터베이스 주소가 누락되어 배포 프로세스가 중단되었습니다.",
+          "seconds": 0.18
+        },
+        {
+          "id": "es_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Spanish",
+          "target_language": "Korean",
+          "input_chars": 63,
+          "input": "Guarda los cambios antes de cerrar la ventana de configuración.",
+          "translation": "설정 창을 닫기 전에 변경 사항을 저장하세요.",
+          "seconds": 0.165
+        },
+        {
+          "id": "fr_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "French",
+          "target_language": "Korean",
+          "input_chars": 75,
+          "input": "Le raccourci clavier ne fonctionne que lorsque l'application est autorisée.",
+          "translation": "키보드 단축키는 앱이 허가된 경우에만 작동합니다.",
+          "seconds": 0.168
+        },
+        {
+          "id": "id_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Indonesian",
+          "target_language": "Korean",
+          "input_chars": 62,
+          "input": "Pengguna dapat mengubah bahasa target dari jendela pengaturan.",
+          "translation": "사용자는 설정 창에서 대상 언어를 변경할 수 있습니다.",
+          "seconds": 0.163
+        },
+        {
+          "id": "ar_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Arabic",
+          "target_language": "Korean",
+          "input_chars": 41,
+          "input": "تعذر حفظ الملف لأن مساحة القرص غير كافية.",
+          "translation": "파일을 저장할 수 없으나 디스크 공간이 충분하지 않기 때문입니다.",
+          "seconds": 0.186
+        },
+        {
+          "id": "ko_to_en_sentence",
+          "length": "sentence",
+          "source_language": "Korean",
+          "target_language": "English",
+          "input_chars": 30,
+          "input": "네트워크가 불안정해서 번역 결과를 임시로 저장했습니다.",
+          "translation": "Due to unstable network, the translation results were temporarily saved.",
+          "seconds": 0.139
+        },
+        {
+          "id": "ko_to_en_long",
+          "length": "long",
+          "source_language": "Korean",
+          "target_language": "English",
+          "input_chars": 122,
+          "input": "새로운 오프라인 모드는 최근 번역 기록을 로컬 캐시에 저장해서 네트워크가 불안정한 상황에서도 사용자가 작업을 계속할 수 있게 합니다. 연결이 복구되면 앱은 원문 텍스트를 업로드하지 않고 사용량 메타데이터만 동기화합니다.",
+          "translation": "The new offline mode saves recent translation records to the local cache, allowing users to continue working even in unstable network conditions. Once the connection is restored, the app syncs only the usage metadata without uploading the original text.",
+          "seconds": 0.293
+        },
+        {
+          "id": "en_to_ja_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Japanese",
+          "input_chars": 66,
+          "input": "The shortcut only works after accessibility permission is granted.",
+          "translation": "ショートカットはアクセシビリティの許可が与えられた後にのみ機能します。",
+          "seconds": 0.189
+        },
+        {
+          "id": "en_to_zh_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Chinese",
+          "input_chars": 66,
+          "input": "The shortcut only works after accessibility permission is granted.",
+          "translation": "该快捷方式只有在获得访问权限后才会生效。",
+          "seconds": 0.132
+        },
+        {
+          "id": "en_to_es_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Spanish",
+          "input_chars": 66,
+          "input": "The shortcut only works after accessibility permission is granted.",
+          "translation": "La acción rápida solo funciona después de obtener la autorización de accesibilidad.",
+          "seconds": 0.179
+        }
+      ],
+      "peak_rss_mb": 1308.1,
+      "sample_count": 17,
+      "created_at_utc": "2026-06-01T01:40:00Z"
+    },
+    {
+      "case": "nllb-ct2",
+      "model": "Timteamteem/CTranslate2-nllb-200-int8",
+      "runtime": "ctranslate2-cpu-int8",
+      "download_seconds": 0.39,
+      "load_seconds": 0.72,
+      "results": [
+        {
+          "id": "en_word",
+          "length": "word",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 5,
+          "input": "twice",
+          "translation": "두 번",
+          "seconds": 0.074
+        },
+        {
+          "id": "en_ui_short",
+          "length": "short_ui",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 14,
+          "input": "Retry download",
+          "translation": "다시 다운로드 시도",
+          "seconds": 0.074
+        },
+        {
+          "id": "en_technical_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 59,
+          "input": "The deployment failed because the database URL was missing.",
+          "translation": "배포는 데이터베이스 URL가 없어서 실패했습니다.",
+          "seconds": 0.193
+        },
+        {
+          "id": "en_code_log",
+          "length": "technical",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 94,
+          "input": "Set DATABASE_URL before running `swift test`; otherwise the migration step exits with code 78.",
+          "translation": "`swift 테스트 `를 실행하기 전에 DATABASE_URL를 설정합니다. 그렇지 않으면 마이그레이션 단계는 코드 78로 종료됩니다.",
+          "seconds": 0.494
+        },
+        {
+          "id": "en_medium_release",
+          "length": "medium",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 117,
+          "input": "Please summarize the release notes before the meeting, and call out any breaking changes that affect the desktop app.",
+          "translation": "회의 전에 발표 메모를 요약하고 데스크톱 앱에 영향을 미치는 모든 변경 사항을 호출하십시오.",
+          "seconds": 0.313
+        },
+        {
+          "id": "en_long_product",
+          "length": "long",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 332,
+          "input": "The new offline mode keeps a local cache of recent translations so users can keep working while the network is unstable. When connectivity returns, the app syncs usage metadata without uploading the original copied text. Administrators can disable the cache from the settings file, and the change takes effect after the next launch.",
+          "translation": "새로운 오프라인 모드는 최신 번역의 로컬 캐시를 유지하므로 사용자가 네트워크가 불안정할 때 계속 작동할 수 있습니다. 연결이 반환되면 응용 프로그램은 원래 복사 된 텍스트를 업로드하지 않고 사용 메타 데이터를 동기화합니다. 관리자는 설정 파일에서 캐시를 비활성화 할 수 있으며 다음 출시 후에 변경이 효력을 발생합니다.",
+          "seconds": 1.054
+        },
+        {
+          "id": "ja_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Japanese",
+          "target_language": "Korean",
+          "input_chars": 28,
+          "input": "ネットワークが不安定なため、翻訳を一時的に保存しました。",
+          "translation": "이 번역은 네트워크가 불안정하기 때문에 일시적으로 보존되었습니다.",
+          "seconds": 0.221
+        },
+        {
+          "id": "zh_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Chinese",
+          "target_language": "Korean",
+          "input_chars": 19,
+          "input": "由于数据库地址缺失，部署流程已经停止。",
+          "translation": "데이터베이스 주소가 없어서 배포 프로세스가 중단되었습니다.",
+          "seconds": 0.299
+        },
+        {
+          "id": "es_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Spanish",
+          "target_language": "Korean",
+          "input_chars": 63,
+          "input": "Guarda los cambios antes de cerrar la ventana de configuración.",
+          "translation": "설정 창을 닫기 전에 변경 사항을 저장하십시오.",
+          "seconds": 0.184
+        },
+        {
+          "id": "fr_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "French",
+          "target_language": "Korean",
+          "input_chars": 75,
+          "input": "Le raccourci clavier ne fonctionne que lorsque l'application est autorisée.",
+          "translation": "키보드 단축은 응용 프로그램이 허용된 경우에만 작동합니다.",
+          "seconds": 0.243
+        },
+        {
+          "id": "id_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Indonesian",
+          "target_language": "Korean",
+          "input_chars": 62,
+          "input": "Pengguna dapat mengubah bahasa target dari jendela pengaturan.",
+          "translation": "사용자는 설정 창에서 목표 언어를 변경할 수 있습니다.",
+          "seconds": 0.181
+        },
+        {
+          "id": "ar_to_ko_sentence",
+          "length": "sentence",
+          "source_language": "Arabic",
+          "target_language": "Korean",
+          "input_chars": 41,
+          "input": "تعذر حفظ الملف لأن مساحة القرص غير كافية.",
+          "translation": "파일 저장이 불가능해 디스크 공간이 부족하기 때문입니다.",
+          "seconds": 0.202
+        },
+        {
+          "id": "ko_to_en_sentence",
+          "length": "sentence",
+          "source_language": "Korean",
+          "target_language": "English",
+          "input_chars": 30,
+          "input": "네트워크가 불안정해서 번역 결과를 임시로 저장했습니다.",
+          "translation": "The network was unstable and the translation was temporarily stored.",
+          "seconds": 0.234
+        },
+        {
+          "id": "ko_to_en_long",
+          "length": "long",
+          "source_language": "Korean",
+          "target_language": "English",
+          "input_chars": 122,
+          "input": "새로운 오프라인 모드는 최근 번역 기록을 로컬 캐시에 저장해서 네트워크가 불안정한 상황에서도 사용자가 작업을 계속할 수 있게 합니다. 연결이 복구되면 앱은 원문 텍스트를 업로드하지 않고 사용량 메타데이터만 동기화합니다.",
+          "translation": "The new offline mode stores the most recent translation records in a local cache, allowing users to continue working even in unstable situations on the network. When the connection is restored, the app doesn't upload original text, but only syncs usage metadata.",
+          "seconds": 0.776
+        },
+        {
+          "id": "en_to_ja_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Japanese",
+          "input_chars": 66,
+          "input": "The shortcut only works after accessibility permission is granted.",
+          "translation": "ショートカットはアクセス可能性の許可が与えられた後のみ有効です",
+          "seconds": 0.229
+        },
+        {
+          "id": "en_to_zh_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Chinese",
+          "input_chars": 66,
+          "input": "The shortcut only works after accessibility permission is granted.",
+          "translation": "快捷方式只能在获取可访问权限后运行.",
+          "seconds": 0.26
+        },
+        {
+          "id": "en_to_es_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Spanish",
+          "input_chars": 66,
+          "input": "The shortcut only works after accessibility permission is granted.",
+          "translation": "El atajo sólo funciona después de que se otorgue el permiso de accesibilidad.",
+          "seconds": 0.275
+        }
+      ],
+      "peak_rss_mb": 1522.0,
+      "sample_count": 17,
+      "created_at_utc": "2026-06-01T01:40:19Z"
+    },
+    {
+      "case": "lfm2-gguf",
+      "model": "gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF/lfm2-1.2b-koen-mt-v8-rl-10k-merged-Q4_K_M.gguf",
+      "runtime": "llama.cpp-cpu",
+      "download_seconds": 0.42,
+      "load_seconds": 8.04,
+      "results": [
+        {
+          "id": "en_word",
+          "length": "word",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 5,
+          "input": "twice",
+          "translation": "두 번",
+          "seconds": 0.47
+        },
+        {
+          "id": "en_ui_short",
+          "length": "short_ui",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 14,
+          "input": "Retry download",
+          "translation": "다시 다운로드 시도",
+          "seconds": 0.243
+        },
+        {
+          "id": "en_technical_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 59,
+          "input": "The deployment failed because the database URL was missing.",
+          "translation": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.298
+        },
+        {
+          "id": "en_code_log",
+          "length": "technical",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 94,
+          "input": "Set DATABASE_URL before running `swift test`; otherwise the migration step exits with code 78.",
+          "translation": "`swift test`를 실행하기 전에 DATABASE_URL을 설정하십시오. 그렇지 않으면 이동 단계는 코드 78으로 종료됩니다.",
+          "seconds": 0.429
+        },
+        {
+          "id": "en_medium_release",
+          "length": "medium",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 117,
+          "input": "Please summarize the release notes before the meeting, and call out any breaking changes that affect the desktop app.",
+          "translation": "회의 전에 릴리스 노트를 요약하고, 데스크톱 앱에 영향을 주는 변경 사항을 알려주십시오.",
+          "seconds": 0.412
+        },
+        {
+          "id": "en_long_product",
+          "length": "long",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 332,
+          "input": "The new offline mode keeps a local cache of recent translations so users can keep working while the network is unstable. When connectivity returns, the app syncs usage metadata without uploading the original copied text. Administrators can disable the cache from the settings file, and the change takes effect after the next launch.",
+          "translation": "새로운 오프라인 모드는 최근 번역을 로컬 캐시로 유지하여 네트워크가 불안정한 동안 사용자가 계속 작업할 수 있도록 합니다. 연결성이 회복되면 앱은 원본 복사된 텍스트를 업로드하지 않고 사용자 데이터를 동기화합니다. 관리자는 설정 파일에서 캐시를 비활성화할 수 있으며, 변경 사항은 다음 실행 후에 적용됩니다.",
+          "seconds": 1.117
+        },
+        {
+          "id": "ko_to_en_sentence",
+          "length": "sentence",
+          "source_language": "Korean",
+          "target_language": "English",
+          "input_chars": 30,
+          "input": "네트워크가 불안정해서 번역 결과를 임시로 저장했습니다.",
+          "translation": "The network is unstable, so I have temporarily stored the translation result.",
+          "seconds": 0.311
+        },
+        {
+          "id": "ko_to_en_long",
+          "length": "long",
+          "source_language": "Korean",
+          "target_language": "English",
+          "input_chars": 122,
+          "input": "새로운 오프라인 모드는 최근 번역 기록을 로컬 캐시에 저장해서 네트워크가 불안정한 상황에서도 사용자가 작업을 계속할 수 있게 합니다. 연결이 복구되면 앱은 원문 텍스트를 업로드하지 않고 사용량 메타데이터만 동기화합니다.",
+          "translation": "The new offline mode saves the recent translation record to the local cache, allowing users to continue working even when the network is unstable. Once the connection is restored, the app synchronizes only the usage metadata, not the full text.",
+          "seconds": 0.861
+        }
+      ],
+      "peak_rss_mb": 1608.8,
+      "sample_count": 8,
+      "created_at_utc": "2026-06-01T01:40:38Z"
+    },
+    {
+      "case": "quickmt-ct2",
+      "model": "quickmt/quickmt-en-ko",
+      "runtime": "quickmt-ctranslate2-cpu",
+      "download_seconds": 0.33,
+      "load_seconds": 0.17,
+      "results": [
+        {
+          "id": "en_word",
+          "length": "word",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 5,
+          "input": "twice",
+          "translation": "두번 째",
+          "seconds": 0.023
+        },
+        {
+          "id": "en_ui_short",
+          "length": "short_ui",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 14,
+          "input": "Retry download",
+          "translation": "다운로드 다운로드 Slot",
+          "seconds": 0.021
+        },
+        {
+          "id": "en_technical_sentence",
+          "length": "sentence",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 59,
+          "input": "The deployment failed because the database URL was missing.",
+          "translation": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 0.03
+        },
+        {
+          "id": "en_code_log",
+          "length": "technical",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 94,
+          "input": "Set DATABASE_URL before running `swift test`; otherwise the migration step exits with code 78.",
+          "translation": "`swift test`를 실행하기 전에 DATABASE_URL을 설정한다. 그렇지 않으면 마이그레이션 단계는 코드 78로 종료된다.",
+          "seconds": 0.064
+        },
+        {
+          "id": "en_medium_release",
+          "length": "medium",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 117,
+          "input": "Please summarize the release notes before the meeting, and call out any breaking changes that affect the desktop app.",
+          "translation": "회의 전에 릴리스 정보를 요약하고 데스크톱 앱에 영향을 미치는 변경 사항을 모두 호출하십시오.",
+          "seconds": 0.038
+        },
+        {
+          "id": "en_long_product",
+          "length": "long",
+          "source_language": "English",
+          "target_language": "Korean",
+          "input_chars": 332,
+          "input": "The new offline mode keeps a local cache of recent translations so users can keep working while the network is unstable. When connectivity returns, the app syncs usage metadata without uploading the original copied text. Administrators can disable the cache from the settings file, and the change takes effect after the next launch.",
+          "translation": "새로운 오프라인 모드는 최근 번역의 로컬 캐시를 유지하므로 네트워크가 불안정한 동안 사용자가 계속 작업을 할 수 있습니다. 연결이 반환되면 앱은 복사 된 원본 텍스트를 업로드하지 않고 사용 메타 데이터를 동기화합니다. 관리자는 설정 파일에서 캐시를 비활성화 할 수 있으며 다음 실행 후 변경 사항이 적용됩니다.",
+          "seconds": 0.108
+        }
+      ],
+      "peak_rss_mb": 1094.4,
+      "sample_count": 6,
+      "created_at_utc": "2026-06-01T01:40:42Z"
+    }
+  ],
+  "manual_assessment": {
+    "mlx-community/Hy-MT2-1.8B-4bit": {
+      "overall": "best_multilingual_candidate",
+      "strengths": [
+        "Good coverage across English, Japanese, Chinese, Spanish, French, Indonesian, Arabic, Korean, Japanese/Chinese/Spanish targets.",
+        "Fast inference across short, medium, and long samples.",
+        "Preserves commands and DATABASE_URL in technical sample."
+      ],
+      "issues": [
+        "One English->Korean medium sample leaked a Chinese token: 任何.",
+        "Arabic->Korean was understandable but grammatically awkward.",
+        "English->Chinese used a generic access-permission phrase rather than precise accessibility-permission wording."
+      ]
+    },
+    "Timteamteem/CTranslate2-nllb-200-int8": {
+      "overall": "broad_language_fallback_only",
+      "strengths": [
+        "Broad language-pair coverage and stable speed.",
+        "Usually preserves basic meaning."
+      ],
+      "issues": [
+        "Korean is often awkward.",
+        "release notes became 발표 메모.",
+        "technical command sample translated swift test as swift 테스트 and produced less natural grammar."
+      ]
+    },
+    "gyung/lfm2-1.2b-koen-mt-v8-rl-10k-merged-GGUF/Q4_K_M": {
+      "overall": "strong_en_ko_and_ko_en_candidate_with_license_review",
+      "strengths": [
+        "Good English<->Korean quality on short, sentence, and long samples.",
+        "Correctly handled twice and Retry download."
+      ],
+      "issues": [
+        "Only evaluated for English<->Korean.",
+        "migration step became 이동 단계, which is not ideal in software context.",
+        "usage metadata became user data in one long sample.",
+        "License is LFM Open License and needs review before integration."
+      ]
+    },
+    "quickmt/quickmt-en-ko": {
+      "overall": "fast_but_not_safe_for_default",
+      "strengths": [
+        "Fastest inference and lowest measured RSS among this expanded run.",
+        "Good on straightforward technical sentence and code-log sample."
+      ],
+      "issues": [
+        "twice became 두번 째.",
+        "Retry download became 다운로드 다운로드 Slot.",
+        "Medium and long outputs are understandable but awkward/literal."
+      ]
+    }
+  },
+  "recommendation": {
+    "default_local_model": "mlx-community/Hy-MT2-1.8B-4bit",
+    "reason": "Best multilingual coverage and speed/quality balance despite a few edge-case wording issues.",
+    "fallbacks": [
+      "Use NLLB only when broad language coverage matters more than Korean fluency.",
+      "Consider LFM2 for English<->Korean after license review.",
+      "Do not use QuickMT as default unless short UI/word routing is fixed."
+    ]
+  }
+}

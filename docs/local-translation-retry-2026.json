@@ -1,0 +1,100 @@
+{
+  "created_at_utc": "2026-06-01T03:05:00Z",
+  "purpose": "Retry earlier failed or suspect local translation model tests with corrected runtime/prompt/dependency choices.",
+  "results": [
+    {
+      "model": "Helsinki-NLP/opus-mt-tc-big-en-ko",
+      "method": "transformers-original-marian",
+      "outcome": "fail",
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "프로세스、403 well2.8:46ther。"
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "잘 오염 물질  잘 해충."
+        },
+        {
+          "input": "twice",
+          "output": "킹"
+        }
+      ],
+      "classification": "Upstream model/tokenizer output is unusable for tested samples; not just app harness error."
+    },
+    {
+      "model": "ooeoeo/opus-mt-tc-big-en-ko-ct2-float16",
+      "method": "ctranslate2-direct-source-target-sentencepiece",
+      "outcome": "fail",
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "프로세스、403 well2.8:46ther。"
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "☆ 좋은 오염 물질☆ 해충 ☆."
+        },
+        {
+          "input": "twice",
+          "output": "칫"
+        }
+      ],
+      "classification": "CT2 export reproduces upstream unusable output."
+    },
+    {
+      "model": "WindstormLabs/translate-tc-big-en-ko/lora-ct2-int8",
+      "method": "ctranslate2-direct-source-target-sentencepiece",
+      "outcome": "fail",
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "프로세스、403 well2.8:46ther。"
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "☆ 좋은 오염 물질☆ 해충 ☆."
+        },
+        {
+          "input": "twice",
+          "output": "칫"
+        }
+      ],
+      "classification": "Packaged CT2 int8 reproduces upstream unusable output."
+    },
+    {
+      "model": "harveykim/kanana-1.5-2.1b-aihub-ko-en-lora",
+      "base_model": "kakaocorp/kanana-1.5-2.1b-base",
+      "method": "transformers-4.46.3-peft-0.19.1-raw-instruction-torch-distributed-patch",
+      "outcome": "runs",
+      "load_seconds": 28.34,
+      "peak_rss_mb": 813.9,
+      "translations": [
+        {
+          "input": "The deployment failed because the database URL was missing.",
+          "output": "데이터베이스 URL이 누락되어 배포가 실패했습니다.",
+          "seconds": 1.67
+        },
+        {
+          "input": "Please summarize the release notes before the meeting.",
+          "output": "회의 전에 출시 노트를 요약해 주세요.",
+          "seconds": 0.4
+        },
+        {
+          "input": "twice",
+          "output": "두 번이나 그랬어요.",
+          "seconds": 0.618
+        }
+      ],
+      "classification": "Earlier failure was harness dependency/prompt mistake; model runs with fragile pinned dependency matrix and raw prompt."
+    },
+    {
+      "model": "aufklarer/MADLAD400-3B-MT-MLX/int4",
+      "method": "official-soniqo-speech-swift-cli",
+      "outcome": "runtime_fail",
+      "build_result": "Build of product 'speech' complete! (48.20s)",
+      "error": "MLX error: Failed to load the default metallib. library not found",
+      "classification": "Generic mlx-lm was wrong runtime; official Swift runtime hits MLX Swift metallib environment/toolchain failure on this host."
+    }
+  ]
+}
