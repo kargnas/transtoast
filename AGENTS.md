@@ -1,50 +1,106 @@
-# CopyTranslator Agent Notes
+# CopyTranslator Agent Guide
+
+## Mission
+
+CopyTranslator is a macOS menu-bar translator. Keep the app native-feeling, fast, and operationally clear. Preserve existing translation behavior while migrating UI surfaces to Tauri 2 + Rust + Svelte.
 
 ## Project Shape
 
-- This is a SwiftPM-first macOS menu bar app (`LSUIElement`, macOS 15+, Swift 6.2 tools).
-- The app bundle identifier must stay `as.kargn.copy-translator`.
-- Keep secrets in local environment files only. Do not commit `.env.local`, token caches, or generated logs that contain credentials.
+- SwiftPM app remains the production shell until the Tauri shell fully replaces it.
+- Bundle identifier must stay `as.kargn.copy-translator`.
+- macOS target: macOS 15+, Swift 6.2 tools.
+- Keep secrets out of Git. Never commit `.env.local`, token caches, or credential-bearing logs.
 
-### Layout
+## Layout
 
-- `Sources/CopyTranslatorCore/` — platform-free logic: `TranslationService`, `TranslatorSettings`, `EnvLoader`, `DoublePressDetector`.
-- `Sources/CopyTranslator/` — AppKit shell: `main.swift` (entry + one-shot CLI modes), `AppDelegate`, monitors, windows, `CredentialsProvider`.
-- `Tests/CopyTranslatorTests/` — `swift test` target.
-- `scripts/` — `run-dev` / `build-app` / `install-app` / `package-app` (.zsh), `hy_mt2_translate.py` (uv backend), benchmark + probe tools.
-
-### Stack
-
-- Frameworks: AppKit, Carbon, CoreGraphics, ScreenCaptureKit.
-- Local text translation: `tencent/Hy-MT2-*` via `uv run scripts/hy_mt2_translate.py`.
-- OpenRouter for non-Hy-MT2 LLM text + screenshot vision translation.
-- `CredentialsProvider` reads `.env.local` from the working directory, so launches with `cwd` = workspace root pick up `OPENROUTER_API_KEY` / `HF_TOKEN` without sourcing.
+- `Sources/CopyTranslatorCore/`: platform-light translation logic, settings defaults, model registry, language handling.
+- `Sources/CopyTranslator/`: current AppKit shell, menu bar app, monitors, settings, permissions, request logs.
+- `Tests/CopyTranslatorTests/`: Swift tests.
+- `scripts/`: build/install/package helpers and local model runtimes.
+- `src/`: Svelte settings UI for the Tauri migration.
+- `src-tauri/`: Rust/Tauri backend and app configuration.
+- `design/`: visual reference board. Treat it as required input for UI work.
+- `DESIGN.md`: durable design contract. Update it when design decisions change.
 
 ## Commands
 
-```zsh
+```sh
 swift test
 swift build
-./scripts/run-dev.zsh
-./scripts/build-app.zsh
+./scripts/run-dev.zsh --show-settings
+npm install
+npm run check
+npm run build
+npm run tauri dev
+cd src-tauri && cargo test
 ```
 
-## VS Code Workflow
+## Defaults And Behavior
 
-- **Run/Debug (`.vscode/launch.json`)** — daemons and debug modes; `cwd` loads `.env.local` automatically:
-  - `🚀 Run Dev (Debug)` — menu bar app with debugger attached.
-  - `⚙️ Settings Window (Debug)` — launches straight into the settings window (`--show-settings`).
-  - `Run Release` — release build run.
-  - `Translate Text Once (Debug)` / `Screenshot Translate Once (Debug)` — one-shot pipeline checks that print and exit.
-- **Tasks (`.vscode/tasks.json`, status bar via `actboy168.tasks`)** — occasional chores only:
-  `📦 Setup: Create .env.local`, `🧪 Run Tests`, `🧹 Clean Build Artifacts`, `🛠️ Build & Install to /Applications`, `📮 Package App (.zip)`.
-- `.vscode/settings.json` enforces swift-format on save and hides `.build` / `dist` / `models`. `.vscode/extensions.json` recommends `swiftlang.swift-vscode` + `actboy168.tasks`.
+- Default UI language: English.
+- Default translation target: Korean.
+- Default text provider: local Hugging Face Hy-MT2.
+- OpenRouter handles non-local LLM translation and screenshot translation.
+- Preserve `Cmd+C` double press and `Shift+Cmd+2` shortcuts.
+- Every persisted setting is code-default plus user override:
+  - persist only values different from `TranslatorSettings()`;
+  - show reset control only when an override exists;
+  - remove the stored override when value returns to default;
+  - remove the full settings store when all values equal defaults.
 
-## Implementation Rules
+## Settings Contract
 
-- Keep the default UI language English.
-- Keep the default translation target Korean unless the user asks for another default.
-- Keep Hugging Face Hy-MT2 as the default text translation provider.
-- Use OpenRouter for non-Hy-MT2 LLM translation and screenshot translation.
-- Preserve the `Cmd+C` double-press and `Shift+Cmd+2` shortcuts when changing shortcut code.
-- Design every setting as a code-default plus user override. Persist only values that differ from the current code default, show a `기본값으로 변경` reset button beside overridden settings, and remove the stored override when the user returns to the default so future default changes apply automatically.
+The settings UI must cover current AppKit behavior before adding new behavior:
+
+- Text Provider: `Local Model`, `OpenRouter LLM`.
+- Source Language: `Auto` plus supported language list.
+- Target Language: supported language list without `Auto`.
+- Toast Position: bottom/top and left/right variants.
+- Local Model: all built-in models plus custom models when supported.
+- Local Backend Path: blank means automatic backend selection.
+- Custom Models JSON: blank means default config lookup.
+- OpenRouter Text Model and Vision Model.
+- Permission status for keyboard and screen recording.
+- Diagnostics/actions: model setup, permission panes, text test, screenshot translation, request logs, stacked toast preview.
+
+Do not edit credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/copy-translator/.env`.
+
+## Design Rules
+
+- Before building or restructuring a screen, create a visual mockup with Codex image generation.
+- Follow `DESIGN.md` and `design/` for color, spacing, typography, sidebar/grouped-row layout, and component behavior.
+- Do not fake platform-owned features in web/CSS:
+  - native titlebar/window controls come from Tauri/macOS;
+  - native window shadow comes from the OS;
+  - System Settings privacy panes stay OS-owned.
+- Use SF Pro system font stack and semantic macOS-like colors.
+- Use the 4 / 8 / 12 / 16 / 20 / 24 spacing scale.
+- Keep groups at 8px radius or less unless native platform chrome owns the shape.
+- Avoid decorative gradients, orbs, stock imagery, and marketing layouts in app surfaces.
+- Use icon buttons or icon+text buttons for concrete actions.
+
+## Layout Rules
+
+- AppKit screens use `NSStackView` + Auto Layout. Avoid hardcoded frames except initial window rects.
+- Tauri/Svelte screens use stable grid/flex dimensions. Text must not overflow controls at minimum window size.
+- Keep labels and controls scannable in two-column grouped rows.
+- Keep minimum settings window size large enough to show controls without clipping.
+
+## Verification
+
+Before claiming UI work complete:
+
+- Run targeted unit tests for changed behavior.
+- Run Swift checks when Swift behavior changes.
+- Run `npm run check`, `npm run build`, and `cd src-tauri && cargo test` for Tauri/Svelte/Rust changes.
+- Run the UI, capture a screenshot, crop the implemented settings surface, and compare it against `design/image.png` plus the generated mockup/reference.
+- Check generated CSS for forbidden custom platform shadows (`box-shadow`) in the settings shell.
+- Report any verification gap clearly.
+
+## Git Hygiene
+
+- Worktree may be dirty. Do not revert user changes unless explicitly asked.
+- Keep diffs small and reversible.
+- Add dependencies only when required by the requested stack or by an existing project rule.
+- After development work is implemented and verified, create the relevant git commit before reporting completion. Do not leave completed development work uncommitted unless the user explicitly asks not to commit or the worktree contains unresolved unrelated changes that make a safe commit impossible.
+- Commit messages, when requested, must follow the Lore Commit Protocol from repo history/instructions.

@@ -1,0 +1,88 @@
+# Design
+
+## Source of truth
+- Status: Active
+- Last refreshed: 2026-06-01
+- Primary product surfaces: macOS menu-bar translator, translation toast/overlay, settings window, permission helper, local model setup, request logs.
+- Evidence reviewed:
+  - `design/image.png` and `design/guide.html`: component board for translation overlays, settings window, tokens, spacing, typography, color, radius, motion.
+  - `Sources/CopyTranslator/SettingsWindowController.swift`: current AppKit settings behavior, groups, reset-to-default controls, diagnostics.
+  - `Sources/CopyTranslatorCore/TranslatorSettings.swift`: code defaults, persistence keys, legacy decode, override-only encoding.
+  - `Sources/CopyTranslator/SettingsStore.swift`: current UserDefaults key and "remove when all defaults" behavior.
+  - `Sources/CopyTranslator/AppDelegate.swift`: menu settings actions, shortcuts, permissions, diagnostics flows.
+  - `README.md`: user-facing feature set, permissions, run/test commands.
+
+## Brand
+- Personality: quiet, native, fast, utility-first, trustworthy.
+- Trust signals: macOS-native window chrome, system font, explicit permission status, visible provider/model state, reset controls only when an override exists.
+- Avoid: marketing pages, decorative gradients/orbs, custom fake platform shadows, oversized hero layouts, hardcoded non-system UI language defaults.
+
+## Product goals
+- Goals: translate copied text quickly, translate screenshots, expose provider/language/model settings without hiding operational state.
+- Non-goals: broad design-system experimentation, cloud-account management, replacing OS privacy panes, adding settings not backed by current product behavior.
+- Success signals: settings changes persist as overrides only, default resets remove overrides, shortcuts remain `Cmd+C` twice and `Shift+Cmd+2`, translation popovers anchor near the keyboard caret/selection when Accessibility can report it, visual shell matches `design/` closely while relying on OS window chrome/shadow.
+
+## Personas and jobs
+- Primary personas: macOS power users, developers, bilingual readers, users comparing local and OpenRouter translation.
+- User jobs: choose translation provider/model, set source/target languages, confirm permissions, run diagnostics, inspect last result/logs, recover defaults.
+- Key contexts of use: menu-bar utility workflow, short text fragments, screenshots, development/debug sessions.
+
+## Information architecture
+- Primary navigation: macOS settings sidebar.
+- Core routes/screens: General, Translation, Shortcuts, Excluded Apps, Advanced, Info.
+- Content hierarchy: high-frequency provider/language settings first; model configuration second; shortcut/permission status third; advanced paths and storage details last.
+
+## Design principles
+- Principle 1: Native first. Use OS titlebar, traffic-light controls, window shadow, keyboard permissions, and system settings links instead of drawing fake platform features.
+- Principle 2: State must explain itself. Defaults, overrides, readiness, and last diagnostic result stay visible.
+- Tradeoffs: complete settings coverage may require wider content than the `design/` board mock; keep the same sidebar/group-row language rather than forcing every control into one small panel.
+
+## Visual language
+- Color: `design/` tokens: Apple blue `#007aff`, green `#34c759`, red `#ff3b30`, text `#1d1d1f`, secondary `#6e6e73`, borders `#e5e5ea` / `#d2d2d7`.
+- Typography: SF Pro system stack through `-apple-system`, compact settings text, no negative letter spacing.
+- Spacing/layout rhythm: 8px grid; 4 / 8 / 12 / 16 / 20 / 24 scale.
+- Shape/radius/elevation: 6px sidebar rows and controls, 8px setting groups. Do not implement custom CSS window shadows; native Tauri/macOS window shadow owns settings windows. Translation popover shadow is component-level elevation from `design/`, while transparent borderless window support comes from macOS/Tauri.
+- Motion: short state transitions only where needed; no decorative motion.
+- Imagery/iconography: use symbol-style icons for settings sidebar and action buttons; do not use stock imagery in app surfaces.
+
+## Components
+- Existing components to reuse: `TranslatorSettings`, `SettingsStore` semantics, `TranslationLanguage`, `LocalModelRegistry`, current permission checks, diagnostics actions, current toast/translation result behavior including loading/success/error states. Toast position is fallback only when the keyboard caret/selection bounds are unavailable.
+- New/changed components: Tauri 2 settings shell, Svelte settings sidebar, grouped setting rows, reset buttons, Rust settings command layer, Tauri/Svelte translation popover surface.
+- Variants and states: default vs overridden setting rows, ready/not-granted permission states, saved/saving, success/error action notices, disabled reset buttons, translation loading/done/original/error states. Translation state switchers are debug-only and must not appear in the default popup.
+- Token/component ownership: `design/guide.html` remains visual token reference; `src/app.css` owns Tauri web implementation tokens; Rust owns setting defaults and persistence normalization.
+
+## Accessibility
+- Target standard: keyboard navigable settings UI with native form controls and visible focus behavior.
+- Keyboard/focus behavior: sidebar buttons, selects, inputs, reset buttons, and actions must be reachable by Tab and activate with Enter/Space.
+- Contrast/readability: text and border colors follow macOS light-mode contrast from `design/`; status color is never the only signal.
+- Screen-reader semantics: use real `button`, `select`, `input`, `label`, `aside`, `main`, and `aria-live` for notices.
+- Reduced motion and sensory considerations: no required animation for comprehension.
+
+## Responsive behavior
+- Supported breakpoints/devices: macOS desktop windows, minimum 640 x 540 for the Tauri settings surface.
+- Layout adaptations: sidebar remains fixed; setting rows collapse to one column below 700px preview width.
+- Touch/hover differences: desktop pointer first; hover is supplementary only.
+
+## Interaction states
+- Loading: centered "Loading settings..." text.
+- Empty: defaults load when no override store exists.
+- Error: action notice plus last-result text where relevant.
+- Success: saved status and success notice.
+- Disabled: reset buttons remain visually reserved but inactive unless a setting differs from code default.
+- Offline/slow network, if applicable: translation/model diagnostics surface command output rather than blocking settings edits.
+
+## Content voice
+- Tone: concise, operational, English by default.
+- Terminology: "Text Provider", "Local Model", "OpenRouter", "Source Language", "Target Language", "Toast Position", "Reset Defaults".
+- Microcopy rules: use direct status labels like "Ready", "Not granted", "Saved"; avoid instructional paragraphs inside compact settings panes.
+
+## Implementation constraints
+- Framework/styling system: Tauri 2 + Rust backend + Svelte 5 frontend.
+- Design-token constraints: follow `design/` colors, radii, grouped rows, sidebar navigation, and compact typography; do not use CSS `box-shadow` for platform-native window features.
+- Performance constraints: load settings synchronously from small override JSON; avoid unnecessary provider/model network calls in settings render.
+- Compatibility constraints: macOS 15+, bundle identifier `as.kargn.copy-translator`, default target language Korean, default text provider local Hy-MT2, OpenRouter for non-local and screenshot translation, Tauri `macos-private-api` enabled for transparent translation popover windows.
+- Test/screenshot expectations: run build/check/tests; run UI, capture screenshot, crop settings and translation surfaces, compare against `design/image.png` references and generated mockup/reference.
+
+## Open questions
+- [ ] Full app-shell migration owner / impact: decide when Tauri replaces AppKit menu bar, toast, permission helper, local model setup, and request log windows.
+- [ ] Storage compatibility owner / impact: decide whether Tauri production should read/write existing macOS UserDefaults binary `Data` key directly or keep the new JSON override store during migration.

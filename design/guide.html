@@ -1,0 +1,1460 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI Component Board - Translation Overlay</title>
+  <style>
+    :root {
+      --blue: #007aff;
+      --blue-2: #2f7cff;
+      --green: #34c759;
+      --red: #ff3b30;
+      --text: #1d1d1f;
+      --secondary: #6e6e73;
+      --tertiary: #a1a1a6;
+      --border: #e5e5ea;
+      --border-strong: #d2d2d7;
+      --bg: #f5f6f8;
+      --card: rgba(255, 255, 255, 0.78);
+      --card-solid: #ffffff;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      --shadow-strong: 0 12px 32px rgba(0, 0, 0, 0.13);
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --grid: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(0, 122, 255, 0.09), transparent 32%),
+        radial-gradient(circle at 100% 0%, rgba(175, 82, 222, 0.07), transparent 34%),
+        linear-gradient(180deg, #fafbfc 0%, #f4f5f7 100%);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      font-synthesis: none;
+    }
+
+    body {
+      padding: 18px;
+    }
+
+    .board {
+      width: 1536px;
+      min-height: 1024px;
+      margin: 0 auto;
+      padding: 26px 28px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 249, 251, 0.78)),
+        radial-gradient(circle at 86% 10%, rgba(0, 122, 255, 0.05), transparent 28%);
+      box-shadow: 0 24px 90px rgba(31, 35, 44, 0.08);
+      overflow: hidden;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      font-weight: 760;
+    }
+
+    .version {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(245, 245, 247, 0.9);
+      color: #515154;
+      font-size: 13px;
+      line-height: 22px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--secondary);
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .component-grid {
+      display: grid;
+      grid-template-columns: 380px 370px 250px 1fr;
+      grid-template-rows: 700px 216px;
+      gap: 10px;
+    }
+
+    .panel {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.54);
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .panel-inner {
+      padding: 18px 20px;
+      height: 100%;
+    }
+
+    .wide {
+      grid-column: span 1;
+    }
+
+    .settings-panel {
+      grid-column: 4;
+      grid-row: 1;
+    }
+
+    .bottom-wide {
+      grid-column: span 1;
+    }
+
+    .panel h2 {
+      margin: 0 0 20px;
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 740;
+      letter-spacing: -0.02em;
+    }
+
+    .section-label {
+      margin: 0 0 12px;
+      color: var(--secondary);
+      font-size: 11px;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+    }
+
+    .small-note {
+      color: var(--secondary);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .bubble {
+      position: relative;
+      width: 308px;
+      min-height: 132px;
+      margin-left: 13px;
+      border: 1px solid rgba(217, 217, 222, 0.9);
+      border-radius: 15px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 252, 253, 0.82));
+      box-shadow: var(--shadow-strong);
+      backdrop-filter: blur(28px) saturate(160%);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+    }
+
+    .bubble::before {
+      content: "";
+      position: absolute;
+      top: -16px;
+      left: calc(50% - 13px);
+      width: 28px;
+      height: 28px;
+      background: inherit;
+      border-left: 1px solid rgba(217, 217, 222, 0.9);
+      border-top: 1px solid rgba(217, 217, 222, 0.9);
+      border-top-left-radius: 6px;
+      transform: rotate(45deg);
+    }
+
+    .bubble-inner {
+      position: relative;
+      z-index: 1;
+      padding: 19px 22px 16px;
+    }
+
+    .loading-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .copying {
+      margin: 16px 0 20px;
+      color: #67676d;
+      font-size: 14px;
+    }
+
+    .progress-track {
+      position: relative;
+      height: 4px;
+      border-radius: 999px;
+      background: #e7e8ec;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 42%;
+      border-radius: inherit;
+      background: var(--blue);
+    }
+
+    .bubble-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 22px;
+      font-size: 12px;
+      color: #515154;
+    }
+
+    .language {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #45454a;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .chevron {
+      width: 8px;
+      height: 8px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+      opacity: 0.8;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 14px;
+      border: 1px solid #d7d7dc;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 560;
+      letter-spacing: -0.01em;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .button.small {
+      min-height: 28px;
+      padding: 0 12px;
+      border-radius: 9px;
+      font-size: 12px;
+    }
+
+    .icon-button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid #d7d7dc;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.82);
+      color: #1f2937;
+      font-size: 17px;
+      line-height: 1;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    }
+
+    .icon-button.flat {
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .translation {
+      min-height: 116px;
+      margin-top: 0;
+    }
+
+    .translation .bubble-inner {
+      padding: 20px 22px 14px;
+    }
+
+    .translation-text {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.55;
+      letter-spacing: -0.04em;
+      font-weight: 580;
+    }
+
+    .translation.original {
+      margin-top: 14px;
+    }
+
+    .translation.original .translation-text {
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 450;
+      letter-spacing: -0.02em;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .popover-positions {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      padding: 0 10px;
+      margin-top: 28px;
+    }
+
+    .position-item {
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+      color: var(--secondary);
+      font-size: 11px;
+    }
+
+    .position-shadow {
+      position: relative;
+      width: 86px;
+      height: 50px;
+      background: linear-gradient(180deg, #f7f8fb, #eeeff3);
+      border-radius: 2px;
+      overflow: visible;
+    }
+
+    .position-shadow::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      left: 18px;
+      width: 46px;
+      height: 22px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: white;
+      box-shadow: var(--shadow);
+    }
+
+    .position-shadow::after {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 34px;
+      width: 12px;
+      height: 12px;
+      background: white;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      transform: rotate(45deg);
+    }
+
+    .position-item:nth-child(2) .position-shadow::before {
+      left: 4px;
+    }
+
+    .position-item:nth-child(2) .position-shadow::after {
+      left: 6px;
+    }
+
+    .position-item:nth-child(3) .position-shadow::before {
+      left: 34px;
+    }
+
+    .position-item:nth-child(3) .position-shadow::after {
+      left: 68px;
+    }
+
+    .spec-bubble-wrap {
+      position: relative;
+      height: 126px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .spec-bubble {
+      position: relative;
+      width: 270px;
+      height: 76px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: var(--shadow);
+    }
+
+    .spec-bubble::before {
+      content: "";
+      position: absolute;
+      top: -14px;
+      left: calc(50% - 11px);
+      width: 24px;
+      height: 24px;
+      background: inherit;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      transform: rotate(45deg);
+      border-top-left-radius: 5px;
+    }
+
+    .spec-arrow {
+      position: absolute;
+      color: var(--blue);
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .spec-arrow.left {
+      left: 8px;
+      top: 41px;
+    }
+
+    .spec-arrow.right {
+      right: 9px;
+      top: 58px;
+    }
+
+    .spec-line {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin: 10px 0;
+      font-size: 11px;
+      color: var(--secondary);
+    }
+
+    .spec-line span {
+      color: #8a8a91;
+    }
+
+    .hr {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    .state-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .state-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 180px;
+      align-items: center;
+      height: 40px;
+      padding: 0 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.75);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      font-size: 12px;
+    }
+
+    .state-row .label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 560;
+      color: var(--blue);
+    }
+
+    .state-row.success .label {
+      color: var(--green);
+    }
+
+    .state-row.error .label {
+      color: var(--red);
+    }
+
+    .mini-progress {
+      width: 184px;
+      height: 4px;
+      border-radius: 999px;
+      background: #e9e9ed;
+      overflow: hidden;
+    }
+
+    .mini-progress::before {
+      content: "";
+      display: block;
+      width: 32%;
+      height: 100%;
+      background: var(--blue);
+      border-radius: inherit;
+    }
+
+    .status-message {
+      color: var(--secondary);
+      font-size: 11px;
+    }
+
+    .action-strip {
+      display: grid;
+      grid-template-columns: 1fr 1px auto auto auto;
+      align-items: center;
+      gap: 12px;
+      height: 50px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: var(--shadow);
+    }
+
+    .divider {
+      width: 1px;
+      height: 22px;
+      background: var(--border);
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-top: 18px;
+      gap: 18px;
+    }
+
+    .button-group {
+      display: grid;
+      gap: 12px;
+      justify-items: start;
+    }
+
+    .button-group .caption {
+      color: var(--secondary);
+      font-size: 11px;
+    }
+
+    .button-stack {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 28px 18px;
+      margin: 10px 0 28px;
+      padding: 4px 2px;
+    }
+
+    .icon-sample {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+      min-width: 44px;
+    }
+
+    .symbol {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      color: #2f343b;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .symbol.sm {
+      width: 18px;
+      height: 18px;
+      font-size: 16px;
+    }
+
+    .symbol.lg {
+      width: 28px;
+      height: 28px;
+      font-size: 26px;
+    }
+
+    .icon-name {
+      color: #56565c;
+      font-size: 11px;
+    }
+
+    .settings-window {
+      width: 448px;
+      height: 575px;
+      margin: 16px auto 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .window-titlebar {
+      position: relative;
+      height: 44px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 650;
+      font-size: 13px;
+    }
+
+    .traffic {
+      position: absolute;
+      left: 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .traffic span {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: block;
+    }
+
+    .traffic .close {
+      background: #ff5f57;
+    }
+
+    .traffic .min {
+      background: #febc2e;
+    }
+
+    .traffic .max {
+      background: #28c840;
+    }
+
+    .settings-body {
+      display: grid;
+      grid-template-columns: 116px 1fr;
+      height: calc(100% - 44px);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      padding: 12px 10px 12px;
+      background: rgba(246, 247, 250, 0.6);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .side-item {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 540;
+      color: #343438;
+    }
+
+    .side-item.active {
+      background: var(--blue);
+      color: white;
+    }
+
+    .side-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 14px 0;
+    }
+
+    .settings-content {
+      padding: 20px 16px;
+      position: relative;
+    }
+
+    .settings-content h3 {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .setting-group {
+      margin-bottom: 18px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.78);
+      overflow: hidden;
+    }
+
+    .setting-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 36px;
+      padding: 8px 11px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .setting-row:last-child {
+      border-bottom: 0;
+    }
+
+    .setting-main strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .setting-main span {
+      color: var(--secondary);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .toggle {
+      width: 30px;
+      height: 18px;
+      padding: 2px;
+      border-radius: 999px;
+      background: var(--blue);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+    }
+
+    .toggle::after {
+      content: "";
+      display: block;
+      width: 14px;
+      height: 14px;
+      margin-left: 12px;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+    }
+
+    .select {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #3f3f46;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 1fr 104px 34px;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 8px 11px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .slider-row:last-child {
+      border-bottom: 0;
+    }
+
+    .slider {
+      position: relative;
+      height: 3px;
+      border-radius: 999px;
+      background: #dedfe5;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 72%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--blue);
+    }
+
+    .slider::after {
+      content: "";
+      position: absolute;
+      left: 68%;
+      top: 50%;
+      width: 13px;
+      height: 13px;
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      background: white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .swatches {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .swatch {
+      width: 13px;
+      height: 13px;
+      border-radius: 999px;
+      background: var(--color);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    }
+
+    .swatch.selected {
+      outline: 3px solid rgba(0, 122, 255, 0.22);
+      box-shadow: inset 0 0 0 4px var(--blue), 0 1px 2px rgba(0, 0, 0, 0.12);
+      background: white;
+    }
+
+    .settings-footer {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--secondary);
+      font-size: 11px;
+    }
+
+    .reset-button {
+      position: absolute;
+      left: 10px;
+      bottom: 12px;
+      height: 24px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: white;
+      font-size: 11px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .api-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .help {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: white;
+      color: #1d1d1f;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 660;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .color-grid {
+      display: flex;
+      gap: 20px;
+      align-items: start;
+      margin-top: 18px;
+    }
+
+    .color-token {
+      width: 44px;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+    }
+
+    .color-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: var(--token);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    .token-name {
+      font-size: 11px;
+      color: #45454a;
+      line-height: 1;
+    }
+
+    .token-value {
+      font-size: 10px;
+      color: var(--secondary);
+      line-height: 1;
+    }
+
+    .type-panel {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 16px;
+      align-items: center;
+      height: calc(100% - 38px);
+    }
+
+    .type-list {
+      display: grid;
+      gap: 12px;
+      font-size: 12px;
+      color: #2f2f35;
+      line-height: 1.35;
+    }
+
+    .type-list span {
+      display: block;
+      color: var(--secondary);
+    }
+
+    .type-card {
+      min-height: 102px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .type-card p {
+      margin: 0 0 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      letter-spacing: -0.02em;
+      font-weight: 570;
+    }
+
+    .spacing-boxes {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      align-items: center;
+      justify-items: center;
+      margin-top: 26px;
+    }
+
+    .space-demo {
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+      font-size: 14px;
+      color: #2f2f35;
+    }
+
+    .space-shape {
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      background: #f0f1f5;
+    }
+
+    .shadow-demos {
+      display: flex;
+      gap: 48px;
+      align-items: center;
+      margin-top: 22px;
+    }
+
+    .shadow-card {
+      width: 74px;
+      height: 46px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .shadow-card.default {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .shadow-card.strong {
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+    }
+
+    .motion-demo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 26px;
+      color: var(--blue);
+    }
+
+    .motion-card {
+      width: 70px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .motion-bubble {
+      position: relative;
+      width: 72px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .motion-bubble::before {
+      content: "";
+      position: absolute;
+      right: 12px;
+      top: -7px;
+      width: 14px;
+      height: 14px;
+      background: white;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      transform: rotate(45deg);
+    }
+
+    .tiny-square {
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      margin: 20px auto 0;
+    }
+
+    @media (max-width: 1600px) {
+      body {
+        padding: 0;
+      }
+
+      .board {
+        transform-origin: top left;
+        transform: scale(calc(100vw / 1536));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="board" aria-label="Translation overlay UI component board">
+    <header>
+      <div class="title-row">
+        <h1>UI Component Board</h1>
+        <span class="version">v1.0</span>
+      </div>
+      <p class="subtitle">번역 오버레이 & 설정 UI 시스템</p>
+    </header>
+
+    <section class="component-grid">
+      <article class="panel">
+        <div class="panel-inner">
+          <h2>1. 번역 오버레이 (말풍선)</h2>
+
+          <p class="section-label">번역 중</p>
+          <div class="bubble">
+            <div class="bubble-inner">
+              <div class="loading-title"><span class="dot"></span> 번역 중...</div>
+              <p class="copying">클립보드의 텍스트를 번역하고 있어요.</p>
+              <div class="progress-track"><span class="progress-fill"></span></div>
+              <div class="bubble-footer">
+                <span class="language">영어 → 한국어 <span class="chevron"></span></span>
+                <button class="button small">취소</button>
+              </div>
+            </div>
+          </div>
+
+          <p class="section-label" style="margin-top: 22px;">번역 완료 (기본)</p>
+          <div class="bubble translation">
+            <div class="bubble-inner">
+              <p class="translation-text">미래는 자신의 꿈의 아름다움을 믿는 사람들의 것이다.</p>
+              <div class="bubble-footer">
+                <span class="language">영어 → 한국어 <span class="chevron"></span></span>
+                <div class="action-row">
+                  <button class="button small">원본 보기</button>
+                  <button class="icon-button">□</button>
+                  <button class="icon-button">⋯</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="section-label" style="margin-top: 22px;">번역 완료 (원본 보기)</p>
+          <div class="bubble translation original">
+            <div class="bubble-inner">
+              <p class="translation-text">The future belongs to those who believe in the beauty of their dreams.</p>
+              <div class="bubble-footer">
+                <span class="language">영어 → 한국어 <span class="chevron"></span></span>
+                <div class="action-row">
+                  <button class="button small">번역 보기</button>
+                  <button class="icon-button">□</button>
+                  <button class="icon-button">⋯</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="section-label" style="margin-top: 22px;">말풍선 위치</p>
+          <div class="popover-positions">
+            <div class="position-item">
+              <span>상단 중앙</span>
+              <div class="position-shadow"></div>
+            </div>
+            <div class="position-item">
+              <span>상단 좌측</span>
+              <div class="position-shadow"></div>
+            </div>
+            <div class="position-item">
+              <span>상단 우측</span>
+              <div class="position-shadow"></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-inner">
+          <h2>2. 말풍선 컴포넌트</h2>
+
+          <p class="section-label">컨테이너</p>
+          <div class="spec-bubble-wrap">
+            <span class="spec-arrow left">↕<br>16</span>
+            <div class="spec-bubble"></div>
+            <span class="spec-arrow right">↔<br>20</span>
+          </div>
+
+          <p class="spec-line">패딩: <span>12px 16px</span> | Radius: <span>14px</span> | Shadow: <span>0 8 24 -8 rgba(0,0,0,0.12)</span></p>
+          <div class="hr"></div>
+
+          <p class="section-label">상태</p>
+          <div class="state-list">
+            <div class="state-row">
+              <span class="label"><span class="dot"></span> 번역 중...</span>
+              <span class="mini-progress"></span>
+              <span class="status-message"></span>
+            </div>
+            <div class="state-row success">
+              <span class="label"><span class="dot"></span> 번역 완료</span>
+              <span></span>
+              <span class="status-message">텍스트가 번역되었습니다.</span>
+            </div>
+            <div class="state-row error">
+              <span class="label"><span class="dot"></span> 오류</span>
+              <span></span>
+              <span class="status-message">번역에 실패했습니다.</span>
+            </div>
+          </div>
+
+          <p class="section-label" style="margin-top: 22px;">하단 액션 영역</p>
+          <div class="action-strip">
+            <span class="language">영어 → 한국어 <span class="chevron"></span></span>
+            <span class="divider"></span>
+            <button class="button small">원본 보기</button>
+            <button class="icon-button">□</button>
+            <button class="icon-button">⋯</button>
+          </div>
+
+          <div class="hr"></div>
+
+          <p class="section-label">버튼</p>
+          <div class="button-row">
+            <div class="button-group">
+              <span class="caption">주요 버튼</span>
+              <div class="button-stack">
+                <button class="button">원본 보기</button>
+                <button class="button">번역 보기</button>
+              </div>
+            </div>
+            <div class="button-group">
+              <span class="caption">아이콘 버튼</span>
+              <div class="button-stack">
+                <button class="icon-button">□</button>
+                <button class="icon-button">⋯</button>
+              </div>
+            </div>
+            <div class="button-group">
+              <span class="caption">기타 버튼</span>
+              <button class="button">취소</button>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+          <p class="section-label">구분선</p>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-inner">
+          <h2>3. 아이콘 세트 (SF Symbols 기반)</h2>
+
+          <div class="icon-grid">
+            <div class="icon-sample"><span class="symbol">□</span><span class="icon-name">복사</span></div>
+            <div class="icon-sample"><span class="symbol">⌕</span><span class="icon-name">읽어주기</span></div>
+            <div class="icon-sample"><span class="symbol">↗</span><span class="icon-name">열기</span></div>
+            <div class="icon-sample"><span class="symbol">⋯</span><span class="icon-name">더보기</span></div>
+            <div class="icon-sample"><span class="symbol">A⇄</span><span class="icon-name">언어 감지</span></div>
+            <div class="icon-sample"><span class="symbol">✓</span><span class="icon-name">완료</span></div>
+            <div class="icon-sample"><span class="symbol">◌</span><span class="icon-name">로딩</span></div>
+            <div class="icon-sample"><span class="symbol">×</span><span class="icon-name">닫기</span></div>
+          </div>
+
+          <div class="hr"></div>
+
+          <p class="section-label">아이콘 사이즈</p>
+          <p class="small-note">16px (기본)</p>
+          <div class="icon-grid" style="grid-template-columns: repeat(5, 1fr); gap: 18px; margin-bottom: 18px;">
+            <span class="symbol sm">□</span>
+            <span class="symbol sm">⌕</span>
+            <span class="symbol sm">◒</span>
+            <span class="symbol sm">↗</span>
+            <span class="symbol sm">⋯</span>
+          </div>
+
+          <p class="small-note">20px (큰 크기)</p>
+          <div class="icon-grid" style="grid-template-columns: repeat(5, 1fr); gap: 18px;">
+            <span class="symbol lg">□</span>
+            <span class="symbol lg">⌕</span>
+            <span class="symbol lg">◒</span>
+            <span class="symbol lg">↗</span>
+            <span class="symbol lg">⋯</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel settings-panel">
+        <div class="panel-inner">
+          <h2>4. 설정 창 (macOS 네이티브 스타일)</h2>
+
+          <div class="settings-window">
+            <div class="window-titlebar">
+              <div class="traffic"><span class="close"></span><span class="min"></span><span class="max"></span></div>
+              설정
+            </div>
+
+            <div class="settings-body">
+              <aside class="sidebar">
+                <div class="side-item active"><span>⚙</span> 일반</div>
+                <div class="side-item"><span>A⇄</span> 번역</div>
+                <div class="side-item"><span>⌨</span> 단축키</div>
+                <div class="side-item"><span>⊘</span> 제외 앱</div>
+                <div class="side-sep"></div>
+                <div class="side-item"><span>☷</span> 고급</div>
+                <div class="side-item"><span>ⓘ</span> 정보</div>
+                <button class="reset-button">기본값으로 복원</button>
+              </aside>
+
+              <section class="settings-content">
+                <h3>기본 동작</h3>
+                <div class="setting-group">
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>자동 번역</strong></div>
+                    <span class="toggle"></span>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>알림 표시</strong></div>
+                    <span class="toggle"></span>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>번역 팝업</strong></div>
+                    <span class="toggle"></span>
+                  </div>
+                </div>
+
+                <h3>모양</h3>
+                <div class="setting-group">
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>테마</strong></div>
+                    <span class="select">시스템 설정을 따름 <span class="chevron"></span></span>
+                  </div>
+                  <div class="slider-row">
+                    <strong>투명도</strong>
+                    <span class="slider"></span>
+                    <span>80%</span>
+                  </div>
+                  <div class="slider-row">
+                    <strong>블러 강도</strong>
+                    <span class="slider"></span>
+                    <span>보통</span>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>액센트 색상</strong></div>
+                    <div class="swatches">
+                      <span class="swatch selected"></span>
+                      <span class="swatch" style="--color:#7d43e6"></span>
+                      <span class="swatch" style="--color:#ef5a84"></span>
+                      <span class="swatch" style="--color:#ff8f1f"></span>
+                      <span class="swatch" style="--color:#f9bf2e"></span>
+                      <span class="swatch" style="--color:#55c88a"></span>
+                      <span class="swatch" style="--color:#8fa1ae"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <h3>기타</h3>
+                <div class="setting-group">
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>메뉴 막대 아이콘</strong></div>
+                    <span class="select">항상 표시 <span class="chevron"></span></span>
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-main"><strong>로그인 시 실행</strong></div>
+                    <span class="toggle"></span>
+                  </div>
+                </div>
+
+                <div class="settings-footer">
+                  <span></span>
+                  <span class="api-status"><span class="dot" style="color: var(--green);"></span> API 사용 중</span>
+                  <span class="help">?</span>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel bottom-wide">
+        <div class="panel-inner">
+          <h2>5. 컬러 시스템</h2>
+          <p class="section-label">라이트 모드</p>
+          <div class="color-grid">
+            <div class="color-token">
+              <span class="color-box" style="--token:#007aff"></span>
+              <span class="token-name">Blue</span>
+              <span class="token-value">#007AFF</span>
+            </div>
+            <div class="color-token">
+              <span class="color-box" style="--token:#34c759"></span>
+              <span class="token-name">Green</span>
+              <span class="token-value">#34C759</span>
+            </div>
+            <div class="color-token">
+              <span class="color-box" style="--token:#ff3b30"></span>
+              <span class="token-name">Red</span>
+              <span class="token-value">#FF3B30</span>
+            </div>
+            <div class="color-token">
+              <span class="color-box" style="--token:#1d1d1f"></span>
+              <span class="token-name">Text</span>
+              <span class="token-value">#1D1D1F</span>
+            </div>
+            <div class="color-token">
+              <span class="color-box" style="--token:#6e6e73"></span>
+              <span class="token-name">Secondary</span>
+              <span class="token-value">#6E6E73</span>
+            </div>
+            <div class="color-token">
+              <span class="color-box" style="--token:#e5e5ea"></span>
+              <span class="token-name">Border</span>
+              <span class="token-value">#E5E5EA</span>
+            </div>
+            <div class="color-token">
+              <span class="color-box" style="--token:#ffffff"></span>
+              <span class="token-name">Background</span>
+              <span class="token-value">#FFFFFF</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel bottom-wide">
+        <div class="panel-inner">
+          <h2>6. 타이포그래피 <span style="font-weight:400; color:var(--secondary);">(SF Pro)</span></h2>
+          <div class="type-panel">
+            <div class="type-list">
+              <div>Body<br><span>14px / Regular</span></div>
+              <div>Body (Small)<br><span>13px / Regular</span></div>
+              <div>Caption<br><span>12px / Regular</span></div>
+            </div>
+            <div class="type-card">
+              <p>미래는 자신의 꿈의 아름다움을 믿는 사람들의 것이다.</p>
+              <p style="font-size: 11px; color: var(--secondary); font-weight: 450;">텍스트가 번역되었습니다.</p>
+              <p style="font-size: 11px; color: var(--secondary); font-weight: 450;">영어 → 한국어</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel bottom-wide">
+        <div class="panel-inner">
+          <h2>7. 간격 시스템 <span style="font-weight:400; color:var(--secondary);">(8pt Grid)</span></h2>
+          <div class="spacing-boxes">
+            <div class="space-demo">4<span class="space-shape" style="width: 24px; height: 24px;"></span></div>
+            <div class="space-demo">8<span class="space-shape" style="width: 32px; height: 32px;"></span></div>
+            <div class="space-demo">24<span class="space-shape" style="width: 48px; height: 48px;"></span></div>
+            <div class="space-demo">16<span class="space-shape" style="width: 32px; height: 32px;"></span></div>
+            <div class="space-demo">20<span class="space-shape" style="width: 40px; height: 40px;"></span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel bottom-wide">
+        <div class="panel-inner">
+          <h2>8. 그림자 시스템</h2>
+          <div class="shadow-demos">
+            <div>
+              <p class="section-label">Default</p>
+              <div class="shadow-card default"></div>
+              <p class="small-note">0 8 24 -8<br>rgba(0,0,0,0.12)</p>
+            </div>
+            <div>
+              <p class="section-label">Strong</p>
+              <div class="shadow-card strong"></div>
+              <p class="small-note">0 12 32 -12<br>rgba(0,0,0,0.16)</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel bottom-wide">
+        <div class="panel-inner">
+          <h2>9. 모션 & 전환</h2>
+          <p class="section-label">등장 (Fade + Slide)</p>
+          <p class="small-note">0.18s / ease-out</p>
+          <div class="motion-demo">
+            <span>→</span>
+            <div class="motion-card"></div>
+            <span>→</span>
+            <div class="motion-bubble"></div>
+          </div>
+
+          <p class="section-label" style="margin-top: 28px;">상태 전환</p>
+          <p class="small-note">0.15s / ease-in-out</p>
+          <div class="tiny-square"></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
