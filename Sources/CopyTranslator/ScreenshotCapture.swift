@@ -28,6 +28,8 @@ struct ScreenContextCaptureResult {
 }
 
 enum ScreenshotCapture {
+    private static let contextCropSize = CGSize(width: 192, height: 192)
+
     static func captureMainDisplayPNG() async throws -> Data {
         try await captureMainDisplayPNG(outputScale: .point1x)
     }
@@ -35,19 +37,21 @@ enum ScreenshotCapture {
     static func captureMainDisplayContextPNGIfAvailable() async -> ScreenContextCaptureResult {
         if CGPreflightScreenCaptureAccess() {
             do {
-                let data = try await captureWithScreenCaptureKit(outputScale: .point1x)
-                return ScreenContextCaptureResult(pngData: data, diagnostic: "ScreenCaptureKit")
+                let data = try await captureWithScreenCaptureKit(outputScale: .contextCrop)
+                return ScreenContextCaptureResult(pngData: data, diagnostic: contextDiagnostic(prefix: "ScreenCaptureKit"))
             } catch {
                 return captureContextWithScreencaptureFallback(prefix: "ScreenCaptureKit failed: \(error.localizedDescription)")
             }
         }
 
-        // Automatic text context should use existing permission paths, but must not open a TCC prompt during Cmd+C.
-        return captureContextWithScreencaptureFallback(prefix: "Screen Recording preflight denied")
+        // Automatic text context must never open a TCC prompt during Cmd+C.
+        // In SwiftPM/VS Code dev runs, the debug executable and the .app bundle can have separate TCC identities;
+        // calling /usr/sbin/screencapture here may show a prompt even when the packaged app is already approved.
+        return ScreenContextCaptureResult(pngData: nil, diagnostic: "Screen Recording preflight denied; skipped automatic context capture")
     }
 
     static func captureMainDisplayContextPNG() async throws -> Data {
-        try await captureMainDisplayPNG(outputScale: .point1x)
+        try await captureMainDisplayPNG(outputScale: .contextCrop)
     }
 
     private static func captureMainDisplayPNG(outputScale: OutputScale) async throws -> Data {
@@ -55,17 +59,10 @@ enum ScreenshotCapture {
             return try await captureWithScreenCaptureKit(outputScale: outputScale)
         }
 
-        do {
-            return try captureWithSystemScreencapture(outputScale: outputScale)
-        } catch {
-            guard CGRequestScreenCaptureAccess() else {
-                if let screenshotError = error as? ScreenshotCaptureError {
-                    throw screenshotError
-                }
-                throw ScreenshotCaptureError.permissionDenied
-            }
-            return try await captureWithScreenCaptureKit(outputScale: outputScale)
+        guard CGRequestScreenCaptureAccess() else {
+            throw ScreenshotCaptureError.permissionDenied
         }
+        return try await captureWithScreenCaptureKit(outputScale: outputScale)
     }
 
     private static func captureWithScreenCaptureKit(outputScale: OutputScale) async throws -> Data {
@@ -84,7 +81,7 @@ enum ScreenshotCapture {
             configuration.width = display.width
             configuration.height = display.height
             configuration.scalesToFit = false
-        case .point1x:
+        case .point1x, .contextCrop:
             let bounds = CGDisplayBounds(display.displayID)
             configuration.width = max(1, Int(bounds.width.rounded()))
             configuration.height = max(1, Int(bounds.height.rounded()))
@@ -93,7 +90,8 @@ enum ScreenshotCapture {
         configuration.showsCursor = false
 
         let image = try await captureImage(filter: filter, configuration: configuration)
-        let bitmap = NSBitmapImageRep(cgImage: image)
+        let outputImage = outputScale == .contextCrop ? contextImageAroundKeyboardCursor(image) : image
+        let bitmap = NSBitmapImageRep(cgImage: outputImage)
         guard let data = bitmap.representation(using: .png, properties: [:]) else {
             throw ScreenshotCaptureError.encodingFailed
         }
@@ -134,8 +132,8 @@ enum ScreenshotCapture {
 
     private static func captureContextWithScreencaptureFallback(prefix: String) -> ScreenContextCaptureResult {
         do {
-            let data = try captureWithSystemScreencapture(outputScale: .point1x)
-            return ScreenContextCaptureResult(pngData: data, diagnostic: "screencapture fallback")
+            let data = try captureWithSystemScreencapture(outputScale: .contextCrop)
+            return ScreenContextCaptureResult(pngData: data, diagnostic: contextDiagnostic(prefix: "screencapture fallback"))
         } catch {
             return ScreenContextCaptureResult(
                 pngData: nil,
@@ -145,7 +143,7 @@ enum ScreenshotCapture {
     }
 
     private static func resizedPNGDataIfNeeded(_ data: Data, outputScale: OutputScale) throws -> Data {
-        guard outputScale == .point1x,
+        guard outputScale == .point1x || outputScale == .contextCrop,
               let source = NSBitmapImageRep(data: data)?.cgImage else {
             return data
         }
@@ -153,33 +151,126 @@ enum ScreenshotCapture {
         let bounds = CGDisplayBounds(CGMainDisplayID())
         let targetWidth = max(1, Int(bounds.width.rounded()))
         let targetHeight = max(1, Int(bounds.height.rounded()))
-        guard source.width > targetWidth || source.height > targetHeight else {
-            return data
+        let image: CGImage
+        if source.width > targetWidth || source.height > targetHeight {
+            guard let context = CGContext(
+                data: nil,
+                width: targetWidth,
+                height: targetHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else {
+                throw ScreenshotCaptureError.encodingFailed
+            }
+
+            context.interpolationQuality = .high
+            context.draw(source, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+            guard let resizedImage = context.makeImage() else {
+                throw ScreenshotCaptureError.encodingFailed
+            }
+            image = resizedImage
+        } else {
+            image = source
         }
 
-        guard let context = CGContext(
-            data: nil,
-            width: targetWidth,
-            height: targetHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            throw ScreenshotCaptureError.encodingFailed
-        }
-
-        context.interpolationQuality = .high
-        context.draw(source, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
-        guard let image = context.makeImage() else {
-            throw ScreenshotCaptureError.encodingFailed
-        }
-
-        let bitmap = NSBitmapImageRep(cgImage: image)
+        let outputImage = outputScale == .contextCrop ? contextImageAroundKeyboardCursor(image) : image
+        let bitmap = NSBitmapImageRep(cgImage: outputImage)
         guard let resized = bitmap.representation(using: .png, properties: [:]) else {
             throw ScreenshotCaptureError.encodingFailed
         }
         return resized
+    }
+
+    private static func contextImageAroundKeyboardCursor(_ image: CGImage) -> CGImage {
+        guard let center = keyboardCursorCenter(in: image) else {
+            return image
+        }
+
+        let cropSize = CGSize(
+            width: min(contextCropSize.width, CGFloat(image.width)),
+            height: min(contextCropSize.height, CGFloat(image.height))
+        )
+        let origin = CGPoint(
+            x: min(max(center.x - cropSize.width / 2, 0), CGFloat(image.width) - cropSize.width),
+            y: min(max(center.y - cropSize.height / 2, 0), CGFloat(image.height) - cropSize.height)
+        )
+        let cropRect = CGRect(origin: origin, size: cropSize).integral
+        return image.cropping(to: cropRect) ?? image
+    }
+
+    private static func keyboardCursorCenter(in image: CGImage) -> CGPoint? {
+        guard let caretBounds = focusedTextCaretBounds() else {
+            return nil
+        }
+
+        let displayBounds = CGDisplayBounds(CGMainDisplayID())
+        guard displayBounds.intersects(caretBounds) else {
+            return nil
+        }
+
+        let x = caretBounds.midX - displayBounds.minX
+        let y = caretBounds.midY - displayBounds.minY
+        guard x.isFinite, y.isFinite else {
+            return nil
+        }
+
+        return CGPoint(
+            x: min(max(x, 0), CGFloat(image.width)),
+            y: min(max(y, 0), CGFloat(image.height))
+        )
+    }
+
+    private static func focusedTextCaretBounds() -> CGRect? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        ) == .success,
+              let focusedElement = focusedObject.map({ $0 as! AXUIElement }) else {
+            return nil
+        }
+
+        var rangeObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXSelectedTextRangeAttribute as CFString,
+            &rangeObject
+        ) == .success,
+              let rangeValue = rangeObject,
+              CFGetTypeID(rangeValue) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        var boundsObject: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            focusedElement,
+            kAXBoundsForRangeParameterizedAttribute as CFString,
+            rangeValue,
+            &boundsObject
+        ) == .success,
+              let boundsValue = boundsObject,
+              CFGetTypeID(boundsValue) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        var bounds = CGRect.zero
+        guard AXValueGetValue(boundsValue as! AXValue, .cgRect, &bounds),
+              !bounds.isNull,
+              !bounds.isEmpty else {
+            return nil
+        }
+
+        return bounds
+    }
+
+    private static func contextDiagnostic(prefix: String) -> String {
+        focusedTextCaretBounds() == nil
+            ? "\(prefix), full context crop (keyboard cursor unavailable)"
+            : "\(prefix), keyboard cursor crop"
     }
 
     private static func shareableContent() async throws -> SCShareableContent {
@@ -224,5 +315,6 @@ enum ScreenshotCapture {
     private enum OutputScale {
         case native
         case point1x
+        case contextCrop
     }
 }
