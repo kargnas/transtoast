@@ -23,11 +23,12 @@ final class PermissionOverlayWindowController: NSWindowController {
 
         let window = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 680, height: 440),
-            styleMask: [.titled, .closable, .nonactivatingPanel],
+            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         window.title = "CopyTranslator Permission Helper"
+        window.minSize = NSSize(width: 560, height: 400)
         window.level = .floating
         window.hidesOnDeactivate = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -50,7 +51,7 @@ final class PermissionOverlayWindowController: NSWindowController {
     private func makeContentView() -> NSView {
         let root = NSStackView()
         root.orientation = .vertical
-        root.alignment = .leading
+        root.alignment = .width
         root.spacing = 18
         root.edgeInsets = NSEdgeInsets(top: 22, left: 24, bottom: 22, right: 24)
 
@@ -66,6 +67,7 @@ final class PermissionOverlayWindowController: NSWindowController {
         let contentRow = NSStackView()
         contentRow.orientation = .horizontal
         contentRow.alignment = .top
+        contentRow.distribution = .fill
         contentRow.spacing = 22
         contentRow.addArrangedSubview(appCard())
         contentRow.addArrangedSubview(actionsCard())
@@ -75,7 +77,6 @@ final class PermissionOverlayWindowController: NSWindowController {
         pathLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         pathLabel.textColor = .secondaryLabelColor
         pathLabel.maximumNumberOfLines = 2
-        pathLabel.widthAnchor.constraint(equalToConstant: 620).isActive = true
         root.addArrangedSubview(pathLabel)
 
         return root
@@ -92,9 +93,10 @@ final class PermissionOverlayWindowController: NSWindowController {
     private func actionsCard() -> NSView {
         let stack = NSStackView()
         stack.orientation = .vertical
-        stack.alignment = .leading
+        stack.alignment = .width
         stack.spacing = 12
-        stack.widthAnchor.constraint(equalToConstant: 380).isActive = true
+        stack.widthAnchor.constraint(greaterThanOrEqualToConstant: 280).isActive = true
+        stack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         stack.addArrangedSubview(sectionLabel("Open a permission pane"))
         stack.addArrangedSubview(button("Input Monitoring", action: #selector(openInputMonitoringClicked)))
@@ -111,7 +113,6 @@ final class PermissionOverlayWindowController: NSWindowController {
         let hint = NSTextField(wrappingLabelWithString: "For Cmd+C twice, add CopyTranslator to Input Monitoring or Accessibility. For screenshots, add it to Screen Recording.")
         hint.textColor = .secondaryLabelColor
         hint.maximumNumberOfLines = 4
-        hint.widthAnchor.constraint(equalToConstant: 360).isActive = true
         stack.addArrangedSubview(hint)
 
         return stack
@@ -126,7 +127,7 @@ final class PermissionOverlayWindowController: NSWindowController {
     private func button(_ title: String, action: Selector) -> NSButton {
         let button = NSButton(title: title, target: self, action: action)
         button.bezelStyle = .rounded
-        button.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        button.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
         return button
     }
 

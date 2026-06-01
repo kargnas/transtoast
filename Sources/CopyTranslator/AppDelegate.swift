@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenshotHotKey: ScreenshotHotKey?
     private var keepAliveWindow: NSWindow?
     private var settingsWindowController: SettingsWindowController?
+    private var localModelSetupWindowController: LocalModelSetupWindowController?
     private var requestLogWindowController: RequestLogWindowController?
     private var permissionOverlayWindowController: PermissionOverlayWindowController?
     private var lastClipboardTriggerAt: Date?
@@ -53,6 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         reportKeyboardPermissionStatus(requestIfMissing: false)
         if CommandLine.arguments.contains("--show-settings") {
             showSettingsWindow()
+        }
+        if !settingsStore.settings.hasCompletedLocalModelSelection {
+            showLocalModelSetupWindow()
         }
     }
 
@@ -225,19 +229,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(submenuItem(title: "Text Provider", submenu: providerMenu))
 
-        let hyMT2Menu = NSMenu()
-        for model in HyMT2Model.allCases {
-            hyMT2Menu.addItem(checkableItem(
+        let localModelMenu = NSMenu()
+        for model in LocalModelRegistry.models(customModelsPath: settingsStore.settings.customLocalModelsPath) {
+            localModelMenu.addItem(checkableItem(
                 title: model.title,
-                checked: settingsStore.settings.hyMT2Model == model,
-                action: #selector(setHyMT2Model(_:)),
-                representedObject: model.rawValue
+                checked: settingsStore.settings.localModelID == model.id,
+                action: #selector(setLocalModel(_:)),
+                representedObject: model.id
             ))
         }
-        menu.addItem(submenuItem(title: "Local Hy-MT2 Model", submenu: hyMT2Menu))
+        menu.addItem(submenuItem(title: "Local Model", submenu: localModelMenu))
+
+        let sourceLanguageMenu = NSMenu()
+        for language in TranslationLanguage.sourceLanguageNames {
+            sourceLanguageMenu.addItem(checkableItem(
+                title: language,
+                checked: settingsStore.settings.sourceLanguage == language,
+                action: #selector(setSourceLanguage(_:)),
+                representedObject: language
+            ))
+        }
+        menu.addItem(submenuItem(title: "Source Language", submenu: sourceLanguageMenu))
 
         let languageMenu = NSMenu()
-        for language in ["English", "Korean", "Simplified Chinese", "Japanese", "Spanish", "German", "French"] {
+        for language in TranslationLanguage.targetLanguageNames {
             languageMenu.addItem(checkableItem(
                 title: language,
                 checked: settingsStore.settings.targetLanguage == language,
@@ -260,9 +275,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionItem(title: "Options...", action: #selector(showSettingsWindow)))
+        menu.addItem(actionItem(title: "Local Model Setup...", action: #selector(showLocalModelSetupWindow)))
         menu.addItem(actionItem(title: "Request Logs...", action: #selector(showRequestLogsWindow)))
         menu.addItem(actionItem(title: "Permission Drop Helper...", action: #selector(showPermissionOverlay)))
-        menu.addItem(actionItem(title: "Set Local Hy-MT2 Backend...", action: #selector(promptLocalHyMT2Backend)))
+        menu.addItem(actionItem(title: "Set Local Backend...", action: #selector(promptLocalHyMT2Backend)))
         menu.addItem(actionItem(title: "Set OpenRouter Text Model...", action: #selector(promptOpenRouterTextModel)))
         menu.addItem(actionItem(title: "Set OpenRouter Vision Model...", action: #selector(promptOpenRouterVisionModel)))
         menu.addItem(actionItem(title: "Test Translation", action: #selector(runTestTranslation)))
@@ -381,12 +397,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
     }
 
-    @objc private func setHyMT2Model(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let model = HyMT2Model(rawValue: rawValue) else {
+    @objc private func setLocalModel(_ sender: NSMenuItem) {
+        guard let modelID = sender.representedObject as? String else {
             return
         }
-        settingsStore.settings.hyMT2Model = model
+        settingsStore.settings.localModelID = modelID
+        rebuildMenu()
+    }
+
+    @objc private func setSourceLanguage(_ sender: NSMenuItem) {
+        guard let language = sender.representedObject as? String else {
+            return
+        }
+        settingsStore.settings.sourceLanguage = language
         rebuildMenu()
     }
 
@@ -409,8 +432,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func promptLocalHyMT2Backend() {
         promptModel(
-            title: "Local Hy-MT2 Backend",
-            informativeText: "Enter the local backend script path. Leave the default empty to auto-detect scripts/hy_mt2_translate.py or the bundled resource.",
+            title: "Local Backend",
+            informativeText: "Enter the local backend script path. Leave the default empty to auto-detect the backend for the selected local model.",
             currentValue: settingsStore.settings.localHyMT2BackendPath ?? ""
         ) { [weak self] value in
             self?.settingsStore.settings.localHyMT2BackendPath = value
@@ -463,6 +486,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 onScreenshotTranslation: { [weak self] in
                     self?.translateScreenshot()
                 },
+                onLocalModelSetup: { [weak self] in
+                    self?.showLocalModelSetupWindow()
+                },
                 onKeyboardPermissionRequest: { [weak self] in
                     self?.requestKeyboardPermission()
                 },
@@ -476,6 +502,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         settingsWindowController?.showWindow(nil)
+    }
+
+    @objc private func showLocalModelSetupWindow() {
+        if localModelSetupWindowController == nil {
+            localModelSetupWindowController = LocalModelSetupWindowController(
+                settingsStore: settingsStore,
+                credentialsProvider: credentialsProvider,
+                translationService: translationService,
+                onSettingsChanged: { [weak self] in
+                    self?.rebuildMenu()
+                }
+            )
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        localModelSetupWindowController?.showWindow(nil)
     }
 
     @objc private func showRequestLogsWindow() {
