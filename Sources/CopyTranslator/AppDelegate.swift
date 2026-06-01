@@ -58,6 +58,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--show-permission-helper") {
             showPermissionOverlay()
         }
+        if CommandLine.arguments.contains("--show-local-model-setup") {
+            showLocalModelSetupWindow()
+        }
+        if CommandLine.arguments.contains("--show-request-logs") {
+            showRequestLogsWindow()
+        }
+        if CommandLine.arguments.contains("--show-stacked-toasts") {
+            showStackedTestToasts()
+        }
         if !settingsStore.settings.hasCompletedLocalModelSelection {
             showLocalModelSetupWindow()
         }
