@@ -1,31 +1,23 @@
 {
-  // Run/debug entry points for the CopyTranslator executable.
-  // cwd = workspace root so CredentialsProvider loads `.env.local`
-  // (OPENROUTER_API_KEY / HF_TOKEN) automatically, same as scripts/run-dev.zsh.
+  // App daemon entry points run through scripts/run-dev.zsh so macOS TCC
+  // permissions use the signed .app bundle id, not SwiftPM's ad-hoc debug id.
   // VS Code draws a divider between different `presentation.group` values.
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "swift",
+      "type": "node-terminal",
       "request": "launch",
-      "name": "🚀 Run Dev (Debug)",
-      "target": "CopyTranslator",
-      "configuration": "debug",
-      "args": [],
+      "name": "🚀 Run Dev App Bundle",
+      "command": "./scripts/run-dev.zsh",
       "cwd": "${workspaceFolder:copy-translator}",
-      "preLaunchTask": "swift: Build Debug CopyTranslator",
       "presentation": { "group": "1_app", "order": 1 }
     },
     {
-      "type": "swift",
+      "type": "node-terminal",
       "request": "launch",
-      "name": "⚙️ Settings Window (Debug)",
-      "target": "CopyTranslator",
-      "configuration": "debug",
-      // README documents this flag for direct UI verification without the menu bar flow.
-      "args": ["--show-settings"],
+      "name": "⚙️ Settings Window App Bundle",
+      "command": "./scripts/run-dev.zsh --show-settings",
       "cwd": "${workspaceFolder:copy-translator}",
-      "preLaunchTask": "swift: Build Debug CopyTranslator",
       "presentation": { "group": "1_app", "order": 2 }
     },
     {

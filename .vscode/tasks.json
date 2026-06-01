@@ -1,8 +1,24 @@
 {
-  // Occasional / one-off developer chores. Daemons (swift run, settings window)
-  // live in launch.json, not here. Surfaced on the status bar via actboy168.tasks.
+  // Occasional / one-off developer chores. App daemon runs through the signed
+  // .app bundle so macOS permissions use the stable bundle id.
   "version": "2.0.0",
   "tasks": [
+    {
+      "label": "🚀 Run Dev App Bundle",
+      "type": "shell",
+      "command": "./scripts/run-dev.zsh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$swiftc"],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "⚙️ Run Dev Settings App Bundle",
+      "type": "shell",
+      "command": "./scripts/run-dev.zsh --show-settings",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$swiftc"],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
     {
       // First-run setup: copy the env template so secrets stay local and untracked.
       "label": "📦 Setup: Create .env.local",
