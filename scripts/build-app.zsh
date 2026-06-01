@@ -10,16 +10,24 @@ CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 SIGN_IDENTITY="${COPY_TRANSLATOR_CODE_SIGN_IDENTITY:-}"
+TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/CopyTranslator.app"
+TAURI_HELPER_DEST="$RESOURCES_DIR/CopyTranslatorTauri.app"
 
 cd "$ROOT"
 swift build -c release
-npm run build >/dev/null
-cargo build --manifest-path "$ROOT/src-tauri/Cargo.toml" --release >/dev/null
+npm run tauri -- build --bundles app >/dev/null
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp ".build/release/$APP_NAME" "$MACOS_DIR/$APP_NAME"
-cp "$ROOT/src-tauri/target/release/copy-translator-tauri" "$MACOS_DIR/copy-translator-tauri"
+ditto "$TAURI_HELPER_SOURCE" "$TAURI_HELPER_DEST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID.tauri-helper" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName CopyTranslatorTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName CopyTranslatorTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$TAURI_HELPER_DEST/Contents/Info.plist" >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f "$TAURI_HELPER_DEST" >/dev/null 2>&1 || true
 cp "$ROOT/scripts/hy_mt2_translate.py" "$RESOURCES_DIR/hy_mt2_translate.py"
 mkdir -p "$RESOURCES_DIR/runtimes"
 cp "$ROOT"/scripts/runtimes/*.py "$RESOURCES_DIR/runtimes/"

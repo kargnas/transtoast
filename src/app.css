@@ -30,6 +30,12 @@ body,
   margin: 0;
 }
 
+:root[data-surface="translation"],
+:root[data-surface="translation"] body,
+:root[data-surface="translation"] #app {
+  background: transparent;
+}
+
 button,
 input,
 select {

@@ -224,6 +224,8 @@ struct TranslationPreviewState {
     #[serde(rename = "providerTitle")]
     provider_title: String,
     model: String,
+    #[serde(rename = "toastDuration", default = "default_toast_duration_value")]
+    toast_duration: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -363,8 +365,17 @@ fn perform_settings_action(
 #[tauri::command]
 fn load_translation_preview(app: AppHandle) -> Result<TranslationPreviewState, String> {
     let settings = load_effective_settings(&app).unwrap_or_else(|_| default_settings());
-    read_translation_preview_state(&app)
-        .map(|state| state.unwrap_or_else(|| sample_translation_preview(&settings)))
+    read_translation_preview_state(&app).map(|state| {
+        let mut state = state.unwrap_or_else(|| sample_translation_preview(&settings));
+        state.toast_duration = settings.toast_duration;
+        state
+    })
+}
+
+#[tauri::command]
+fn close_translation_preview(app: AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
 }
 
 #[tauri::command]
@@ -470,6 +481,8 @@ pub fn run() {
                     .decorations(false)
                     .transparent(true)
                     .always_on_top(true)
+                    .skip_taskbar(true)
+                    .focusable(false)
                     .focused(false)
                     .build()
                     .map(|window| {
@@ -496,7 +509,8 @@ pub fn run() {
             run_local_model_benchmark,
             load_request_logs,
             clear_request_logs,
-            load_translation_preview
+            load_translation_preview,
+            close_translation_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running CopyTranslator Tauri app");
@@ -782,7 +796,12 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
         error_text: None,
         provider_title: provider_title(&settings.provider).to_string(),
         model: model_title(&settings.local_model_id, &settings.provider).to_string(),
+        toast_duration: settings.toast_duration,
     }
+}
+
+fn default_toast_duration_value() -> f64 {
+    default_settings().toast_duration
 }
 
 fn provider_title(provider: &TranslationProvider) -> &'static str {
@@ -1188,6 +1207,9 @@ fn legacy_binary_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn candidate_roots(app: &AppHandle) -> Vec<PathBuf> {
     let mut roots = Vec::new();
+    if let Some(root) = workspace_root_arg().or_else(workspace_root_env) {
+        push_ancestors(&mut roots, &root);
+    }
     if let Ok(current) = std::env::current_dir() {
         push_ancestors(&mut roots, &current);
     }
@@ -1195,6 +1217,31 @@ fn candidate_roots(app: &AppHandle) -> Vec<PathBuf> {
         push_ancestors(&mut roots, &resource_dir);
     }
     roots
+}
+
+fn workspace_root_env() -> Option<PathBuf> {
+    std::env::var("COPY_TRANSLATOR_WORKSPACE_ROOT")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+}
+
+fn workspace_root_arg() -> Option<PathBuf> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = arg.strip_prefix("--workspace-root=") {
+            if !value.trim().is_empty() {
+                return Some(PathBuf::from(value));
+            }
+        }
+        if arg == "--workspace-root" {
+            return args
+                .next()
+                .filter(|value| !value.trim().is_empty())
+                .map(PathBuf::from);
+        }
+    }
+    None
 }
 
 fn push_ancestors(roots: &mut Vec<PathBuf>, start: &Path) {

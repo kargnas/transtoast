@@ -14,6 +14,7 @@
   let preview = $state<TranslationPreviewState>(fallbackTranslationState);
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
+  let dismissTimer: number | undefined;
 
   const languagePair = $derived(`${shortLanguage(preview.sourceLanguage)} → ${shortLanguage(preview.targetLanguage)}`);
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
@@ -25,10 +26,15 @@
   const compactMode = $derived(visibleMode === "translated" || visibleMode === "original");
   const tallMode = $derived(debugMode || visibleMode === "loading" || visibleMode === "error");
 
-  onMount(async () => {
+  onMount(() => {
     isTauri = "__TAURI_INTERNALS__" in window;
-    if (!isTauri) return;
+    if (isTauri) {
+      void loadPreview();
+    }
+    return () => clearAutoDismiss();
+  });
 
+  async function loadPreview() {
     try {
       preview = await invoke<TranslationPreviewState>("load_translation_preview");
       visibleMode = requestedMode ?? preview.mode;
@@ -36,7 +42,8 @@
       preview = fallbackTranslationState;
       visibleMode = requestedMode ?? "translated";
     }
-  });
+    scheduleAutoDismiss();
+  }
 
   function modeFromQuery(value: string | null): TranslationMode | null {
     if (value === "loading" || value === "translated" || value === "original" || value === "error") {
@@ -73,7 +80,11 @@
 
   async function closePopover() {
     if (!isTauri) return;
-    await getCurrentWindow().close();
+    try {
+      await invoke("close_translation_preview");
+    } catch {
+      await getCurrentWindow().close();
+    }
   }
 
   async function cancelLoading() {
@@ -82,6 +93,23 @@
       return;
     }
     await closePopover();
+  }
+
+  function scheduleAutoDismiss() {
+    clearAutoDismiss();
+    if (debugMode || visibleMode === "loading") return;
+
+    const seconds = Number.isFinite(preview.toastDuration) ? preview.toastDuration : fallbackTranslationState.toastDuration;
+    dismissTimer = window.setTimeout(() => {
+      void closePopover();
+    }, Math.max(1, seconds) * 1000);
+  }
+
+  function clearAutoDismiss() {
+    if (dismissTimer !== undefined) {
+      window.clearTimeout(dismissTimer);
+      dismissTimer = undefined;
+    }
   }
 </script>
 

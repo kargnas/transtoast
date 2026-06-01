@@ -14,6 +14,26 @@ private struct TranslationPreviewPayload: Encodable {
     var model: String
 }
 
+private struct ScreenRectArgument {
+    var x: CGFloat
+    var y: CGFloat
+    var width: CGFloat
+    var height: CGFloat
+
+    init(_ rect: CGRect) {
+        x = rect.origin.x
+        y = rect.origin.y
+        width = rect.width
+        height = rect.height
+    }
+
+    var value: String {
+        [x, y, width, height]
+            .map { String(format: "%.3f", Double($0)) }
+            .joined(separator: ",")
+    }
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
@@ -25,8 +45,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pasteboardMonitor: PasteboardMonitor?
     private var screenshotHotKey: ScreenshotHotKey?
     private var keepAliveWindow: NSWindow?
-    private var tauriSurfaceProcesses: [String: Process] = [:]
-    private var translationPopoverProcess: Process?
     private var lastClipboardTriggerAt: Date?
     private var isUserQuitting = false
     private var hasStarted = false
@@ -419,49 +437,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openTauriSurface(_ surface: String) -> Bool {
-        if let process = tauriSurfaceProcesses[surface] {
-            if process.isRunning {
-                activateRunningApplication(processIdentifier: process.processIdentifier)
-                return true
-            }
-            tauriSurfaceProcesses[surface] = nil
-        }
-
-        guard let executableURL = resolveTauriSettingsExecutableURL() else {
-            return false
-        }
-
-        let process = Process()
-        process.executableURL = executableURL
-        if surface != "settings" {
-            process.arguments = ["--surface", surface]
-        }
-        let workspaceRootURL = resolveWorkspaceRootURL()
-        process.currentDirectoryURL = workspaceRootURL
-
-        var environment = ProcessInfo.processInfo.environment
-        if let workspaceRootURL {
-            environment["COPY_TRANSLATOR_WORKSPACE_ROOT"] = workspaceRootURL.path
-        }
-        process.environment = environment
-        process.terminationHandler = { [weak self] finishedProcess in
-            Task { @MainActor in
-                if self?.tauriSurfaceProcesses[surface] === finishedProcess {
-                    self?.tauriSurfaceProcesses[surface] = nil
-                }
-            }
-        }
-
-        do {
-            try process.run()
-        } catch {
-            print("Could not open Tauri \(surface): \(error.localizedDescription)")
-            return false
-        }
-
-        tauriSurfaceProcesses[surface] = process
-        activateRunningApplication(processIdentifier: process.processIdentifier)
-        return true
+        launchTauriHelper(
+            arguments: ["--surface", surface],
+            activate: true,
+            replaceExistingMatching: "--surface \(surface)"
+        )
     }
 
     private func showTranslationLoading(originalText: String, sourceTitle: String) {
@@ -533,46 +513,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func launchTranslationPopover(mode: String) -> Bool {
-        if let process = translationPopoverProcess, process.isRunning {
-            process.terminate()
-        }
-        translationPopoverProcess = nil
-
-        guard let executableURL = resolveTauriSettingsExecutableURL() else {
-            return false
-        }
-
-        let process = Process()
-        process.executableURL = executableURL
-        process.arguments = [
+        var arguments = [
             "--translation-preview",
             "--translation-preview-state=\(mode)",
         ]
-        let workspaceRootURL = resolveWorkspaceRootURL()
-        process.currentDirectoryURL = workspaceRootURL
-
-        var environment = ProcessInfo.processInfo.environment
-        if let workspaceRootURL {
-            environment["COPY_TRANSLATOR_WORKSPACE_ROOT"] = workspaceRootURL.path
-        }
-        process.environment = environment
-        process.terminationHandler = { [weak self] finishedProcess in
-            Task { @MainActor in
-                if self?.translationPopoverProcess === finishedProcess {
-                    self?.translationPopoverProcess = nil
-                }
-            }
+        if let caretBounds = focusedTextCaretBounds() {
+            arguments.append("--translation-preview-caret=\(ScreenRectArgument(caretBounds).value)")
         }
 
-        do {
-            try process.run()
-        } catch {
-            print("Could not open Tauri translation popover: \(error.localizedDescription)")
-            return false
+        return launchTauriHelper(
+            arguments: arguments,
+            activate: false,
+            replaceExistingMatching: "--translation-preview"
+        )
+    }
+
+    private func focusedTextCaretBounds() -> CGRect? {
+        guard AXIsProcessTrusted() else {
+            return nil
         }
 
-        translationPopoverProcess = process
-        return true
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        ) == .success,
+            let focusedObject
+        else {
+            return nil
+        }
+        let focusedElement = focusedObject as! AXUIElement
+
+        var selectedRangeObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRangeObject
+        ) == .success,
+            let selectedRange = selectedRangeObject
+        else {
+            return nil
+        }
+
+        var boundsObject: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            focusedElement,
+            kAXBoundsForRangeParameterizedAttribute as CFString,
+            selectedRange,
+            &boundsObject
+        ) == .success,
+            let boundsObject,
+            CFGetTypeID(boundsObject) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+        let boundsValue = boundsObject as! AXValue
+        guard AXValueGetType(boundsValue) == .cgRect else {
+            return nil
+        }
+
+        var rect = CGRect.zero
+        guard AXValueGetValue(boundsValue, .cgRect, &rect),
+              rect.origin.x.isFinite,
+              rect.origin.y.isFinite,
+              rect.width.isFinite,
+              rect.height.isFinite,
+              rect.width >= 0,
+              rect.height > 0
+        else {
+            return nil
+        }
+
+        return tauriScreenRect(fromAccessibilityRect: rect)
+    }
+
+    private func tauriScreenRect(fromAccessibilityRect rect: CGRect) -> CGRect {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) ?? NSScreen.main,
+              let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else {
+            return rect
+        }
+
+        let displayBounds = CGDisplayBounds(CGDirectDisplayID(screenNumber.uint32Value))
+        let x = displayBounds.minX + (rect.minX - screen.frame.minX)
+        let y = displayBounds.maxY - (rect.minY - screen.frame.minY) - rect.height
+        return CGRect(x: x, y: y, width: rect.width, height: rect.height)
     }
 
     private func resolvedLanguages(
@@ -598,21 +626,102 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func resolveTauriSettingsExecutableURL() -> URL? {
-        let explicitExecutablePath = argumentValue(after: "--tauri-settings-executable")
-        var candidates: [URL] = []
-        if let explicitExecutablePath, !explicitExecutablePath.isEmpty {
-            candidates.append(URL(fileURLWithPath: explicitExecutablePath))
-        }
-        if let executableDirectoryURL = Bundle.main.executableURL?.deletingLastPathComponent() {
-            candidates.append(executableDirectoryURL.appendingPathComponent("copy-translator-tauri"))
-        }
-        if let workspaceRootURL = resolveWorkspaceRootURL() {
-            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/copy-translator-tauri"))
-            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/copy-translator-tauri"))
+    private func launchTauriHelper(
+        arguments: [String],
+        activate: Bool,
+        replaceExistingMatching match: String
+    ) -> Bool {
+        guard let appURL = resolveTauriHelperAppURL() else {
+            return false
         }
 
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+        terminateTauriHelper(appURL: appURL, matching: match)
+
+        let previousFrontmostApplication = activate ? nil : NSWorkspace.shared.frontmostApplication
+        let helperBundleIdentifier = Bundle(url: appURL)?.bundleIdentifier
+        var launchArguments = arguments
+        if let workspaceRootURL = resolveWorkspaceRootURL() {
+            launchArguments.append(contentsOf: ["--workspace-root", workspaceRootURL.path])
+        }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = activate
+        configuration.createsNewApplicationInstance = true
+        configuration.arguments = launchArguments
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
+            if let error {
+                print("Could not open Tauri helper app: \(error.localizedDescription)")
+            }
+        }
+        if !activate {
+            restoreFrontmostApplication(
+                previousFrontmostApplication,
+                helperBundleIdentifier: helperBundleIdentifier
+            )
+        }
+        return true
+    }
+
+    private func restoreFrontmostApplication(
+        _ application: NSRunningApplication?,
+        helperBundleIdentifier: String?
+    ) {
+        let ownBundleIdentifier = Bundle.main.bundleIdentifier
+        let guardedBundleIdentifiers = Set(
+            [helperBundleIdentifier, ownBundleIdentifier].compactMap { $0 }
+        )
+        let guardedNames = Set(["CopyTranslator", "CopyTranslatorTauri", "copy-translator-tauri"])
+
+        for delay in [0.05, 0.15, 0.35, 0.75] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let frontmostApplication = NSWorkspace.shared.frontmostApplication else {
+                    return
+                }
+
+                let frontmostBundleIdentifier = frontmostApplication.bundleIdentifier
+                let frontmostName = frontmostApplication.localizedName
+                let didHelperTakeFocus = frontmostBundleIdentifier.map(guardedBundleIdentifiers.contains) ?? false
+                    || frontmostName.map(guardedNames.contains) ?? false
+
+                guard didHelperTakeFocus else {
+                    return
+                }
+
+                application?.activate(options: [])
+            }
+        }
+    }
+
+    private func terminateTauriHelper(appURL: URL, matching match: String) {
+        let executablePath = appURL
+            .appendingPathComponent("Contents/MacOS/copy-translator-tauri")
+            .path
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        process.arguments = ["-f", "\(executablePath).*\(match)"]
+        try? process.run()
+    }
+
+    private func resolveTauriHelperAppURL() -> URL? {
+        let explicitAppPath = argumentValue(after: "--tauri-helper-app")
+        var candidates: [URL] = []
+        if let explicitAppPath, !explicitAppPath.isEmpty {
+            candidates.append(URL(fileURLWithPath: explicitAppPath))
+        }
+        if let resourceURL = Bundle.main.resourceURL {
+            candidates.append(resourceURL.appendingPathComponent("CopyTranslatorTauri.app", isDirectory: true))
+            candidates.append(resourceURL.appendingPathComponent("CopyTranslator.app", isDirectory: true))
+        }
+        if let workspaceRootURL = resolveWorkspaceRootURL() {
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/bundle/macos/CopyTranslator.app", isDirectory: true))
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/bundle/macos/CopyTranslator.app", isDirectory: true))
+        }
+
+        return candidates.first { candidate in
+            FileManager.default.isExecutableFile(
+                atPath: candidate.appendingPathComponent("Contents/MacOS/copy-translator-tauri").path
+            )
+        }
     }
 
     private func resolveWorkspaceRootURL() -> URL? {
@@ -657,13 +766,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return nil
             }
             candidate = parent
-        }
-    }
-
-    private func activateRunningApplication(processIdentifier: pid_t) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            NSRunningApplication(processIdentifier: processIdentifier)?
-                .activate(options: [])
         }
     }
 

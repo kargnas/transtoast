@@ -17,7 +17,11 @@ const surfaceComponents: Record<AppSurface, typeof App> = {
   "toast-stack": ToastStack as typeof App
 };
 
-const Component = surfaceComponents[currentSurface()];
+const surface = currentSurface();
+document.documentElement.dataset.surface = surface;
+document.body.dataset.surface = surface;
+
+const Component = surfaceComponents[surface];
 
 const app = mount(Component, {
   target: document.getElementById("app")!

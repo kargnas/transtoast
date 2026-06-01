@@ -9,6 +9,7 @@ export type TranslationPreviewState = {
   errorText: string | null;
   providerTitle: string;
   model: string;
+  toastDuration: number;
 };
 
 export const fallbackTranslationState: TranslationPreviewState = {
@@ -19,5 +20,6 @@ export const fallbackTranslationState: TranslationPreviewState = {
   translatedText: "미래는 자신의 꿈의 아름다움을 믿는 사람들의 것이다.",
   errorText: null,
   providerTitle: "Local Model",
-  model: "Hy-MT2 1.8B 4-bit"
+  model: "Hy-MT2 1.8B 4-bit",
+  toastDuration: 6
 };
