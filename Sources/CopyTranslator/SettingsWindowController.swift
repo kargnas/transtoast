@@ -5,16 +5,17 @@ import CoreGraphics
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
-    // Single source for spacing/width tokens. Spacing values stay on the 4/8/12/16/20/24
-    // scale so the window keeps consistent whitespace; widths live here so no magic number leaks into layout code.
     private enum Layout {
         static let groupSpacing: CGFloat = 16
         static let rowSpacing: CGFloat = 8
+        static let groupInset: CGFloat = 12
         static let windowInset: CGFloat = 20
         static let labelColumnWidth: CGFloat = 150
         static let controlMinWidth: CGFloat = 220
-        static let resetButtonMinWidth: CGFloat = 120
+        static let controlPreferredWidth: CGFloat = 300
+        static let resetButtonMinWidth: CGFloat = 132
         static let actionButtonMinWidth: CGFloat = 132
+        static let formMaxWidth: CGFloat = 540
     }
 
     private enum SettingRow: Int, CaseIterable {
@@ -36,8 +37,6 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     private let onRequestLogs: () -> Void
     private let onScreenshotTranslation: () -> Void
     private let onLocalModelSetup: () -> Void
-    private let onKeyboardPermissionRequest: () -> Void
-    private let onScreenRecordingPermissionRequest: () -> Void
     private let onPermissionOverlayRequest: () -> Void
 
     private let providerPopup = NSPopUpButton()
@@ -49,9 +48,11 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     private let customLocalModelsField = NSTextField()
     private let openRouterTextModelField = NSTextField()
     private let openRouterVisionModelField = NSTextField()
-    private let permissionStatusField = NSTextField(wrappingLabelWithString: "")
+    private let keyboardPermissionStatusField = NSTextField(wrappingLabelWithString: "")
+    private let screenPermissionStatusField = NSTextField(wrappingLabelWithString: "")
     private let lastResultField = NSTextField(wrappingLabelWithString: "No translation yet.")
     private var resetButtons: [SettingRow: NSButton] = [:]
+    private var resetButtonWidths: [SettingRow: NSLayoutConstraint] = [:]
 
     init(
         settingsStore: SettingsStore,
@@ -61,8 +62,6 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         onRequestLogs: @escaping () -> Void,
         onScreenshotTranslation: @escaping () -> Void,
         onLocalModelSetup: @escaping () -> Void,
-        onKeyboardPermissionRequest: @escaping () -> Void,
-        onScreenRecordingPermissionRequest: @escaping () -> Void,
         onPermissionOverlayRequest: @escaping () -> Void
     ) {
         self.settingsStore = settingsStore
@@ -72,18 +71,16 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         self.onRequestLogs = onRequestLogs
         self.onScreenshotTranslation = onScreenshotTranslation
         self.onLocalModelSetup = onLocalModelSetup
-        self.onKeyboardPermissionRequest = onKeyboardPermissionRequest
-        self.onScreenRecordingPermissionRequest = onScreenRecordingPermissionRequest
         self.onPermissionOverlayRequest = onPermissionOverlayRequest
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "CopyTranslator Settings"
-        window.minSize = NSSize(width: 580, height: 460)
+        window.minSize = NSSize(width: 580, height: 620)
         window.center()
         super.init(window: window)
         window.contentView = makeContentView()
@@ -110,60 +107,75 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     }
 
     private func makeContentView() -> NSView {
+        let contentView = NSView()
+
         let root = NSStackView()
+        root.translatesAutoresizingMaskIntoConstraints = false
         root.orientation = .vertical
         root.alignment = .width
         root.distribution = .fill
         root.spacing = Layout.groupSpacing
-        root.edgeInsets = NSEdgeInsets(
-            top: Layout.windowInset,
-            left: Layout.windowInset,
-            bottom: Layout.windowInset,
-            right: Layout.windowInset
-        )
+        contentView.addSubview(root)
 
-        let title = NSTextField(labelWithString: "CopyTranslator Settings")
-        // Dynamic Type style instead of a hardcoded point size so the title respects accessibility text scaling.
-        title.font = .preferredFont(forTextStyle: .title2)
-        root.addArrangedSubview(title)
+        let preferredWidth = root.widthAnchor.constraint(equalToConstant: Layout.formMaxWidth)
+        preferredWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            root.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            root.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Layout.windowInset),
+            root.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Layout.windowInset),
+            root.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: Layout.windowInset),
+            root.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -Layout.windowInset),
+            preferredWidth,
+        ])
 
-        root.addArrangedSubview(row(label: "Text Provider", control: providerPopup, setting: .provider))
-        root.addArrangedSubview(row(label: "Local Model", control: localModelPopup, setting: .localModel))
-        root.addArrangedSubview(row(label: "Source Language", control: sourceLanguagePopup, setting: .sourceLanguage))
-        root.addArrangedSubview(row(label: "Target Language", control: targetLanguagePopup, setting: .targetLanguage))
-        root.addArrangedSubview(row(label: "Toast Position", control: toastPositionPopup, setting: .toastPosition))
-        root.addArrangedSubview(row(label: "Local Backend Path", control: localBackendField, setting: .localBackendPath))
-        root.addArrangedSubview(row(label: "Custom Models JSON", control: customLocalModelsField, setting: .customLocalModelsPath))
-        root.addArrangedSubview(row(label: "OpenRouter Text Model", control: openRouterTextModelField, setting: .openRouterTextModel))
-        root.addArrangedSubview(row(label: "OpenRouter Vision Model", control: openRouterVisionModelField, setting: .openRouterVisionModel))
-        root.addArrangedSubview(row(label: "Permissions", control: permissionStatusField))
-        root.addArrangedSubview(row(label: "Last Result", control: lastResultField))
+        root.addArrangedSubview(groupBox(
+            title: "General",
+            views: [
+                row(label: "Text Provider", control: providerPopup, setting: .provider),
+                row(label: "Source Language", control: sourceLanguagePopup, setting: .sourceLanguage),
+                row(label: "Target Language", control: targetLanguagePopup, setting: .targetLanguage),
+                row(label: "Toast Position", control: toastPositionPopup, setting: .toastPosition),
+            ]
+        ))
 
-        let buttonRow = NSStackView()
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = Layout.rowSpacing
-        buttonRow.addArrangedSubview(button(title: "Run Text Test", action: #selector(runTextTest)))
-        buttonRow.addArrangedSubview(button(title: "Model Setup", action: #selector(showLocalModelSetup)))
-        buttonRow.addArrangedSubview(button(title: "Request Logs", action: #selector(showRequestLogs)))
-        root.addArrangedSubview(buttonRow)
+        root.addArrangedSubview(groupBox(
+            title: "Models",
+            views: [
+                row(label: "Local Model", control: localModelPopup, setting: .localModel),
+                row(label: "Local Backend Path", control: localBackendField, setting: .localBackendPath),
+                row(label: "Custom Models JSON", control: customLocalModelsField, setting: .customLocalModelsPath),
+                row(label: "Text Model", control: openRouterTextModelField, setting: .openRouterTextModel),
+                row(label: "Vision Model", control: openRouterVisionModelField, setting: .openRouterVisionModel),
+                actionRow(buttons: [button(title: "Model Setup", action: #selector(showLocalModelSetup))]),
+            ]
+        ))
 
-        let testRow = NSStackView()
-        testRow.orientation = .horizontal
-        testRow.spacing = Layout.rowSpacing
-        testRow.addArrangedSubview(button(title: "Show Stacked Toasts", action: #selector(showStackedToasts)))
-        testRow.addArrangedSubview(button(title: "Translate Screenshot", action: #selector(translateScreenshot)))
-        root.addArrangedSubview(testRow)
+        root.addArrangedSubview(groupBox(
+            title: "Permissions",
+            views: [
+                row(label: "Keyboard", control: keyboardPermissionStatusField),
+                row(label: "Screen Recording", control: screenPermissionStatusField),
+                actionRow(buttons: [button(title: "Permission Helper", action: #selector(showPermissionOverlay))]),
+            ]
+        ))
 
-        let permissionRow = NSStackView()
-        permissionRow.orientation = .horizontal
-        permissionRow.spacing = Layout.rowSpacing
-        permissionRow.addArrangedSubview(button(title: "Permission Helper", action: #selector(showPermissionOverlay)))
-        permissionRow.addArrangedSubview(button(title: "Keyboard Prompt", action: #selector(requestKeyboardPermission)))
-        permissionRow.addArrangedSubview(button(title: "Screen Settings", action: #selector(requestScreenRecordingPermission)))
-        root.addArrangedSubview(permissionRow)
+        root.addArrangedSubview(groupBox(
+            title: "Diagnostics",
+            views: [
+                row(label: "Last Result", control: lastResultField),
+                actionRow(buttons: [
+                    button(title: "Run Text Test", action: #selector(runTextTest)),
+                    button(title: "Translate Screenshot", action: #selector(translateScreenshot)),
+                ]),
+                actionRow(buttons: [
+                    button(title: "Request Logs", action: #selector(showRequestLogs)),
+                    button(title: "Show Stacked Toasts", action: #selector(showStackedToasts)),
+                ]),
+            ]
+        ))
 
         configureControls()
-        return root
+        return contentView
     }
 
     func updateLastResult(_ text: String) {
@@ -189,18 +201,26 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         )
         configurePopup(toastPositionPopup, cases: ToastPosition.allCases.map { ($0.title, $0.rawValue) }, action: #selector(toastPositionChanged))
 
+        for popup in [providerPopup, localModelPopup, sourceLanguagePopup, targetLanguagePopup, toastPositionPopup] {
+            popup.font = .preferredFont(forTextStyle: .body)
+        }
+
         for field in [localBackendField, customLocalModelsField, openRouterTextModelField, openRouterVisionModelField] {
             field.delegate = self
             field.target = self
             field.action = #selector(textFieldSubmitted)
+            field.font = .preferredFont(forTextStyle: .body)
             field.lineBreakMode = .byTruncatingMiddle
         }
-        permissionStatusField.lineBreakMode = .byWordWrapping
-        permissionStatusField.maximumNumberOfLines = 3
-        permissionStatusField.isSelectable = true
-        lastResultField.lineBreakMode = .byWordWrapping
+
+        for field in [keyboardPermissionStatusField, screenPermissionStatusField, lastResultField] {
+            field.font = .preferredFont(forTextStyle: .body)
+            field.lineBreakMode = .byWordWrapping
+            field.isSelectable = true
+        }
+        keyboardPermissionStatusField.maximumNumberOfLines = 2
+        screenPermissionStatusField.maximumNumberOfLines = 2
         lastResultField.maximumNumberOfLines = 4
-        lastResultField.isSelectable = true
     }
 
     private func configurePopup(_ popup: NSPopUpButton, cases: [(String, String)], action: Selector) {
@@ -228,16 +248,17 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         customLocalModelsField.stringValue = settingsStore.settings.customLocalModelsPath ?? ""
         openRouterTextModelField.stringValue = settingsStore.settings.openRouterTextModel
         openRouterVisionModelField.stringValue = settingsStore.settings.openRouterVisionModel
-        permissionStatusField.stringValue = permissionStatusText()
+        refreshPermissionStatusFields()
         refreshDefaultButtons()
     }
 
-    private func permissionStatusText() -> String {
+    private func refreshPermissionStatusFields() {
         let keyboardReady = CGPreflightListenEventAccess() || AXIsProcessTrusted()
         let screenReady = CGPreflightScreenCaptureAccess()
-        let keyboard = keyboardReady ? "Keyboard ready" : "Clipboard fallback ready; keyboard permission recommended"
-        let screen = screenReady ? "Screen ready" : "Screen trust is not active for this signed app"
-        return "\(keyboard). \(screen)."
+        keyboardPermissionStatusField.stringValue = keyboardReady ? "Ready" : "Not granted"
+        screenPermissionStatusField.stringValue = screenReady ? "Ready" : "Not granted"
+        keyboardPermissionStatusField.textColor = keyboardReady ? .labelColor : .secondaryLabelColor
+        screenPermissionStatusField.textColor = screenReady ? .labelColor : .secondaryLabelColor
     }
 
     private func select(_ popup: NSPopUpButton, value: String) {
@@ -247,25 +268,49 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
     }
 
-    private func row(label: String, control: NSControl, setting: SettingRow? = nil) -> NSView {
-        let labelView = NSTextField(labelWithString: label)
-        labelView.alignment = .right
-        labelView.translatesAutoresizingMaskIntoConstraints = false
-        labelView.widthAnchor.constraint(equalToConstant: Layout.labelColumnWidth).isActive = true
-        // Label column is fixed; the control flexes. High hugging on the label keeps the two-column grid aligned.
-        labelView.setContentHuggingPriority(.required, for: .horizontal)
+    private func groupBox(title: String, views: [NSView]) -> NSBox {
+        let box = NSBox()
+        box.translatesAutoresizingMaskIntoConstraints = false
+        box.title = title
+        box.titlePosition = .atTop
+        box.boxType = .primary
+        box.contentViewMargins = NSSize(width: Layout.groupInset, height: Layout.groupInset)
 
+        let stack = NSStackView(views: views)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.orientation = .vertical
+        stack.alignment = .width
+        stack.distribution = .fill
+        stack.spacing = Layout.rowSpacing
+
+        if let contentView = box.contentView {
+            contentView.addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+                stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+                stack.topAnchor.constraint(equalTo: contentView.topAnchor),
+                stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            ])
+        }
+
+        return box
+    }
+
+    private func row(label: String, control: NSControl, setting: SettingRow? = nil) -> NSView {
         control.translatesAutoresizingMaskIntoConstraints = false
         control.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.controlMinWidth).isActive = true
+        let preferredWidth = control.widthAnchor.constraint(equalToConstant: Layout.controlPreferredWidth)
+        preferredWidth.priority = .defaultHigh
+        preferredWidth.isActive = true
         control.setContentHuggingPriority(.defaultLow, for: .horizontal)
         control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        var views: [NSView] = [labelView, control]
-        if let setting {
-            views.append(resetButton(for: setting))
-        }
-
-        let stack = NSStackView(views: views)
+        let stack = NSStackView(views: [
+            rowLabel(label),
+            control,
+            resetButtonContainer(for: setting),
+        ])
+        stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.distribution = .fill
@@ -273,25 +318,86 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         return stack
     }
 
-    private func resetButton(for setting: SettingRow) -> NSButton {
+    private func actionRow(buttons: [NSButton]) -> NSView {
+        let buttonStack = NSStackView(views: buttons)
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
+        buttonStack.orientation = .horizontal
+        buttonStack.alignment = .centerY
+        buttonStack.distribution = .fill
+        buttonStack.spacing = Layout.rowSpacing
+
+        let controlContainer = NSView()
+        controlContainer.translatesAutoresizingMaskIntoConstraints = false
+        controlContainer.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.controlMinWidth).isActive = true
+        let preferredWidth = controlContainer.widthAnchor.constraint(equalToConstant: Layout.controlPreferredWidth)
+        preferredWidth.priority = .defaultHigh
+        preferredWidth.isActive = true
+        controlContainer.addSubview(buttonStack)
+        NSLayoutConstraint.activate([
+            buttonStack.leadingAnchor.constraint(equalTo: controlContainer.leadingAnchor),
+            buttonStack.topAnchor.constraint(equalTo: controlContainer.topAnchor),
+            buttonStack.bottomAnchor.constraint(equalTo: controlContainer.bottomAnchor),
+            buttonStack.trailingAnchor.constraint(lessThanOrEqualTo: controlContainer.trailingAnchor),
+        ])
+
+        let stack = NSStackView(views: [rowLabel(""), controlContainer])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.distribution = .fill
+        stack.spacing = Layout.rowSpacing
+        return stack
+    }
+
+    private func rowLabel(_ text: String) -> NSTextField {
+        let labelView = NSTextField(labelWithString: text)
+        labelView.translatesAutoresizingMaskIntoConstraints = false
+        labelView.alignment = .right
+        labelView.font = .preferredFont(forTextStyle: .body)
+        labelView.lineBreakMode = .byTruncatingTail
+        labelView.widthAnchor.constraint(equalToConstant: Layout.labelColumnWidth).isActive = true
+        labelView.setContentHuggingPriority(.required, for: .horizontal)
+        labelView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return labelView
+    }
+
+    private func resetButtonContainer(for setting: SettingRow?) -> NSView {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        guard let setting else {
+            return container
+        }
+
+        let width = container.widthAnchor.constraint(equalToConstant: 0)
+        width.isActive = true
+        resetButtonWidths[setting] = width
+
         let button = NSButton(title: "Reset to Default", target: self, action: #selector(resetSettingToDefault))
+        button.translatesAutoresizingMaskIntoConstraints = false
         button.bezelStyle = .rounded
         button.setButtonType(.momentaryPushIn)
+        button.font = .preferredFont(forTextStyle: .body)
         button.tag = setting.rawValue
         button.isHidden = true
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.resetButtonMinWidth).isActive = true
-        button.setContentHuggingPriority(.required, for: .horizontal)
         resetButtons[setting] = button
-        return button
+        container.addSubview(button)
+
+        NSLayoutConstraint.activate([
+            button.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+        ])
+
+        return container
     }
 
     private func button(title: String, action: Selector) -> NSButton {
         let button = NSButton(title: title, target: self, action: action)
+        button.translatesAutoresizingMaskIntoConstraints = false
         button.bezelStyle = .rounded
         button.setButtonType(.momentaryPushIn)
-        button.sendAction(on: [.leftMouseDown, .leftMouseUp])
-        button.translatesAutoresizingMaskIntoConstraints = false
+        button.font = .preferredFont(forTextStyle: .body)
         button.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.actionButtonMinWidth).isActive = true
         return button
     }
@@ -391,15 +497,20 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     private func refreshDefaultButtons() {
         let settings = settingsStore.settings
         let defaults = TranslatorSettings()
-        resetButtons[.provider]?.isHidden = settings.provider == defaults.provider
-        resetButtons[.localModel]?.isHidden = settings.localModelID == defaults.localModelID
-        resetButtons[.sourceLanguage]?.isHidden = settings.sourceLanguage == defaults.sourceLanguage
-        resetButtons[.targetLanguage]?.isHidden = settings.targetLanguage == defaults.targetLanguage
-        resetButtons[.toastPosition]?.isHidden = settings.toastPosition == defaults.toastPosition
-        resetButtons[.localBackendPath]?.isHidden = settings.localHyMT2BackendPath == defaults.localHyMT2BackendPath
-        resetButtons[.customLocalModelsPath]?.isHidden = settings.customLocalModelsPath == defaults.customLocalModelsPath
-        resetButtons[.openRouterTextModel]?.isHidden = settings.openRouterTextModel == defaults.openRouterTextModel
-        resetButtons[.openRouterVisionModel]?.isHidden = settings.openRouterVisionModel == defaults.openRouterVisionModel
+        setResetVisible(settings.provider != defaults.provider, for: .provider)
+        setResetVisible(settings.localModelID != defaults.localModelID, for: .localModel)
+        setResetVisible(settings.sourceLanguage != defaults.sourceLanguage, for: .sourceLanguage)
+        setResetVisible(settings.targetLanguage != defaults.targetLanguage, for: .targetLanguage)
+        setResetVisible(settings.toastPosition != defaults.toastPosition, for: .toastPosition)
+        setResetVisible(settings.localHyMT2BackendPath != defaults.localHyMT2BackendPath, for: .localBackendPath)
+        setResetVisible(settings.customLocalModelsPath != defaults.customLocalModelsPath, for: .customLocalModelsPath)
+        setResetVisible(settings.openRouterTextModel != defaults.openRouterTextModel, for: .openRouterTextModel)
+        setResetVisible(settings.openRouterVisionModel != defaults.openRouterVisionModel, for: .openRouterVisionModel)
+    }
+
+    private func setResetVisible(_ visible: Bool, for row: SettingRow) {
+        resetButtons[row]?.isHidden = !visible
+        resetButtonWidths[row]?.constant = visible ? Layout.resetButtonMinWidth : 0
     }
 
     @objc private func runTextTest() {
@@ -423,14 +534,6 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     @objc private func translateScreenshot() {
         applyTextFields()
         onScreenshotTranslation()
-    }
-
-    @objc private func requestKeyboardPermission() {
-        onKeyboardPermissionRequest()
-    }
-
-    @objc private func requestScreenRecordingPermission() {
-        onScreenRecordingPermissionRequest()
     }
 
     @objc private func showPermissionOverlay() {

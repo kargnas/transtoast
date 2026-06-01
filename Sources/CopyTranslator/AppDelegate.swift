@@ -55,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--show-settings") {
             showSettingsWindow()
         }
+        if CommandLine.arguments.contains("--show-permission-helper") {
+            showPermissionOverlay()
+        }
         if !settingsStore.settings.hasCompletedLocalModelSelection {
             showLocalModelSetupWindow()
         }
@@ -274,17 +277,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(submenuItem(title: "Toast Position", submenu: positionMenu))
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(actionItem(title: "Options...", action: #selector(showSettingsWindow)))
-        menu.addItem(actionItem(title: "Local Model Setup...", action: #selector(showLocalModelSetupWindow)))
-        menu.addItem(actionItem(title: "Request Logs...", action: #selector(showRequestLogsWindow)))
-        menu.addItem(actionItem(title: "Permission Drop Helper...", action: #selector(showPermissionOverlay)))
-        menu.addItem(actionItem(title: "Set Local Backend...", action: #selector(promptLocalHyMT2Backend)))
-        menu.addItem(actionItem(title: "Set OpenRouter Text Model...", action: #selector(promptOpenRouterTextModel)))
-        menu.addItem(actionItem(title: "Set OpenRouter Vision Model...", action: #selector(promptOpenRouterVisionModel)))
-        menu.addItem(actionItem(title: "Test Translation", action: #selector(runTestTranslation)))
-        menu.addItem(actionItem(title: "Request Keyboard Permission", action: #selector(requestKeyboardPermission)))
-        menu.addItem(actionItem(title: "Open Input Monitoring Settings", action: #selector(openInputMonitoringSettings)))
-        menu.addItem(actionItem(title: "Open Screen Recording Settings", action: #selector(openScreenRecordingSettings)))
+        menu.addItem(actionItem(title: "Settings...", action: #selector(showSettingsWindow)))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionItem(title: "Quit", action: #selector(quit)))
 
@@ -488,12 +481,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 },
                 onLocalModelSetup: { [weak self] in
                     self?.showLocalModelSetupWindow()
-                },
-                onKeyboardPermissionRequest: { [weak self] in
-                    self?.requestKeyboardPermission()
-                },
-                onScreenRecordingPermissionRequest: { [weak self] in
-                    self?.openScreenRecordingSettings()
                 },
                 onPermissionOverlayRequest: { [weak self] in
                     self?.showPermissionOverlay()
