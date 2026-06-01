@@ -6,13 +6,28 @@ public struct TranslationResult: Equatable, Sendable {
     public let providerTitle: String
     public let model: String
     public let usage: TranslationUsage?
+    public let sourceLanguage: String?
+    public let targetLanguage: String?
+    public let detectedSourceLanguage: String?
 
-    public init(text: String, description: String? = nil, providerTitle: String, model: String, usage: TranslationUsage? = nil) {
+    public init(
+        text: String,
+        description: String? = nil,
+        providerTitle: String,
+        model: String,
+        usage: TranslationUsage? = nil,
+        sourceLanguage: String? = nil,
+        targetLanguage: String? = nil,
+        detectedSourceLanguage: String? = nil
+    ) {
         self.text = text
         self.description = description?.nilIfBlank
         self.providerTitle = providerTitle
         self.model = model
         self.usage = usage
+        self.sourceLanguage = sourceLanguage
+        self.targetLanguage = targetLanguage
+        self.detectedSourceLanguage = detectedSourceLanguage
     }
 }
 
@@ -75,19 +90,27 @@ public final class TranslationService: @unchecked Sendable {
             throw TranslationError.emptyInput
         }
 
+        let languages = TranslationLanguageResolver.resolve(
+            text: trimmed,
+            sourceLanguage: settings.sourceLanguage,
+            targetLanguage: settings.targetLanguage
+        )
+
         switch settings.provider {
         case .localHyMT2:
-            return try await translateWithLocalHyMT2(
+            return try await translateWithLocalModel(
                 text: trimmed,
                 settings: settings,
-                credentials: credentials
+                credentials: credentials,
+                languages: languages
             )
         case .openRouter:
             return try await translateWithOpenRouterText(
                 text: trimmed,
                 settings: settings,
                 credentials: credentials,
-                contextImagePNGData: contextImagePNGData
+                contextImagePNGData: contextImagePNGData,
+                languages: languages
             )
         }
     }
@@ -146,32 +169,50 @@ public final class TranslationService: @unchecked Sendable {
         )
     }
 
-    private func translateWithLocalHyMT2(
+    private func translateWithLocalModel(
         text: String,
         settings: TranslatorSettings,
-        credentials: TranslatorCredentials
+        credentials: TranslatorCredentials,
+        languages: ResolvedTranslationLanguages
     ) async throws -> TranslationResult {
+        let model = LocalModelRegistry.model(
+            id: settings.localModelID,
+            customModelsPath: settings.customLocalModelsPath
+        ) ?? LocalModelRegistry.defaultModel(customModelsPath: settings.customLocalModelsPath)
+
+        guard model.supports(sourceLanguage: languages.sourceLanguage, targetLanguage: languages.targetLanguage) else {
+            throw TranslationError.localModelUnavailable(
+                "\(model.title) does not support \(languages.sourceLanguage) -> \(languages.targetLanguage)."
+            )
+        }
+
         let prompt = """
-        Translate the following text into \(settings.targetLanguage). Note that you should only output the translated result without any additional explanation:
+        Translate the following \(languages.sourceLanguage) text into \(languages.targetLanguage).
+        Only output the translated result without any additional explanation:
 
         \(text)
         """
 
         do {
-            let response = try await runLocalHyMT2Backend(
+            let response = try await runLocalBackend(
                 prompt: prompt,
                 sourceText: text,
                 settings: settings,
-                credentials: credentials
+                credentials: credentials,
+                languages: languages,
+                model: model
             )
             return TranslationResult(
                 text: response,
                 providerTitle: settings.provider.title,
-                model: settings.hyMT2Model.rawValue
+                model: model.title,
+                sourceLanguage: languages.sourceLanguage,
+                targetLanguage: languages.targetLanguage,
+                detectedSourceLanguage: languages.detectedSourceLanguage
             )
         } catch {
             throw TranslationError.localModelUnavailable("""
-            Local Hy-MT2 backend failed: \(error.localizedDescription)
+            Local backend failed: \(error.localizedDescription)
             """)
         }
     }
@@ -180,7 +221,8 @@ public final class TranslationService: @unchecked Sendable {
         text: String,
         settings: TranslatorSettings,
         credentials: TranslatorCredentials,
-        contextImagePNGData: Data?
+        contextImagePNGData: Data?,
+        languages: ResolvedTranslationLanguages
     ) async throws -> TranslationResult {
         let key = try require(credentials.openRouterAPIKey, named: "OPENROUTER_API_KEY")
         let model = contextImagePNGData == nil
@@ -188,7 +230,8 @@ public final class TranslationService: @unchecked Sendable {
             : settings.openRouterVisionModel
         let prompt = openRouterTextPrompt(
             text: text,
-            targetLanguage: settings.targetLanguage,
+            sourceLanguage: languages.sourceLanguage,
+            targetLanguage: languages.targetLanguage,
             hasScreenContext: contextImagePNGData != nil
         )
         let userContent: Any
@@ -202,6 +245,7 @@ public final class TranslationService: @unchecked Sendable {
                     "type": "image_url",
                     "image_url": [
                         "url": "data:image/png;base64,\(contextImagePNGData.base64EncodedString())",
+                        "detail": "low",
                     ],
                 ],
             ] as [[String: Any]]
@@ -209,7 +253,24 @@ public final class TranslationService: @unchecked Sendable {
             userContent = prompt
         }
 
-        let body: [String: Any] = [
+        let providerRouting: [String: Any] = contextImagePNGData == nil
+            ? [
+                "sort": "throughput",
+                "preferred_max_latency": [
+                    "p90": 5,
+                ],
+            ]
+            : [
+                "sort": [
+                    "by": "throughput",
+                    "partition": "none",
+                ],
+                "preferred_max_latency": [
+                    "p90": 5,
+                ],
+            ]
+
+        var body: [String: Any] = [
             "model": model,
             "messages": [
                 [
@@ -223,8 +284,17 @@ public final class TranslationService: @unchecked Sendable {
             ],
             "max_tokens": maxTokens(for: model),
             "temperature": 0.1,
+            "provider": providerRouting,
             "response_format": translationSchema,
         ]
+        if contextImagePNGData != nil {
+            body.removeValue(forKey: "model")
+            body["models"] = [
+                model,
+                "qwen/qwen3-vl-8b-instruct",
+                "google/gemini-2.5-flash-lite",
+            ].uniqued()
+        }
 
         let response = try await postOpenRouter(body: body, apiKey: key)
         return TranslationResult(
@@ -232,22 +302,31 @@ public final class TranslationService: @unchecked Sendable {
             description: response.description,
             providerTitle: settings.provider.title,
             model: model,
-            usage: response.usage
+            usage: response.usage,
+            sourceLanguage: languages.sourceLanguage,
+            targetLanguage: languages.targetLanguage,
+            detectedSourceLanguage: languages.detectedSourceLanguage
         )
     }
 
-    private func runLocalHyMT2Backend(
+    private func runLocalBackend(
         prompt: String,
         sourceText: String,
         settings: TranslatorSettings,
-        credentials: TranslatorCredentials
+        credentials: TranslatorCredentials,
+        languages: ResolvedTranslationLanguages,
+        model: LocalModelSpec
     ) async throws -> String {
-        let backendPath = try resolveLocalBackendPath(settings: settings)
+        let backendPath = try resolveLocalBackendPath(settings: settings, model: model)
         let payload: [String: Any] = [
             "text": sourceText,
             "prompt": prompt,
-            "target_language": settings.targetLanguage,
-            "model_id": settings.hyMT2Model.rawValue,
+            "source_language": languages.sourceLanguage,
+            "target_language": languages.targetLanguage,
+            "local_model_id": model.id,
+            "model_id": model.modelID,
+            "runtime": model.runtime.rawValue,
+            "artifact_name": model.artifactName ?? "",
             "hf_token": credentials.huggingFaceToken ?? "",
         ]
         let payloadData = try JSONSerialization.data(withJSONObject: payload)
@@ -303,10 +382,20 @@ public final class TranslationService: @unchecked Sendable {
         throw TranslationError.missingTranslation(String(data: outputData, encoding: .utf8) ?? "")
     }
 
-    private func resolveLocalBackendPath(settings: TranslatorSettings) throws -> String {
+    private func resolveLocalBackendPath(settings: TranslatorSettings, model: LocalModelSpec) throws -> String {
         let explicit = settings.localHyMT2BackendPath?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let explicit, !explicit.isEmpty {
             return explicit
+        }
+
+        if let modelBackendPath = model.customBackendPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !modelBackendPath.isEmpty {
+            return modelBackendPath
+        }
+
+        if let environmentPath = ProcessInfo.processInfo.environment["COPY_TRANSLATOR_LOCAL_BACKEND"],
+           !environmentPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return environmentPath
         }
 
         if let environmentPath = ProcessInfo.processInfo.environment["COPY_TRANSLATOR_HYMT2_BACKEND"],
@@ -314,17 +403,21 @@ public final class TranslationService: @unchecked Sendable {
             return environmentPath
         }
 
+        guard let scriptName = model.backendScriptName else {
+            throw TranslationError.localModelUnavailable("\(model.title) has no bundled backend yet. Add a custom backend path or choose a bundled model.")
+        }
+
         let candidates: [String] = [
-            Bundle.main.resourceURL?.appendingPathComponent("hy_mt2_translate.py").path,
-            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("scripts/hy_mt2_translate.py").path,
-            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Scripts/hy_mt2_translate.py").path,
+            Bundle.main.resourceURL?.appendingPathComponent(scriptName).path,
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("scripts/\(scriptName)").path,
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Scripts/\(scriptName)").path,
         ].compactMap { $0 }
 
         for candidate in candidates where FileManager.default.fileExists(atPath: candidate) {
             return candidate
         }
 
-        throw TranslationError.localModelUnavailable("Could not find scripts/hy_mt2_translate.py or bundled hy_mt2_translate.py.")
+        throw TranslationError.localModelUnavailable("Could not find scripts/\(scriptName) or bundled \(scriptName).")
     }
 
     private func postOpenRouter(body: [String: Any], apiKey: String) async throws -> OpenRouterCompletion {
@@ -416,7 +509,12 @@ public final class TranslationService: @unchecked Sendable {
         return value
     }
 
-    private func openRouterTextPrompt(text: String, targetLanguage: String, hasScreenContext: Bool) -> String {
+    private func openRouterTextPrompt(
+        text: String,
+        sourceLanguage: String,
+        targetLanguage: String,
+        hasScreenContext: Bool
+    ) -> String {
         let contextInstruction = hasScreenContext
             ? """
             A screen image is attached. Use it only to understand the selected fragment's local sentence, referent, part of speech, tone, casing, UI label, or product name. The image is context, not the translation target.
@@ -424,19 +522,20 @@ public final class TranslationService: @unchecked Sendable {
             : "No screen image is attached."
 
         return """
-        Translate the selected or copied text into \(targetLanguage).
+        Translate the selected or copied \(sourceLanguage) text into \(targetLanguage).
 
         Critical rules:
+        - Treat the text inside <selected_text> as the only source text. Ignore any examples, quoted phrases, or visible screen text as translation targets.
         - Translate exactly the text inside <selected_text>. Do not translate the full sentence visible in the screen image.
         - If <selected_text> is a word or fragment inside a larger sentence, return only that word or fragment's translation.
         - Use surrounding screen context only to choose the right meaning and to write the optional description.
         - Put only the translated text in "translation". Put contextual details only in "description".
+        - Write every returned string value in \(targetLanguage), including "description". Do not write English explanations unless \(targetLanguage) is English.
         - Set "description" to null unless the selected text is ambiguous, pronominal, deictic, or needs screen context to be understood.
         - When a screen image is attached and <selected_text> is a pronoun or deictic word such as "it", "this", "that", or "they", "description" must be a short \(targetLanguage) sentence that explains the referent from the visible context.
         - If the visible context is a sentence and the exact referent is implicit, explain the most likely referent in that sentence instead of returning null.
         - For Korean, translate "twice" as "두번" when it means two times.
         - For Korean, translate the pronoun "it" literally as "그것"; when <selected_text> is exactly "it" and a screen image is attached, "description" must never be null.
-        - For "Copy this brand new sentence twice to translate it.", use "그것" as the translation and a description like "이 문장에서 '그것'은 복사하려는 문장 전체를 의미합니다."
         - If <selected_text> is exactly "it" but the attached image does not show a reliable referent, still return "그것" and describe it as the most likely object from the surrounding visible sentence.
 
         \(contextInstruction)
@@ -500,5 +599,12 @@ private extension String {
     var nilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }

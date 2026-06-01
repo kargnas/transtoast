@@ -12,12 +12,24 @@ struct OpenRouterScreenContextTests {
         )
         let service = TranslationService(session: stubbedOpenRouterSession { request in
             let body = try #require(request.jsonBody)
-            #expect(body["model"] as? String == "openrouter/vision-model")
+            #expect(body["model"] == nil)
+            let models = try #require(body["models"] as? [String])
+            #expect(models.first == "openrouter/vision-model")
+            #expect(models.contains("qwen/qwen3-vl-8b-instruct"))
+            #expect(models.contains("google/gemini-2.5-flash-lite"))
+
+            let provider = try #require(body["provider"] as? [String: Any])
+            let sort = try #require(provider["sort"] as? [String: Any])
+            #expect(sort["by"] as? String == "throughput")
+            #expect(sort["partition"] as? String == "none")
 
             let messages = try #require(body["messages"] as? [[String: Any]])
             let userMessage = try #require(messages.last)
             let content = try #require(userMessage["content"] as? [[String: Any]])
             #expect(content.contains { $0["type"] as? String == "image_url" })
+            let image = try #require(content.first { $0["type"] as? String == "image_url" })
+            let imageURL = try #require(image["image_url"] as? [String: Any])
+            #expect(imageURL["detail"] as? String == "low")
             let prompt = try #require(content.compactMap { $0["text"] as? String }.first)
             #expect(prompt.contains("Do not translate the full sentence visible in the screen image."))
             #expect(prompt.contains("Translate exactly the text inside <selected_text>."))
@@ -58,6 +70,9 @@ struct OpenRouterScreenContextTests {
             let content = try #require(userMessage["content"] as? [[String: Any]])
             let prompt = try #require(content.compactMap { $0["text"] as? String }.first)
             #expect(prompt.contains("translate the pronoun \"it\" literally as \"그것\""))
+            #expect(prompt.contains("Treat the text inside <selected_text> as the only source text."))
+            #expect(prompt.contains("Write every returned string value in Korean"))
+            #expect(!prompt.contains("Copy this brand new sentence twice to translate it."))
             return openRouterResponse(
                 "그것",
                 description: "이 문장에서 '그것'은 복사하려는 문장 전체를 의미합니다."
