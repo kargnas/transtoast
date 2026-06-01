@@ -1,0 +1,5 @@
+{
+  // swiftlang.swift-vscode: official Swift language/debug support.
+  // actboy168.tasks: shows tasks.json entries on the status bar for one-click runs.
+  "recommendations": ["swiftlang.swift-vscode", "actboy168.tasks"]
+}

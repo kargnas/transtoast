@@ -1,0 +1,47 @@
+{
+  // Occasional / one-off developer chores. Daemons (swift run, settings window)
+  // live in launch.json, not here. Surfaced on the status bar via actboy168.tasks.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // First-run setup: copy the env template so secrets stay local and untracked.
+      "label": "📦 Setup: Create .env.local",
+      "type": "shell",
+      "command": "[ -f .env.local ] && echo '.env.local already exists, leaving it untouched.' || { cp .env.example .env.local && echo 'Created .env.local — fill in OPENROUTER_API_KEY and HF_TOKEN.'; }",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "🧪 Run Tests",
+      "type": "shell",
+      "command": "swift test",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      // Clears SwiftPM build artifacts; use after dependency or toolchain changes.
+      "label": "🧹 Clean Build Artifacts",
+      "type": "shell",
+      "command": "rm -rf .build dist && echo 'Removed .build and dist.'",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      // Release build + codesign + install to /Applications (see scripts/install-app.zsh).
+      "label": "🛠️ Build & Install to /Applications",
+      "type": "shell",
+      "command": "./scripts/install-app.zsh --open",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      // Produces dist/CopyTranslator.zip for sharing with another Mac.
+      "label": "📮 Package App (.zip)",
+      "type": "shell",
+      "command": "./scripts/package-app.zsh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$swiftc"]
+    }
+  ]
+}

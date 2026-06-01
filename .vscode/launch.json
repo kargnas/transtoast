@@ -1,0 +1,75 @@
+{
+  // Run/debug entry points for the CopyTranslator executable.
+  // cwd = workspace root so CredentialsProvider loads `.env.local`
+  // (OPENROUTER_API_KEY / HF_TOKEN) automatically, same as scripts/run-dev.zsh.
+  // VS Code draws a divider between different `presentation.group` values.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "name": "🚀 Run Dev (Debug)",
+      "target": "CopyTranslator",
+      "configuration": "debug",
+      "args": [],
+      "cwd": "${workspaceFolder:copy-translator}",
+      "preLaunchTask": "swift: Build Debug CopyTranslator",
+      "presentation": { "group": "1_app", "order": 1 }
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "name": "⚙️ Settings Window (Debug)",
+      "target": "CopyTranslator",
+      "configuration": "debug",
+      // README documents this flag for direct UI verification without the menu bar flow.
+      "args": ["--show-settings"],
+      "cwd": "${workspaceFolder:copy-translator}",
+      "preLaunchTask": "swift: Build Debug CopyTranslator",
+      "presentation": { "group": "1_app", "order": 2 }
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "name": "Run Release",
+      "target": "CopyTranslator",
+      "configuration": "release",
+      "args": [],
+      "cwd": "${workspaceFolder:copy-translator}",
+      "preLaunchTask": "swift: Build Release CopyTranslator",
+      "presentation": { "group": "2_release", "order": 1 }
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "name": "Translate Text Once (Debug)",
+      "target": "CopyTranslator",
+      "configuration": "debug",
+      // One-shot pipeline test: prints the translation and exits (no menu bar daemon).
+      "args": ["--translate-text-once", "${input:textToTranslate}"],
+      "cwd": "${workspaceFolder:copy-translator}",
+      "preLaunchTask": "swift: Build Debug CopyTranslator",
+      "presentation": { "group": "3_oneshot", "order": 1 }
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "name": "Screenshot Translate Once (Debug)",
+      "target": "CopyTranslator",
+      "configuration": "debug",
+      // Captures the main display, translates it via the OpenRouter vision model, then exits.
+      "args": ["--screenshot-once"],
+      "cwd": "${workspaceFolder:copy-translator}",
+      "preLaunchTask": "swift: Build Debug CopyTranslator",
+      "presentation": { "group": "3_oneshot", "order": 2 }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "textToTranslate",
+      "type": "promptString",
+      "description": "Text to translate once",
+      "default": "Hello, world"
+    }
+  ]
+}

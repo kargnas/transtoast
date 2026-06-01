@@ -1,0 +1,30 @@
+{
+  // Workspace formatting/linting for the Swift toolchain. The official Swift
+  // extension (swiftlang.swift-vscode) drives swift-format on save.
+  "editor.formatOnSave": true,
+  "[swift]": {
+    "editor.defaultFormatter": "swiftlang.swift-vscode",
+    "editor.tabSize": 4
+  },
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+
+  // Keep build output and generated bundles out of search, file watcher, and explorer noise.
+  "files.exclude": {
+    "**/.build": true,
+    "**/.swiftpm": true,
+    "**/dist": true,
+    "**/DerivedData": true
+  },
+  "search.exclude": {
+    "**/.build": true,
+    "**/dist": true,
+    "**/models": true
+  },
+  "files.watcherExclude": {
+    "**/.build/**": true,
+    "**/dist/**": true,
+    "**/models/**": true
+  }
+}
