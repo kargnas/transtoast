@@ -2,7 +2,11 @@
 .swiftpm/
 DerivedData/
 dist/
+dist-web/
 models/
+node_modules/
+src-tauri/gen/
+src-tauri/target/
 
 # API keys and local model/runtime state must stay local.
 .env
