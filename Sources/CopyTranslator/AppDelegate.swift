@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pasteboardMonitor: PasteboardMonitor?
     private var screenshotHotKey: ScreenshotHotKey?
     private var keepAliveWindow: NSWindow?
+    private var tauriSettingsProcess: Process?
     private var settingsWindowController: SettingsWindowController?
     private var localModelSetupWindowController: LocalModelSetupWindowController?
     private var requestLogWindowController: RequestLogWindowController?
@@ -470,6 +471,128 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSettingsWindow() {
+        if !CommandLine.arguments.contains("--show-legacy-settings"),
+           openRenewedSettingsWindow() {
+            return
+        }
+
+        showLegacySettingsWindow()
+    }
+
+    private func openRenewedSettingsWindow() -> Bool {
+        if let process = tauriSettingsProcess {
+            if process.isRunning {
+                activateRunningApplication(processIdentifier: process.processIdentifier)
+                return true
+            }
+            tauriSettingsProcess = nil
+        }
+
+        guard let executableURL = resolveTauriSettingsExecutableURL() else {
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = executableURL
+        let workspaceRootURL = resolveWorkspaceRootURL()
+        process.currentDirectoryURL = workspaceRootURL
+
+        var environment = ProcessInfo.processInfo.environment
+        if let workspaceRootURL {
+            environment["COPY_TRANSLATOR_WORKSPACE_ROOT"] = workspaceRootURL.path
+        }
+        process.environment = environment
+        process.terminationHandler = { [weak self] finishedProcess in
+            Task { @MainActor in
+                if self?.tauriSettingsProcess === finishedProcess {
+                    self?.tauriSettingsProcess = nil
+                }
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            toastManager.show(
+                title: "Settings",
+                message: "Could not open renewed settings: \(error.localizedDescription)",
+                settings: settingsStore.settings
+            )
+            return false
+        }
+
+        tauriSettingsProcess = process
+        activateRunningApplication(processIdentifier: process.processIdentifier)
+        return true
+    }
+
+    private func resolveTauriSettingsExecutableURL() -> URL? {
+        let explicitExecutablePath = argumentValue(after: "--tauri-settings-executable")
+        var candidates: [URL] = []
+        if let explicitExecutablePath, !explicitExecutablePath.isEmpty {
+            candidates.append(URL(fileURLWithPath: explicitExecutablePath))
+        }
+        if let workspaceRootURL = resolveWorkspaceRootURL() {
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/copy-translator-tauri"))
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/copy-translator-tauri"))
+        }
+
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+
+    private func resolveWorkspaceRootURL() -> URL? {
+        var candidates: [URL] = []
+        if let workspaceRootPath = argumentValue(after: "--workspace-root"),
+           !workspaceRootPath.isEmpty {
+            candidates.append(URL(fileURLWithPath: workspaceRootPath))
+        }
+        if let workspaceRootPath = ProcessInfo.processInfo.environment["COPY_TRANSLATOR_WORKSPACE_ROOT"],
+           !workspaceRootPath.isEmpty {
+            candidates.append(URL(fileURLWithPath: workspaceRootPath))
+        }
+        candidates.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+        candidates.append(Bundle.main.bundleURL)
+        if let resourceURL = Bundle.main.resourceURL {
+            candidates.append(resourceURL)
+        }
+
+        for candidate in candidates {
+            if let rootURL = firstAncestorWithPackageManifest(from: candidate) {
+                return rootURL
+            }
+        }
+        return nil
+    }
+
+    private func firstAncestorWithPackageManifest(from url: URL) -> URL? {
+        var candidate = url.standardizedFileURL
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+           !isDirectory.boolValue {
+            candidate.deleteLastPathComponent()
+        }
+
+        while true {
+            if FileManager.default.fileExists(atPath: candidate.appendingPathComponent("Package.swift").path) {
+                return candidate
+            }
+
+            let parent = candidate.deletingLastPathComponent()
+            if parent.path == candidate.path {
+                return nil
+            }
+            candidate = parent
+        }
+    }
+
+    private func activateRunningApplication(processIdentifier: pid_t) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            NSRunningApplication(processIdentifier: processIdentifier)?
+                .activate(options: [])
+        }
+    }
+
+    private func showLegacySettingsWindow() {
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(
                 settingsStore: settingsStore,
