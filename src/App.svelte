@@ -466,6 +466,16 @@
             </div>
             <div class="setting-row">
               <span class="setting-copy">
+                <strong>Keyboard Cursor</strong>
+                <span>Accessibility permission for caret-anchored popovers</span>
+              </span>
+              <span class:ready={settingsState.permissions.accessibility} class="status-pill">
+                {settingsState.permissions.accessibility ? "Ready" : "Not granted"}
+              </span>
+              <span class="reset-row spacer"></span>
+            </div>
+            <div class="setting-row">
+              <span class="setting-copy">
                 <strong>Screen Recording</strong>
               </span>
               <span class:ready={settingsState.permissions.screen} class="status-pill">

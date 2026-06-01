@@ -1,9 +1,8 @@
 import AppKit
-import ApplicationServices
 import CopyTranslatorCore
 import CoreGraphics
 
-private struct TranslationPreviewPayload: Encodable {
+struct TranslationPreviewPayload: Encodable {
     var mode: String
     var sourceLanguage: String
     var targetLanguage: String
@@ -14,38 +13,21 @@ private struct TranslationPreviewPayload: Encodable {
     var model: String
 }
 
-private struct ScreenRectArgument {
-    var x: CGFloat
-    var y: CGFloat
-    var width: CGFloat
-    var height: CGFloat
-
-    init(_ rect: CGRect) {
-        x = rect.origin.x
-        y = rect.origin.y
-        width = rect.width
-        height = rect.height
-    }
-
-    var value: String {
-        [x, y, width, height]
-            .map { String(format: "%.3f", Double($0)) }
-            .joined(separator: ",")
-    }
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
     private let translationService = TranslationService()
     private let requestLogStore = RequestLogStore()
+    private let translationPopoverController = TranslationPopoverController()
     private var statusItem: NSStatusItem?
     private var keyboardMonitor: KeyboardMonitor?
     private var pasteboardMonitor: PasteboardMonitor?
     private var screenshotHotKey: ScreenshotHotKey?
     private var keepAliveWindow: NSWindow?
     private var lastClipboardTriggerAt: Date?
+    private var lastTranslationCaretBounds: CGRect?
+    private var suppressCurrentTextTranslationPopover = false
     private var isUserQuitting = false
     private var hasStarted = false
     private var lifetimeActivity: NSObjectProtocol?
@@ -489,118 +471,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showTranslationPopover(_ payload: TranslationPreviewPayload, sourceTitle: String) {
-        do {
-            try writeTranslationPreviewPayload(payload)
-        } catch {
-            print("Could not write translation preview for \(sourceTitle): \(error.localizedDescription)")
+        let requiresCaretAnchor = payload.originalText != "[screen screenshot]"
+        let caretBounds: CGRect?
+        if payload.mode == "loading" {
+            caretBounds = KeyboardCaretLocator.focusedTextCaretBounds()
+            lastTranslationCaretBounds = caretBounds
+            suppressCurrentTextTranslationPopover = requiresCaretAnchor && caretBounds == nil
+        } else {
+            caretBounds = lastTranslationCaretBounds ?? KeyboardCaretLocator.focusedTextCaretBounds()
+        }
+
+        guard !(requiresCaretAnchor && suppressCurrentTextTranslationPopover) else {
+            translationPopoverController.close()
+            print("Skipped translation popover for \(sourceTitle): keyboard cursor bounds are unavailable.")
             return
         }
 
-        guard launchTranslationPopover(mode: payload.mode) else {
-            print("Could not launch Tauri translation popover for \(sourceTitle).")
-            return
-        }
-    }
-
-    private func writeTranslationPreviewPayload(_ payload: TranslationPreviewPayload) throws {
-        try SharedAppStorage.ensureDirectoryExists()
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(payload).write(
-            to: SharedAppStorage.fileURL("translation-preview.json"),
-            options: [.atomic]
+        translationPopoverController.show(
+            payload: payload,
+            settings: settingsStore.settings,
+            caretBounds: caretBounds
         )
-    }
-
-    private func launchTranslationPopover(mode: String) -> Bool {
-        var arguments = [
-            "--translation-preview",
-            "--translation-preview-state=\(mode)",
-        ]
-        if let caretBounds = focusedTextCaretBounds() {
-            arguments.append("--translation-preview-caret=\(ScreenRectArgument(caretBounds).value)")
-        }
-
-        return launchTauriHelper(
-            arguments: arguments,
-            activate: false,
-            replaceExistingMatching: "--translation-preview"
-        )
-    }
-
-    private func focusedTextCaretBounds() -> CGRect? {
-        guard AXIsProcessTrusted() else {
-            return nil
-        }
-
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedObject: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedObject
-        ) == .success,
-            let focusedObject
-        else {
-            return nil
-        }
-        let focusedElement = focusedObject as! AXUIElement
-
-        var selectedRangeObject: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            focusedElement,
-            kAXSelectedTextRangeAttribute as CFString,
-            &selectedRangeObject
-        ) == .success,
-            let selectedRange = selectedRangeObject
-        else {
-            return nil
-        }
-
-        var boundsObject: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(
-            focusedElement,
-            kAXBoundsForRangeParameterizedAttribute as CFString,
-            selectedRange,
-            &boundsObject
-        ) == .success,
-            let boundsObject,
-            CFGetTypeID(boundsObject) == AXValueGetTypeID()
-        else {
-            return nil
-        }
-        let boundsValue = boundsObject as! AXValue
-        guard AXValueGetType(boundsValue) == .cgRect else {
-            return nil
-        }
-
-        var rect = CGRect.zero
-        guard AXValueGetValue(boundsValue, .cgRect, &rect),
-              rect.origin.x.isFinite,
-              rect.origin.y.isFinite,
-              rect.width.isFinite,
-              rect.height.isFinite,
-              rect.width >= 0,
-              rect.height > 0
-        else {
-            return nil
-        }
-
-        return tauriScreenRect(fromAccessibilityRect: rect)
-    }
-
-    private func tauriScreenRect(fromAccessibilityRect rect: CGRect) -> CGRect {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) ?? NSScreen.main,
-              let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
-        else {
-            return rect
-        }
-
-        let displayBounds = CGDisplayBounds(CGDirectDisplayID(screenNumber.uint32Value))
-        let x = displayBounds.minX + (rect.minX - screen.frame.minX)
-        let y = displayBounds.maxY - (rect.minY - screen.frame.minY) - rect.height
-        return CGRect(x: x, y: y, width: rect.width, height: rect.height)
     }
 
     private func resolvedLanguages(
@@ -637,8 +528,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         terminateTauriHelper(appURL: appURL, matching: match)
 
-        let previousFrontmostApplication = activate ? nil : NSWorkspace.shared.frontmostApplication
-        let helperBundleIdentifier = Bundle(url: appURL)?.bundleIdentifier
         var launchArguments = arguments
         if let workspaceRootURL = resolveWorkspaceRootURL() {
             launchArguments.append(contentsOf: ["--workspace-root", workspaceRootURL.path])
@@ -653,43 +542,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 print("Could not open Tauri helper app: \(error.localizedDescription)")
             }
         }
-        if !activate {
-            restoreFrontmostApplication(
-                previousFrontmostApplication,
-                helperBundleIdentifier: helperBundleIdentifier
-            )
-        }
         return true
-    }
-
-    private func restoreFrontmostApplication(
-        _ application: NSRunningApplication?,
-        helperBundleIdentifier: String?
-    ) {
-        let ownBundleIdentifier = Bundle.main.bundleIdentifier
-        let guardedBundleIdentifiers = Set(
-            [helperBundleIdentifier, ownBundleIdentifier].compactMap { $0 }
-        )
-        let guardedNames = Set(["CopyTranslator", "CopyTranslatorTauri", "copy-translator-tauri"])
-
-        for delay in [0.05, 0.15, 0.35, 0.75] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard let frontmostApplication = NSWorkspace.shared.frontmostApplication else {
-                    return
-                }
-
-                let frontmostBundleIdentifier = frontmostApplication.bundleIdentifier
-                let frontmostName = frontmostApplication.localizedName
-                let didHelperTakeFocus = frontmostBundleIdentifier.map(guardedBundleIdentifiers.contains) ?? false
-                    || frontmostName.map(guardedNames.contains) ?? false
-
-                guard didHelperTakeFocus else {
-                    return
-                }
-
-                application?.activate(options: [])
-            }
-        }
     }
 
     private func terminateTauriHelper(appURL: URL, matching match: String) {

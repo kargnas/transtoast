@@ -1,0 +1,424 @@
+import AppKit
+import CopyTranslatorCore
+
+@MainActor
+final class TranslationPopoverController {
+    private let margin: CGFloat = 24
+    private let caretGap: CGFloat = 8
+    private let windowWidth: CGFloat = 356
+    private let compactHeight: CGFloat = 150
+    private let tallHeight: CGFloat = 176
+
+    private var panel: TranslationPopoverPanel?
+    private var dismissWorkItem: DispatchWorkItem?
+
+    func show(
+        payload: TranslationPreviewPayload,
+        settings: TranslatorSettings,
+        caretBounds: CGRect?
+    ) {
+        close()
+
+        let size = CGSize(
+            width: windowWidth,
+            height: payload.mode == "loading" || payload.mode == "error" ? tallHeight : compactHeight
+        )
+        let placement = placement(for: size, caretBounds: caretBounds, settings: settings)
+        let panel = TranslationPopoverPanel(
+            contentRect: CGRect(origin: placement.origin, size: size),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.level = .floating
+        panel.ignoresMouseEvents = false
+        panel.isReleasedWhenClosed = false
+        panel.contentView = TranslationPopoverContentView(
+            frame: CGRect(origin: .zero, size: size),
+            payload: payload,
+            arrowEdge: placement.arrowEdge,
+            onClose: { [weak self] in
+                self?.close()
+            }
+        )
+
+        self.panel = panel
+        panel.orderFrontRegardless()
+        scheduleDismissIfNeeded(mode: payload.mode, duration: settings.toastDuration)
+    }
+
+    func close() {
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+        panel?.orderOut(nil)
+        panel = nil
+    }
+
+    private func scheduleDismissIfNeeded(mode: String, duration: TimeInterval) {
+        guard mode != "loading" else {
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                self?.close()
+            }
+        }
+        dismissWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(1, duration), execute: workItem)
+    }
+
+    private func placement(
+        for size: CGSize,
+        caretBounds: CGRect?,
+        settings: TranslatorSettings
+    ) -> (origin: CGPoint, arrowEdge: TranslationPopoverArrowEdge) {
+        if let caretBounds,
+           let screen = screen(containing: caretBounds) {
+            let visibleFrame = screen.visibleFrame
+            let x = clamp(
+                caretBounds.midX - size.width / 2,
+                visibleFrame.minX + margin,
+                visibleFrame.maxX - size.width - margin
+            )
+
+            let belowY = caretBounds.minY - caretGap - size.height
+            if belowY >= visibleFrame.minY + margin {
+                return (CGPoint(x: x, y: belowY), .top)
+            }
+
+            let aboveY = caretBounds.maxY + caretGap
+            if aboveY + size.height <= visibleFrame.maxY - margin {
+                return (CGPoint(x: x, y: aboveY), .bottom)
+            }
+
+            let y = clamp(
+                belowY,
+                visibleFrame.minY + margin,
+                visibleFrame.maxY - size.height - margin
+            )
+            return (CGPoint(x: x, y: y), y < caretBounds.minY ? .top : .bottom)
+        }
+
+        let visibleFrame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+            ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let left = visibleFrame.minX + margin
+        let right = visibleFrame.maxX - size.width - margin
+        let bottom = visibleFrame.minY + margin
+        let top = visibleFrame.maxY - size.height - margin
+
+        switch settings.toastPosition {
+        case .bottomRight:
+            return (CGPoint(x: right, y: bottom), .none)
+        case .bottomLeft:
+            return (CGPoint(x: left, y: bottom), .none)
+        case .topRight:
+            return (CGPoint(x: right, y: top), .none)
+        case .topLeft:
+            return (CGPoint(x: left, y: top), .none)
+        }
+    }
+
+    private func screen(containing rect: CGRect) -> NSScreen? {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        return NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main
+    }
+
+    private func clamp(_ value: CGFloat, _ minValue: CGFloat, _ maxValue: CGFloat) -> CGFloat {
+        if minValue > maxValue {
+            return minValue
+        }
+        return min(max(value, minValue), maxValue)
+    }
+}
+
+final class TranslationPopoverPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+private enum TranslationPopoverArrowEdge {
+    case top
+    case bottom
+    case none
+}
+
+private final class TranslationPopoverContentView: NSView {
+    private let payload: TranslationPreviewPayload
+    private let arrowEdge: TranslationPopoverArrowEdge
+    private let onClose: () -> Void
+
+    private var visibleMode: String
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let bodyLabel = NSTextField(wrappingLabelWithString: "")
+    private let languageLabel = NSTextField(labelWithString: "")
+    private let originalButton = NSButton(title: "", target: nil, action: nil)
+    private let copyButton = NSButton(title: "", target: nil, action: nil)
+    private let moreButton = NSButton(title: "", target: nil, action: nil)
+    private let closeButton = NSButton(title: "", target: nil, action: nil)
+    private let progressIndicator = NSProgressIndicator()
+
+    init(
+        frame: CGRect,
+        payload: TranslationPreviewPayload,
+        arrowEdge: TranslationPopoverArrowEdge,
+        onClose: @escaping () -> Void
+    ) {
+        self.payload = payload
+        self.arrowEdge = arrowEdge
+        self.onClose = onClose
+        visibleMode = payload.mode
+        super.init(frame: frame)
+        setup()
+        render()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override var isFlipped: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        let bubble = bubbleRect
+        let fillColor = NSColor.windowBackgroundColor.withAlphaComponent(0.94)
+        let strokeColor = NSColor.separatorColor.withAlphaComponent(0.9)
+        let bubblePath = NSBezierPath(roundedRect: bubble, xRadius: 16, yRadius: 16)
+        fillColor.setFill()
+        bubblePath.fill()
+        strokeColor.setStroke()
+        bubblePath.lineWidth = 1
+        bubblePath.stroke()
+
+        guard arrowEdge != .none else {
+            return
+        }
+
+        let midX = bounds.midX
+        let arrowWidth: CGFloat = 28
+        let arrowHeight: CGFloat = 18
+        let path = NSBezierPath()
+        switch arrowEdge {
+        case .top:
+            path.move(to: CGPoint(x: midX - arrowWidth / 2, y: bubble.maxY - 1))
+            path.line(to: CGPoint(x: midX, y: bubble.maxY + arrowHeight - 1))
+            path.line(to: CGPoint(x: midX + arrowWidth / 2, y: bubble.maxY - 1))
+        case .bottom:
+            path.move(to: CGPoint(x: midX - arrowWidth / 2, y: bubble.minY + 1))
+            path.line(to: CGPoint(x: midX, y: bubble.minY - arrowHeight + 1))
+            path.line(to: CGPoint(x: midX + arrowWidth / 2, y: bubble.minY + 1))
+        case .none:
+            return
+        }
+        path.close()
+        fillColor.setFill()
+        path.fill()
+        strokeColor.setStroke()
+        path.lineWidth = 1
+        path.stroke()
+    }
+
+    override func layout() {
+        super.layout()
+        layoutContent()
+    }
+
+    private var bubbleRect: CGRect {
+        let horizontalInset: CGFloat = 24
+        let arrowHeight: CGFloat = arrowEdge == .none ? 0 : 18
+        switch arrowEdge {
+        case .top:
+            return CGRect(
+                x: horizontalInset,
+                y: 0,
+                width: bounds.width - horizontalInset * 2,
+                height: bounds.height - arrowHeight
+            )
+        case .bottom:
+            return CGRect(
+                x: horizontalInset,
+                y: arrowHeight,
+                width: bounds.width - horizontalInset * 2,
+                height: bounds.height - arrowHeight
+            )
+        case .none:
+            return bounds.insetBy(dx: horizontalInset, dy: 0)
+        }
+    }
+
+    private func setup() {
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+
+        for label in [titleLabel, bodyLabel, languageLabel] {
+            label.drawsBackground = false
+            label.isBordered = false
+            label.isEditable = false
+            label.isSelectable = false
+            addSubview(label)
+        }
+
+        titleLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.textColor = .labelColor
+        bodyLabel.font = .preferredFont(forTextStyle: .body)
+        bodyLabel.textColor = .labelColor
+        bodyLabel.maximumNumberOfLines = 3
+        bodyLabel.lineBreakMode = .byTruncatingTail
+        languageLabel.font = .preferredFont(forTextStyle: .caption1)
+        languageLabel.textColor = .secondaryLabelColor
+
+        configureButton(originalButton, title: "원본 보기", action: #selector(toggleOriginal))
+        configureButton(copyButton, imageName: "doc.on.doc", action: #selector(copyText))
+        configureButton(moreButton, title: "...", action: #selector(noop))
+        configureButton(closeButton, imageName: "xmark", action: #selector(close))
+
+        progressIndicator.style = .bar
+        progressIndicator.isIndeterminate = true
+        progressIndicator.controlSize = .small
+        progressIndicator.startAnimation(nil)
+        addSubview(progressIndicator)
+    }
+
+    private func configureButton(
+        _ button: NSButton,
+        title: String? = nil,
+        imageName: String? = nil,
+        action: Selector
+    ) {
+        button.target = self
+        button.action = action
+        button.bezelStyle = .rounded
+        button.controlSize = .regular
+        button.font = .preferredFont(forTextStyle: .body)
+        button.focusRingType = .none
+        if let title {
+            button.title = title
+        }
+        if let imageName {
+            button.title = ""
+            button.image = NSImage(systemSymbolName: imageName, accessibilityDescription: nil)
+            button.imagePosition = .imageOnly
+        }
+        addSubview(button)
+    }
+
+    private func render() {
+        languageLabel.stringValue = "⌘  \(shortLanguage(payload.sourceLanguage)) → \(shortLanguage(payload.targetLanguage))"
+
+        switch visibleMode {
+        case "loading":
+            titleLabel.stringValue = "번역 중..."
+            titleLabel.textColor = .controlAccentColor
+            bodyLabel.stringValue = payload.originalText == "[screen screenshot]"
+                ? "스크린샷을 캡처하고 번역하고 있어요."
+                : "클립보드의 텍스트를 번역하고 있어요."
+        case "error":
+            titleLabel.stringValue = "오류"
+            titleLabel.textColor = .systemRed
+            bodyLabel.stringValue = payload.errorText ?? "번역에 실패했습니다."
+        default:
+            titleLabel.stringValue = ""
+            bodyLabel.stringValue = visibleMode == "original" ? payload.originalText : payload.translatedText
+            originalButton.title = visibleMode == "original" ? "번역 보기" : "원본 보기"
+        }
+
+        needsLayout = true
+        needsDisplay = true
+    }
+
+    private func layoutContent() {
+        let bubble = bubbleRect
+        let content = bubble.insetBy(dx: 22, dy: 16)
+
+        switch visibleMode {
+        case "loading":
+            titleLabel.isHidden = false
+            bodyLabel.isHidden = false
+            languageLabel.isHidden = false
+            progressIndicator.isHidden = false
+            originalButton.isHidden = true
+            copyButton.isHidden = true
+            moreButton.isHidden = true
+            closeButton.isHidden = false
+
+            titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 72, height: 24)
+            closeButton.frame = CGRect(x: content.maxX - 58, y: content.maxY - 30, width: 58, height: 28)
+            closeButton.title = "취소"
+            bodyLabel.frame = CGRect(x: content.minX, y: content.maxY - 80, width: content.width, height: 42)
+            progressIndicator.frame = CGRect(x: content.minX, y: content.minY + 31, width: content.width, height: 8)
+            languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 20)
+
+        case "error":
+            titleLabel.isHidden = false
+            bodyLabel.isHidden = false
+            languageLabel.isHidden = false
+            progressIndicator.isHidden = true
+            originalButton.isHidden = true
+            copyButton.isHidden = true
+            moreButton.isHidden = true
+            closeButton.isHidden = false
+
+            titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 40, height: 24)
+            closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
+            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: 72)
+            languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width - 40, height: 20)
+
+        default:
+            titleLabel.isHidden = true
+            bodyLabel.isHidden = false
+            languageLabel.isHidden = false
+            progressIndicator.isHidden = true
+            originalButton.isHidden = false
+            copyButton.isHidden = false
+            moreButton.isHidden = false
+            closeButton.isHidden = true
+
+            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 50, width: content.width, height: 54)
+            languageLabel.frame = CGRect(x: content.minX, y: content.minY + 5, width: 105, height: 22)
+            moreButton.frame = CGRect(x: content.maxX - 38, y: content.minY, width: 38, height: 30)
+            copyButton.frame = CGRect(x: moreButton.frame.minX - 44, y: content.minY, width: 38, height: 30)
+            originalButton.frame = CGRect(x: copyButton.frame.minX - 92, y: content.minY, width: 84, height: 30)
+        }
+    }
+
+    @objc private func toggleOriginal() {
+        visibleMode = visibleMode == "original" ? "translated" : "original"
+        render()
+    }
+
+    @objc private func copyText() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(visibleMode == "original" ? payload.originalText : payload.translatedText, forType: .string)
+    }
+
+    @objc private func close() {
+        onClose()
+    }
+
+    @objc private func noop() {}
+
+    private func shortLanguage(_ language: String) -> String {
+        switch language {
+        case "English": "영어"
+        case "Korean": "한국어"
+        case "Simplified Chinese": "중국어"
+        case "Japanese": "일본어"
+        case "Spanish": "스페인어"
+        case "German": "독일어"
+        case "French": "프랑스어"
+        case "Indonesian": "인도네시아어"
+        case "Arabic": "아랍어"
+        case "Auto": "자동"
+        default: language
+        }
+    }
+}

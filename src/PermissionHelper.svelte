@@ -32,7 +32,7 @@
     <header class="surface-header">
       <div>
         <h1>Permission Helper</h1>
-        <p>Grant keyboard permissions for Cmd+C detection and screen permissions for screenshot translation.</p>
+        <p>Grant keyboard permissions for Cmd+C detection, Accessibility for caret popovers, and screen permissions for screenshot translation.</p>
       </div>
       <button onclick={load}><RefreshCw size={14} />Refresh</button>
     </header>
@@ -50,6 +50,16 @@
             <span class="setting-copy"><strong>Keyboard</strong></span>
             <span class:ready={settingsState.permissions.keyboard} class="status-pill">
               {settingsState.permissions.keyboard ? "Ready" : "Not granted"}
+            </span>
+            <span class="reset-row spacer"></span>
+          </div>
+          <div class="setting-row">
+            <span class="setting-copy">
+              <strong>Keyboard Cursor</strong>
+              <span>Required for popovers near the text caret</span>
+            </span>
+            <span class:ready={settingsState.permissions.accessibility} class="status-pill">
+              {settingsState.permissions.accessibility ? "Ready" : "Not granted"}
             </span>
             <span class="reset-row spacer"></span>
           </div>

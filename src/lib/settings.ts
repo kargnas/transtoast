@@ -35,6 +35,7 @@ export type SettingOption = {
 
 export type PermissionStatus = {
   keyboard: boolean;
+  accessibility: boolean;
   screen: boolean;
 };
 
@@ -149,6 +150,7 @@ export const fallbackState: SettingsState = {
   },
   permissions: {
     keyboard: false,
+    accessibility: false,
     screen: false
   },
   storagePath: "Browser preview"

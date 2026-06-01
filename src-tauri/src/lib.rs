@@ -138,6 +138,7 @@ struct SettingOption {
 #[derive(Clone, Debug, Serialize)]
 struct PermissionStatus {
     keyboard: bool,
+    accessibility: bool,
     screen: bool,
 }
 
@@ -1368,15 +1369,21 @@ fn request_keyboard_prompt() -> Result<ActionResult, String> {
 fn permission_status() -> PermissionStatus {
     #[cfg(target_os = "macos")]
     {
-        let keyboard = unsafe { CGPreflightListenEventAccess() || AXIsProcessTrusted() };
+        let accessibility = unsafe { AXIsProcessTrusted() };
+        let keyboard = unsafe { CGPreflightListenEventAccess() || accessibility };
         let screen = unsafe { CGPreflightScreenCaptureAccess() };
-        PermissionStatus { keyboard, screen }
+        PermissionStatus {
+            keyboard,
+            accessibility,
+            screen,
+        }
     }
 
     #[cfg(not(target_os = "macos"))]
     {
         PermissionStatus {
             keyboard: false,
+            accessibility: false,
             screen: false,
         }
     }

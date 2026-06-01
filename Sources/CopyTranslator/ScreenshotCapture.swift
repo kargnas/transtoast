@@ -201,7 +201,7 @@ enum ScreenshotCapture {
     }
 
     private static func keyboardCursorCenter(in image: CGImage) -> CGPoint? {
-        guard let caretBounds = focusedTextCaretBounds() else {
+        guard let caretBounds = KeyboardCaretLocator.focusedTextCaretBounds() else {
             return nil
         }
 
@@ -222,53 +222,8 @@ enum ScreenshotCapture {
         )
     }
 
-    private static func focusedTextCaretBounds() -> CGRect? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedObject: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedObject
-        ) == .success,
-              let focusedElement = focusedObject.map({ $0 as! AXUIElement }) else {
-            return nil
-        }
-
-        var rangeObject: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            focusedElement,
-            kAXSelectedTextRangeAttribute as CFString,
-            &rangeObject
-        ) == .success,
-              let rangeValue = rangeObject,
-              CFGetTypeID(rangeValue) == AXValueGetTypeID() else {
-            return nil
-        }
-
-        var boundsObject: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(
-            focusedElement,
-            kAXBoundsForRangeParameterizedAttribute as CFString,
-            rangeValue,
-            &boundsObject
-        ) == .success,
-              let boundsValue = boundsObject,
-              CFGetTypeID(boundsValue) == AXValueGetTypeID() else {
-            return nil
-        }
-
-        var bounds = CGRect.zero
-        guard AXValueGetValue(boundsValue as! AXValue, .cgRect, &bounds),
-              !bounds.isNull,
-              !bounds.isEmpty else {
-            return nil
-        }
-
-        return bounds
-    }
-
     private static func contextDiagnostic(prefix: String) -> String {
-        focusedTextCaretBounds() == nil
+        KeyboardCaretLocator.focusedTextCaretBounds() == nil
             ? "\(prefix), full context crop (keyboard cursor unavailable)"
             : "\(prefix), keyboard cursor crop"
     }
