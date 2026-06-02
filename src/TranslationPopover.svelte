@@ -22,6 +22,7 @@
   let countdownPaused = $state(false);
 
   const languagePair = $derived(`${shortLanguage(preview.sourceLanguage)} → ${shortLanguage(preview.targetLanguage)}`);
+  const footerMeta = $derived(preview.model.trim() ? `${languagePair} · ${preview.model}` : languagePair);
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
   const loadingMessage = $derived(
     preview.originalText === "[screen screenshot]"
@@ -32,7 +33,9 @@
   const tallMode = $derived(debugMode || visibleMode === "loading" || visibleMode === "error");
   const showCountdown = $derived(!debugMode && visibleMode !== "loading");
   const countdownLabel = $derived(`${countdownRemaining.toFixed(1)}s`);
-  const countdownProgress = $derived(`${Math.max(0, Math.min(1, countdownRemaining / countdownDuration)) * 100}%`);
+  const countdownProgressValue = $derived(Math.max(0, Math.min(1, countdownRemaining / countdownDuration)));
+  const countdownProgress = $derived(`${countdownProgressValue * 100}%`);
+  const dismissOpacity = $derived((0.62 + countdownProgressValue * 0.38).toFixed(3));
 
   onMount(() => {
     isTauri = "__TAURI_INTERNALS__" in window;
@@ -175,7 +178,7 @@
     tabindex="-1"
     onmousedown={startDragging}
     class:hover-paused={countdownPaused}
-    style={`--countdown-progress: ${countdownProgress}`}
+    style={`--countdown-progress: ${countdownProgress}; --dismiss-opacity: ${dismissOpacity}`}
     onmouseenter={pauseAutoDismiss}
     onmouseleave={scheduleAutoDismiss}
   >
@@ -194,7 +197,7 @@
         <p class="copying">{loadingMessage}</p>
         <div class="progress-track" aria-hidden="true"><span class="progress-fill"></span></div>
         <footer class="bubble-footer">
-          <span class="language"><Languages size={14} />{languagePair}</span>
+          <span class="language"><Languages size={14} /><span class="language-text">{footerMeta}</span></span>
           <button class="small-button" onclick={cancelLoading}>취소</button>
         </footer>
       {:else if visibleMode === "error"}
@@ -204,13 +207,13 @@
         </div>
         <p class="copying">{preview.errorText ?? "번역에 실패했습니다."}</p>
         <footer class="bubble-footer">
-          <span class="language"><Languages size={14} />{languagePair}</span>
+          <span class="language"><Languages size={14} /><span class="language-text">{footerMeta}</span></span>
           <button class="icon-button" aria-label="Close" onclick={closePopover}><X size={16} /></button>
         </footer>
       {:else}
         <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
         <footer class="bubble-footer">
-          <span class="language"><Languages size={14} />{languagePair}</span>
+          <span class="language"><Languages size={14} /><span class="language-text">{footerMeta}</span></span>
           <div class="action-row">
             <button class="small-button" onclick={toggleOriginal}>
               {visibleMode === "original" ? "번역 보기" : "원본 보기"}

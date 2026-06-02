@@ -13,8 +13,10 @@ final class TranslationPopoverController {
 
     private var panel: TranslationPopoverPanel?
     private var dismissWorkItem: DispatchWorkItem?
+    private var hoverPollTimer: Timer?
     private var clickMonitorTokens: [Any] = []
     private var currentMode: String?
+    private var isPointerInsidePanel = false
 
     func show(
         payload: TranslationPreviewPayload,
@@ -59,7 +61,9 @@ final class TranslationPopoverController {
 
         self.panel = panel
         currentMode = payload.mode
+        isPointerInsidePanel = false
         installClickMonitors(for: panel)
+        startHoverPolling(for: panel)
         panel.orderFrontRegardless()
         scheduleDismissIfNeeded(mode: payload.mode)
     }
@@ -67,11 +71,14 @@ final class TranslationPopoverController {
     func close() {
         dismissWorkItem?.cancel()
         dismissWorkItem = nil
+        hoverPollTimer?.invalidate()
+        hoverPollTimer = nil
         removeClickMonitors()
         contentView?.stopDismissCountdown()
         panel?.orderOut(nil)
         panel = nil
         currentMode = nil
+        isPointerInsidePanel = false
     }
 
     private func scheduleDismissIfNeeded(mode: String) {
@@ -130,6 +137,31 @@ final class TranslationPopoverController {
         }) {
             clickMonitorTokens.append(globalMonitor)
         }
+    }
+
+    private func startHoverPolling(for panel: NSPanel) {
+        hoverPollTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.08, repeats: true) { [weak self, weak panel] _ in
+            Task { @MainActor in
+                guard let self,
+                      let panel else {
+                    return
+                }
+                let isInside = panel.frame.contains(NSEvent.mouseLocation)
+                guard isInside != self.isPointerInsidePanel else {
+                    return
+                }
+                self.isPointerInsidePanel = isInside
+                self.contentView?.setHovering(isInside)
+                if isInside {
+                    self.pauseDismissTimer()
+                } else {
+                    self.resumeDismissTimer()
+                }
+            }
+        }
+        hoverPollTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func removeClickMonitors() {
@@ -357,16 +389,13 @@ private final class TranslationPopoverContentView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        isHovering = true
-        needsDisplay = true
-        animateHoverPulse()
+        setHovering(true)
         onMouseEntered()
     }
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        isHovering = false
-        needsDisplay = true
+        setHovering(false)
         onMouseExited()
     }
 
@@ -385,6 +414,7 @@ private final class TranslationPopoverContentView: NSView {
             return
         }
 
+        alphaValue = 1.0
         countdownDuration = duration
         countdownEndDate = Date().addingTimeInterval(duration)
         countdownTimer?.invalidate()
@@ -411,6 +441,7 @@ private final class TranslationPopoverContentView: NSView {
         countdownTimer = nil
         countdownEndDate = nil
         countdownDuration = duration
+        alphaValue = 1.0
         countdownPill.isHidden = false
         countdownFill.isHidden = false
         countdownLabel.isHidden = false
@@ -422,6 +453,17 @@ private final class TranslationPopoverContentView: NSView {
         countdownTimer?.invalidate()
         countdownTimer = nil
         countdownEndDate = nil
+    }
+
+    func setHovering(_ hovering: Bool) {
+        guard isHovering != hovering else {
+            return
+        }
+        isHovering = hovering
+        needsDisplay = true
+        if hovering {
+            animateHoverPulse()
+        }
     }
 
     private var bubbleRect: CGRect {
@@ -467,6 +509,7 @@ private final class TranslationPopoverContentView: NSView {
         bodyLabel.lineBreakMode = .byWordWrapping
         languageLabel.font = .preferredFont(forTextStyle: .caption1)
         languageLabel.textColor = .secondaryLabelColor
+        languageLabel.lineBreakMode = .byTruncatingTail
 
         countdownPill.wantsLayer = true
         countdownPill.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.82).cgColor
@@ -527,6 +570,9 @@ private final class TranslationPopoverContentView: NSView {
 
     private func render() {
         languageLabel.stringValue = "⌘  \(shortLanguage(payload.sourceLanguage)) → \(shortLanguage(payload.targetLanguage))"
+        if !payload.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            languageLabel.stringValue += " · \(payload.model)"
+        }
 
         switch visibleMode {
         case "loading":
@@ -593,7 +639,7 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.imagePosition = .imageOnly
             layoutCountdownPill(x: closeButton.frame.minX - 48, y: content.maxY - 27)
             bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68)
-            languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width - 40, height: 20)
+            languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width - 84, height: 20)
 
         default:
             titleLabel.isHidden = true
@@ -608,10 +654,15 @@ private final class TranslationPopoverContentView: NSView {
 
             layoutCountdownPill(x: content.maxX - 42, y: content.maxY - 21)
             bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 50, width: content.width - 48, height: content.height - 50)
-            languageLabel.frame = CGRect(x: content.minX, y: content.minY + 5, width: 105, height: 22)
             moreButton.frame = CGRect(x: content.maxX - 38, y: content.minY, width: 38, height: 30)
             copyButton.frame = CGRect(x: moreButton.frame.minX - 44, y: content.minY, width: 38, height: 30)
             originalButton.frame = CGRect(x: copyButton.frame.minX - 92, y: content.minY, width: 84, height: 30)
+            languageLabel.frame = CGRect(
+                x: content.minX,
+                y: content.minY + 5,
+                width: max(72, originalButton.frame.minX - content.minX - 8),
+                height: 22
+            )
         }
     }
 
@@ -637,6 +688,7 @@ private final class TranslationPopoverContentView: NSView {
     private func updateCountdown(remaining: TimeInterval, label: String) {
         let progress = countdownDuration > 0 ? max(0, min(1, remaining / countdownDuration)) : 0
         countdownLabel.stringValue = label
+        alphaValue = 0.62 + 0.38 * CGFloat(progress)
         var fillFrame = countdownPill.bounds
         fillFrame.size.width = max(0, countdownPill.bounds.width * CGFloat(progress))
         countdownFill.frame = fillFrame
@@ -645,6 +697,7 @@ private final class TranslationPopoverContentView: NSView {
     private func hideCountdown() {
         countdownTimer?.invalidate()
         countdownTimer = nil
+        alphaValue = 1.0
         countdownPill.isHidden = true
         countdownFill.isHidden = true
         countdownLabel.isHidden = true
