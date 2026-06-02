@@ -27,7 +27,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keepAliveWindow: NSWindow?
     private var lastClipboardTriggerAt: Date?
     private var lastTranslationCaretBounds: CGRect?
-    private var suppressCurrentTextTranslationPopover = false
     private var isUserQuitting = false
     private var hasStarted = false
     private var lifetimeActivity: NSObjectProtocol?
@@ -474,17 +473,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let requiresCaretAnchor = payload.originalText != "[screen screenshot]"
         let caretBounds: CGRect?
         if payload.mode == "loading" {
-            caretBounds = KeyboardCaretLocator.focusedTextCaretBounds()
+            let focusedCaretBounds = KeyboardCaretLocator.focusedTextCaretBounds()
+            caretBounds = focusedCaretBounds
+                ?? (requiresCaretAnchor ? KeyboardCaretLocator.frontmostWindowAnchorBounds() : nil)
             lastTranslationCaretBounds = caretBounds
-            suppressCurrentTextTranslationPopover = requiresCaretAnchor && caretBounds == nil
         } else {
-            caretBounds = lastTranslationCaretBounds ?? KeyboardCaretLocator.focusedTextCaretBounds()
-        }
-
-        guard !(requiresCaretAnchor && suppressCurrentTextTranslationPopover) else {
-            translationPopoverController.close()
-            print("Skipped translation popover for \(sourceTitle): keyboard cursor bounds are unavailable.")
-            return
+            caretBounds = lastTranslationCaretBounds
+                ?? KeyboardCaretLocator.focusedTextCaretBounds()
+                ?? (requiresCaretAnchor ? KeyboardCaretLocator.frontmostWindowAnchorBounds() : nil)
         }
 
         translationPopoverController.show(

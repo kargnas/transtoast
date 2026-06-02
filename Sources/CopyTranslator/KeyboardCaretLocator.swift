@@ -28,6 +28,20 @@ enum KeyboardCaretLocator {
         return screenRect
     }
 
+    static func frontmostWindowAnchorBounds() -> CGRect? {
+        guard let frontmostApplication = NSWorkspace.shared.frontmostApplication,
+              let windowBounds = frontmostWindowBounds(for: frontmostApplication.processIdentifier) else {
+            return nil
+        }
+
+        return CGRect(
+            x: windowBounds.midX,
+            y: max(windowBounds.minY, windowBounds.maxY - 130),
+            width: 1,
+            height: 1
+        )
+    }
+
     private static func focusedTextCaretBounds(in applicationElement: AXUIElement) -> CGRect? {
         var focusedObject: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
@@ -87,6 +101,32 @@ enum KeyboardCaretLocator {
         return rect.standardized
     }
 
+    private static func frontmostWindowBounds(for processIdentifier: pid_t) -> CGRect? {
+        guard let windowInfos = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return nil
+        }
+
+        for windowInfo in windowInfos {
+            guard let ownerPID = windowInfo[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == processIdentifier,
+                  let layer = windowInfo[kCGWindowLayer as String] as? Int,
+                  layer == 0,
+                  let boundsDictionary = windowInfo[kCGWindowBounds as String] as? NSDictionary,
+                  let topLeftBounds = CGRect(dictionaryRepresentation: boundsDictionary),
+                  topLeftBounds.width > 1,
+                  topLeftBounds.height > 1 else {
+                continue
+            }
+
+            return screenRect(fromTopLeftRect: topLeftBounds)
+        }
+
+        return nil
+    }
+
     private static func screenRect(fromAccessibilityRect rect: CGRect) -> CGRect? {
         guard rect.origin.x.isFinite,
               rect.origin.y.isFinite,
@@ -111,6 +151,10 @@ enum KeyboardCaretLocator {
 
         let mainFrame = (NSScreen.main ?? screens[0]).frame
         return convertTopLeftRect(rect, in: mainFrame)
+    }
+
+    private static func screenRect(fromTopLeftRect rect: CGRect) -> CGRect? {
+        screenRect(fromAccessibilityRect: rect)
     }
 
     private static func convertTopLeftRect(_ rect: CGRect, in screenFrame: CGRect) -> CGRect {
