@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
-  import { Check, Copy, Languages, MoreHorizontal, X } from "@lucide/svelte";
+  import { Check, Copy, Eye, Languages, X } from "@lucide/svelte";
   import { fallbackTranslationState, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
 
   const params = new URLSearchParams(window.location.search);
@@ -14,7 +14,6 @@
   let preview = $state<TranslationPreviewState>(fallbackTranslationState);
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
-  let moreOpen = $state(false);
   let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
   let countdownInterval: number | undefined;
@@ -24,7 +23,7 @@
   let countdownPaused = $state(false);
 
   const uiStrings = localeStrings();
-  const languagePair = $derived(`${shortLanguage(preview.sourceLanguage)} → ${shortLanguage(preview.targetLanguage)}`);
+  const targetLanguage = $derived(shortLanguage(preview.targetLanguage));
   const modelName = $derived(preview.model.trim());
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
   const loadingMessage = $derived(
@@ -76,9 +75,6 @@
         cancel: "취소",
         close: "닫기",
         copyCurrent: "복사",
-        copyOriginal: "원본 복사",
-        copyTranslation: "번역 복사",
-        moreActions: "추가 작업",
         copied: "복사됨",
         usesKoreanLanguageNames: true
       };
@@ -95,9 +91,6 @@
       cancel: "Cancel",
       close: "Close",
       copyCurrent: "Copy",
-      copyOriginal: "Copy Original",
-      copyTranslation: "Copy Translation",
-      moreActions: "More actions",
       copied: "Copied",
       usesKoreanLanguageNames: false
     };
@@ -132,19 +125,6 @@
 
   async function copyText() {
     await navigator.clipboard?.writeText(bodyText);
-    moreOpen = false;
-    markCopied();
-  }
-
-  async function copyOriginal() {
-    await navigator.clipboard?.writeText(preview.originalText);
-    moreOpen = false;
-    markCopied();
-  }
-
-  async function copyTranslation() {
-    await navigator.clipboard?.writeText(preview.translatedText);
-    moreOpen = false;
     markCopied();
   }
 
@@ -166,7 +146,6 @@
 
   function toggleOriginal() {
     visibleMode = visibleMode === "original" ? "translated" : "original";
-    moreOpen = false;
   }
 
   async function startDragging(event: MouseEvent) {
@@ -180,7 +159,6 @@
   }
 
   async function closePopover() {
-    moreOpen = false;
     if (!isTauri) return;
     try {
       await invoke("close_translation_preview");
@@ -249,11 +227,6 @@
     }
   }
 
-  function toggleMore(event: MouseEvent) {
-    event.stopPropagation();
-    moreOpen = !moreOpen;
-  }
-
 </script>
 
 <main class="translation-stage" class:debug={debugMode} class:tall={tallMode} aria-label="Translation popup">
@@ -272,13 +245,10 @@
     onmouseleave={scheduleAutoDismiss}
   >
     <div class="translation-bubble-inner">
-      {#if showCountdown}
-        <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
-          <span class="dismiss-countdown-fill"></span>
-          <span class="dismiss-countdown-label">{countdownLabel}</span>
-        </div>
-      {/if}
       {#if visibleMode === "loading"}
+        <div class="top-controls">
+          <button class="icon-button" aria-label={uiStrings.cancel} onclick={cancelLoading}><X size={16} /></button>
+        </div>
         <div class="loading-title">
           <span class="status-dot"></span>
           <span>{uiStrings.translating}</span>
@@ -287,10 +257,9 @@
         <div class="progress-track" aria-hidden="true"><span class="progress-fill"></span></div>
         <footer class="bubble-footer">
           <div class="footer-meta">
-            <span class="language"><Languages size={14} /><span class="language-text">{languagePair}</span></span>
+            <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelName}<span class="model-label">{modelName}</span>{/if}
           </div>
-          <button class="small-button" onclick={cancelLoading}>{uiStrings.cancel}</button>
         </footer>
       {:else if visibleMode === "error"}
         <div class="loading-title error-title">
@@ -298,40 +267,42 @@
           <span>{uiStrings.error}</span>
         </div>
         <p class="copying">{preview.errorText ?? uiStrings.translationFailed}</p>
+        <div class="top-controls">
+          {#if showCountdown}
+            <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
+              <span class="dismiss-countdown-fill"></span>
+              <span class="dismiss-countdown-label">{countdownLabel}</span>
+            </div>
+          {/if}
+          <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
+        </div>
         <footer class="bubble-footer">
           <div class="footer-meta">
-            <span class="language"><Languages size={14} /><span class="language-text">{languagePair}</span></span>
+            <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelName}<span class="model-label">{modelName}</span>{/if}
           </div>
-          <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </footer>
       {:else}
+        <div class="top-controls">
+          {#if showCountdown}
+            <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
+              <span class="dismiss-countdown-fill"></span>
+              <span class="dismiss-countdown-label">{countdownLabel}</span>
+            </div>
+          {/if}
+          <button class="icon-button" aria-label={visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal} onclick={toggleOriginal}>
+            {#if visibleMode === "original"}<Languages size={16} />{:else}<Eye size={16} />{/if}
+          </button>
+          <button class="icon-button" aria-label={copied ? uiStrings.copied : uiStrings.copyCurrent} onclick={copyText}>
+            {#if copied}<Check size={16} />{:else}<Copy size={16} />{/if}
+          </button>
+          <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
+        </div>
         <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
         <footer class="bubble-footer">
           <div class="footer-meta">
-            <span class="language"><Languages size={14} /><span class="language-text">{languagePair}</span></span>
+            <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelName}<span class="model-label">{modelName}</span>{/if}
-          </div>
-          <div class="action-row">
-            <button class="small-button" onclick={toggleOriginal}>
-              {visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal}
-            </button>
-            <button class="icon-button" aria-label={copied ? uiStrings.copied : uiStrings.copyCurrent} onclick={copyText}>
-              {#if copied}<Check size={16} />{:else}<Copy size={16} />{/if}
-            </button>
-            <div class="more-anchor">
-              <button class="icon-button more-button" aria-label={uiStrings.moreActions} aria-expanded={moreOpen} onclick={toggleMore}>
-                <MoreHorizontal size={17} />
-              </button>
-              {#if moreOpen}
-                <div class="more-menu" role="menu">
-                  <button role="menuitem" onclick={copyOriginal}>{uiStrings.copyOriginal}</button>
-                  <button role="menuitem" onclick={copyTranslation}>{uiStrings.copyTranslation}</button>
-                  <span class="menu-separator"></span>
-                  <button role="menuitem" onclick={closePopover}>{uiStrings.close}</button>
-                </div>
-              {/if}
-            </div>
           </div>
         </footer>
       {/if}

@@ -289,8 +289,6 @@ private struct PopoverStrings {
     var showTranslation: String
     var cancel: String
     var copied: String
-    var copyOriginal: String
-    var copyTranslation: String
     var close: String
     var usesKoreanLanguageNames: Bool
 
@@ -306,8 +304,6 @@ private struct PopoverStrings {
                 showTranslation: "번역 보기",
                 cancel: "취소",
                 copied: "복사됨",
-                copyOriginal: "원본 복사",
-                copyTranslation: "번역 복사",
                 close: "닫기",
                 usesKoreanLanguageNames: true
             )
@@ -323,8 +319,6 @@ private struct PopoverStrings {
             showTranslation: "Translation",
             cancel: "Cancel",
             copied: "Copied",
-            copyOriginal: "Copy Original",
-            copyTranslation: "Copy Translation",
             close: "Close",
             usesKoreanLanguageNames: false
         )
@@ -355,7 +349,6 @@ private final class TranslationPopoverContentView: NSView {
     private let countdownLabel = NSTextField(labelWithString: "")
     private let originalButton = NSButton(title: "", target: nil, action: nil)
     private let copyButton = NSButton(title: "", target: nil, action: nil)
-    private let moreButton = NSButton(title: "", target: nil, action: nil)
     private let closeButton = NSButton(title: "", target: nil, action: nil)
     private let progressIndicator = NSProgressIndicator()
     private var isHovering = false
@@ -628,9 +621,8 @@ private final class TranslationPopoverContentView: NSView {
         countdownLabel.textColor = .secondaryLabelColor
         countdownPill.addSubview(countdownLabel)
 
-        configureButton(originalButton, title: strings.showOriginal, action: #selector(toggleOriginal))
+        configureButton(originalButton, imageName: "eye", action: #selector(toggleOriginal))
         configureButton(copyButton, imageName: "doc.on.doc", action: #selector(copyText))
-        configureButton(moreButton, title: "...", action: #selector(showMoreMenu))
         configureButton(closeButton, imageName: "xmark", action: #selector(close))
 
         progressIndicator.style = .bar
@@ -664,7 +656,7 @@ private final class TranslationPopoverContentView: NSView {
     }
 
     private func render() {
-        languageLabel.stringValue = "⌘  \(shortLanguage(payload.sourceLanguage)) → \(shortLanguage(payload.targetLanguage))"
+        languageLabel.stringValue = "⌘  \(shortLanguage(payload.targetLanguage))"
         modelLabel.stringValue = payload.model.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch visibleMode {
@@ -682,7 +674,12 @@ private final class TranslationPopoverContentView: NSView {
         default:
             titleLabel.stringValue = ""
             bodyLabel.stringValue = visibleMode == "original" ? payload.originalText : payload.translatedText
-            originalButton.title = visibleMode == "original" ? strings.showTranslation : strings.showOriginal
+            originalButton.title = ""
+            originalButton.image = NSImage(
+                systemSymbolName: visibleMode == "original" ? "arrow.left.arrow.right" : "eye",
+                accessibilityDescription: visibleMode == "original" ? strings.showTranslation : strings.showOriginal
+            )
+            originalButton.imagePosition = .imageOnly
         }
 
         needsLayout = true
@@ -702,15 +699,14 @@ private final class TranslationPopoverContentView: NSView {
             progressIndicator.isHidden = false
             originalButton.isHidden = true
             copyButton.isHidden = true
-            moreButton.isHidden = true
             closeButton.isHidden = false
             countdownPill.isHidden = true
 
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 72, height: 24)
-            closeButton.frame = CGRect(x: content.maxX - 58, y: content.maxY - 30, width: 58, height: 28)
-            closeButton.title = strings.cancel
-            closeButton.image = nil
-            closeButton.imagePosition = .noImage
+            closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
+            closeButton.title = ""
+            closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.cancel)
+            closeButton.imagePosition = .imageOnly
             bodyLabel.frame = CGRect(x: content.minX, y: content.maxY - 80, width: content.width, height: 42)
             progressIndicator.frame = CGRect(x: content.minX, y: content.minY + 31, width: content.width, height: 8)
             modelLabel.frame = CGRect(x: content.maxX - 132, y: content.minY, width: 132, height: 20)
@@ -729,7 +725,6 @@ private final class TranslationPopoverContentView: NSView {
             progressIndicator.isHidden = true
             originalButton.isHidden = true
             copyButton.isHidden = true
-            moreButton.isHidden = true
             closeButton.isHidden = false
             countdownPill.isHidden = false
 
@@ -756,22 +751,19 @@ private final class TranslationPopoverContentView: NSView {
             progressIndicator.isHidden = true
             originalButton.isHidden = false
             copyButton.isHidden = false
-            moreButton.isHidden = false
-            closeButton.isHidden = true
+            closeButton.isHidden = false
             countdownPill.isHidden = false
 
-            layoutCountdownPill(x: content.maxX - 42, y: content.maxY - 21)
-            modelLabel.frame = CGRect(x: content.minX, y: content.minY + 31, width: content.width - 48, height: 16)
-            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 64, width: content.width - 48, height: content.height - 64)
-            moreButton.frame = CGRect(x: content.maxX - 38, y: content.minY, width: 38, height: 30)
-            copyButton.frame = CGRect(x: moreButton.frame.minX - 44, y: content.minY, width: 38, height: 30)
-            originalButton.frame = CGRect(x: copyButton.frame.minX - 92, y: content.minY, width: 84, height: 30)
-            languageLabel.frame = CGRect(
-                x: content.minX,
-                y: content.minY + 5,
-                width: max(72, originalButton.frame.minX - content.minX - 8),
-                height: 22
-            )
+            closeButton.title = ""
+            closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.close)
+            closeButton.imagePosition = .imageOnly
+            closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
+            copyButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
+            originalButton.frame = CGRect(x: copyButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
+            layoutCountdownPill(x: originalButton.frame.minX - 50, y: content.maxY - 25)
+            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 44, width: content.width, height: content.height - 80)
+            modelLabel.frame = CGRect(x: content.minX, y: content.minY + 20, width: content.width, height: 16)
+            languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 18)
         }
     }
 
@@ -816,7 +808,6 @@ private final class TranslationPopoverContentView: NSView {
         let controlViews: [NSView] = [
             originalButton,
             copyButton,
-            moreButton,
             closeButton,
             countdownPill,
         ]
@@ -865,37 +856,8 @@ private final class TranslationPopoverContentView: NSView {
         showCopiedState()
     }
 
-    @objc private func copyOriginal() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(payload.originalText, forType: .string)
-        showCopiedState()
-    }
-
-    @objc private func copyTranslation() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(payload.translatedText, forType: .string)
-        showCopiedState()
-    }
-
     @objc private func close() {
         onClose()
-    }
-
-    @objc private func showMoreMenu() {
-        let menu = NSMenu()
-        menu.addItem(menuItem(title: strings.copyOriginal, action: #selector(copyOriginal)))
-        menu.addItem(menuItem(title: strings.copyTranslation, action: #selector(copyTranslation)))
-        menu.addItem(.separator())
-        menu.addItem(menuItem(title: strings.close, action: #selector(close)))
-        menu.popUp(positioning: nil, at: CGPoint(x: moreButton.frame.minX, y: moreButton.frame.maxY + 4), in: self)
-    }
-
-    private func menuItem(title: String, action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = self
-        return item
     }
 
     private func showCopiedState() {

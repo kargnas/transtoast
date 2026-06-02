@@ -392,7 +392,7 @@ kbd {
 }
 
 .translation-bubble.compact {
-  min-height: 116px;
+  min-height: 132px;
 }
 
 .translation-bubble.hover-paused {
@@ -436,7 +436,7 @@ kbd {
 }
 
 .translation-bubble.compact .bubble-footer {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .dismiss-countdown {
@@ -482,6 +482,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-right: 96px;
   color: var(--blue);
   font-size: 14px;
   font-weight: 650;
@@ -524,8 +525,7 @@ kbd {
 .bubble-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
   margin-top: 22px;
   color: #515154;
   font-size: 12px;
@@ -534,7 +534,7 @@ kbd {
 .footer-meta {
   display: grid;
   min-width: 0;
-  max-width: 132px;
+  width: 100%;
   gap: 2px;
 }
 
@@ -568,7 +568,9 @@ kbd {
 
 .translation-text {
   margin: 0;
-  max-width: 228px;
+  max-width: none;
+  min-height: 42px;
+  padding-top: 34px;
   color: var(--text);
   font-size: 16px;
   font-weight: 580;
@@ -579,6 +581,23 @@ kbd {
   font-size: 14px;
   font-weight: 450;
   line-height: 1.45;
+}
+
+.top-controls {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-controls .dismiss-countdown {
+  position: relative;
+  top: auto;
+  right: auto;
+  flex: 0 0 auto;
 }
 
 .action-row {
@@ -613,42 +632,6 @@ kbd {
   height: 32px;
   padding: 0;
   border-radius: 10px;
-}
-
-.more-anchor {
-  position: relative;
-}
-
-.more-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  display: grid;
-  width: 142px;
-  padding: 5px;
-  border: 1px solid rgba(215, 215, 220, 0.94);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
-}
-
-.more-menu button {
-  min-height: 26px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12px;
-  text-align: left;
-}
-
-.more-menu button:hover {
-  background: rgba(0, 122, 255, 0.1);
-}
-
-.menu-separator {
-  height: 1px;
-  margin: 4px 2px;
-  background: rgba(215, 215, 220, 0.9);
 }
 
 .preview-switcher {
