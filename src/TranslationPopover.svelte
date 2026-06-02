@@ -14,6 +14,8 @@
   let preview = $state<TranslationPreviewState>(fallbackTranslationState);
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
+  let moreOpen = $state(false);
+  let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
   let countdownInterval: number | undefined;
   let countdownStartedAt = $state(0);
@@ -21,13 +23,14 @@
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
   let countdownPaused = $state(false);
 
+  const uiStrings = localeStrings();
   const languagePair = $derived(`${shortLanguage(preview.sourceLanguage)} → ${shortLanguage(preview.targetLanguage)}`);
-  const footerMeta = $derived(preview.model.trim() ? `${languagePair} · ${preview.model}` : languagePair);
+  const modelName = $derived(preview.model.trim());
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
   const loadingMessage = $derived(
     preview.originalText === "[screen screenshot]"
-      ? "스크린샷을 캡처하고 번역하고 있어요."
-      : "클립보드의 텍스트를 번역하고 있어요."
+      ? uiStrings.translatingScreenshot
+      : uiStrings.translatingClipboard
   );
   const compactMode = $derived(visibleMode === "translated" || visibleMode === "original");
   const tallMode = $derived(debugMode || visibleMode === "loading" || visibleMode === "error");
@@ -45,6 +48,7 @@
     return () => {
       clearAutoDismiss();
       clearCountdown();
+      clearCopyReset();
     };
   });
 
@@ -59,6 +63,46 @@
     scheduleAutoDismiss();
   }
 
+  function localeStrings() {
+    if (params.get("ui") === "ko") {
+      return {
+        translating: "번역 중...",
+        translatingClipboard: "클립보드의 텍스트를 번역하고 있어요.",
+        translatingScreenshot: "스크린샷을 캡처하고 번역하고 있어요.",
+        error: "오류",
+        translationFailed: "번역에 실패했습니다.",
+        showOriginal: "원본 보기",
+        showTranslation: "번역 보기",
+        cancel: "취소",
+        close: "닫기",
+        copyCurrent: "복사",
+        copyOriginal: "원본 복사",
+        copyTranslation: "번역 복사",
+        moreActions: "추가 작업",
+        copied: "복사됨",
+        usesKoreanLanguageNames: true
+      };
+    }
+
+    return {
+      translating: "Translating...",
+      translatingClipboard: "Translating clipboard text.",
+      translatingScreenshot: "Capturing and translating the screenshot.",
+      error: "Error",
+      translationFailed: "Translation failed.",
+      showOriginal: "Original",
+      showTranslation: "Translation",
+      cancel: "Cancel",
+      close: "Close",
+      copyCurrent: "Copy",
+      copyOriginal: "Copy Original",
+      copyTranslation: "Copy Translation",
+      moreActions: "More actions",
+      copied: "Copied",
+      usesKoreanLanguageNames: false
+    };
+  }
+
   function modeFromQuery(value: string | null): TranslationMode | null {
     if (value === "loading" || value === "translated" || value === "original" || value === "error") {
       return value;
@@ -67,6 +111,10 @@
   }
 
   function shortLanguage(language: string) {
+    if (!uiStrings.usesKoreanLanguageNames) {
+      return language;
+    }
+
     const names: Record<string, string> = {
       English: "영어",
       Korean: "한국어",
@@ -84,12 +132,41 @@
 
   async function copyText() {
     await navigator.clipboard?.writeText(bodyText);
+    moreOpen = false;
+    markCopied();
+  }
+
+  async function copyOriginal() {
+    await navigator.clipboard?.writeText(preview.originalText);
+    moreOpen = false;
+    markCopied();
+  }
+
+  async function copyTranslation() {
+    await navigator.clipboard?.writeText(preview.translatedText);
+    moreOpen = false;
+    markCopied();
+  }
+
+  function markCopied() {
+    clearCopyReset();
     copied = true;
-    window.setTimeout(() => (copied = false), 1200);
+    copyResetTimer = window.setTimeout(() => {
+      copied = false;
+      copyResetTimer = undefined;
+    }, 1200);
+  }
+
+  function clearCopyReset() {
+    if (copyResetTimer !== undefined) {
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = undefined;
+    }
   }
 
   function toggleOriginal() {
     visibleMode = visibleMode === "original" ? "translated" : "original";
+    moreOpen = false;
   }
 
   async function startDragging(event: MouseEvent) {
@@ -103,6 +180,7 @@
   }
 
   async function closePopover() {
+    moreOpen = false;
     if (!isTauri) return;
     try {
       await invoke("close_translation_preview");
@@ -170,6 +248,12 @@
       clearCountdown();
     }
   }
+
+  function toggleMore(event: MouseEvent) {
+    event.stopPropagation();
+    moreOpen = !moreOpen;
+  }
+
 </script>
 
 <main class="translation-stage" class:debug={debugMode} class:tall={tallMode} aria-label="Translation popup">
@@ -197,36 +281,57 @@
       {#if visibleMode === "loading"}
         <div class="loading-title">
           <span class="status-dot"></span>
-          <span>번역 중...</span>
+          <span>{uiStrings.translating}</span>
         </div>
         <p class="copying">{loadingMessage}</p>
         <div class="progress-track" aria-hidden="true"><span class="progress-fill"></span></div>
         <footer class="bubble-footer">
-          <span class="language"><Languages size={14} /><span class="language-text">{footerMeta}</span></span>
-          <button class="small-button" onclick={cancelLoading}>취소</button>
+          <div class="footer-meta">
+            <span class="language"><Languages size={14} /><span class="language-text">{languagePair}</span></span>
+            {#if modelName}<span class="model-label">{modelName}</span>{/if}
+          </div>
+          <button class="small-button" onclick={cancelLoading}>{uiStrings.cancel}</button>
         </footer>
       {:else if visibleMode === "error"}
         <div class="loading-title error-title">
           <span class="status-dot"></span>
-          <span>오류</span>
+          <span>{uiStrings.error}</span>
         </div>
-        <p class="copying">{preview.errorText ?? "번역에 실패했습니다."}</p>
+        <p class="copying">{preview.errorText ?? uiStrings.translationFailed}</p>
         <footer class="bubble-footer">
-          <span class="language"><Languages size={14} /><span class="language-text">{footerMeta}</span></span>
-          <button class="icon-button" aria-label="Close" onclick={closePopover}><X size={16} /></button>
+          <div class="footer-meta">
+            <span class="language"><Languages size={14} /><span class="language-text">{languagePair}</span></span>
+            {#if modelName}<span class="model-label">{modelName}</span>{/if}
+          </div>
+          <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </footer>
       {:else}
         <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
         <footer class="bubble-footer">
-          <span class="language"><Languages size={14} /><span class="language-text">{footerMeta}</span></span>
+          <div class="footer-meta">
+            <span class="language"><Languages size={14} /><span class="language-text">{languagePair}</span></span>
+            {#if modelName}<span class="model-label">{modelName}</span>{/if}
+          </div>
           <div class="action-row">
             <button class="small-button" onclick={toggleOriginal}>
-              {visibleMode === "original" ? "번역 보기" : "원본 보기"}
+              {visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal}
             </button>
-            <button class="icon-button" aria-label="Copy translation" onclick={copyText}>
+            <button class="icon-button" aria-label={copied ? uiStrings.copied : uiStrings.copyCurrent} onclick={copyText}>
               {#if copied}<Check size={16} />{:else}<Copy size={16} />{/if}
             </button>
-            <button class="icon-button" aria-label="More actions"><MoreHorizontal size={17} /></button>
+            <div class="more-anchor">
+              <button class="icon-button more-button" aria-label={uiStrings.moreActions} aria-expanded={moreOpen} onclick={toggleMore}>
+                <MoreHorizontal size={17} />
+              </button>
+              {#if moreOpen}
+                <div class="more-menu" role="menu">
+                  <button role="menuitem" onclick={copyOriginal}>{uiStrings.copyOriginal}</button>
+                  <button role="menuitem" onclick={copyTranslation}>{uiStrings.copyTranslation}</button>
+                  <span class="menu-separator"></span>
+                  <button role="menuitem" onclick={closePopover}>{uiStrings.close}</button>
+                </div>
+              {/if}
+            </div>
           </div>
         </footer>
       {/if}

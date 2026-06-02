@@ -531,6 +531,13 @@ kbd {
   font-size: 12px;
 }
 
+.footer-meta {
+  display: grid;
+  min-width: 0;
+  max-width: 132px;
+  gap: 2px;
+}
+
 .language {
   display: inline-flex;
   align-items: center;
@@ -545,6 +552,18 @@ kbd {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.model-label {
+  min-width: 0;
+  overflow: hidden;
+  color: #77777d;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .translation-text {
@@ -566,6 +585,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .small-button,
@@ -593,6 +613,42 @@ kbd {
   height: 32px;
   padding: 0;
   border-radius: 10px;
+}
+
+.more-anchor {
+  position: relative;
+}
+
+.more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  display: grid;
+  width: 142px;
+  padding: 5px;
+  border: 1px solid rgba(215, 215, 220, 0.94);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.more-menu button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+}
+
+.more-menu button:hover {
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: rgba(215, 215, 220, 0.9);
 }
 
 .preview-switcher {
