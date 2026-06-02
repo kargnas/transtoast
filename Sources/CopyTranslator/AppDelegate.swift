@@ -68,9 +68,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--show-request-logs") {
             showRequestLogs()
         }
-        if CommandLine.arguments.contains("--show-stacked-toasts") {
-            showStackedTestToasts()
-        }
         if runsPopoverSmoke {
             showTranslationPopoverSmoke()
         } else if !settingsStore.settings.hasCompletedLocalModelSelection {
@@ -651,10 +648,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showRequestLogs() {
         _ = openTauriSurface("request-logs")
-    }
-
-    private func showStackedTestToasts() {
-        _ = openTauriSurface("toast-stack")
     }
 
     @objc private func openInputMonitoringSettings() {

@@ -124,8 +124,7 @@
     clearCountdown();
     if (debugMode || visibleMode === "loading") return;
 
-    const seconds = Number.isFinite(preview.toastDuration) ? preview.toastDuration : fallbackTranslationState.toastDuration;
-    countdownDuration = Math.max(1, seconds);
+    countdownDuration = dismissDurationForText(bodyText);
     countdownRemaining = countdownDuration;
     countdownPaused = false;
     countdownStartedAt = performance.now();
@@ -146,9 +145,15 @@
     clearAutoDismiss();
     clearCountdown();
     if (debugMode || visibleMode === "loading") return;
-    countdownDuration = Math.max(1, Number.isFinite(preview.toastDuration) ? preview.toastDuration : fallbackTranslationState.toastDuration);
+    countdownDuration = dismissDurationForText(bodyText);
     countdownRemaining = countdownDuration;
     countdownPaused = true;
+  }
+
+  function dismissDurationForText(text: string) {
+    const estimatedLines = Math.max(1, Math.ceil(text.length / 28));
+    if (estimatedLines < 5) return 4;
+    return Math.min(10, 4 + estimatedLines - 4);
   }
 
   function clearCountdown() {

@@ -6,7 +6,6 @@ pub enum AppSurface {
     LocalModelSetup,
     RequestLogs,
     PermissionHelper,
-    ToastStack,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -31,7 +30,6 @@ impl AppSurface {
             "local-model-setup" => Some(Self::LocalModelSetup),
             "request-logs" => Some(Self::RequestLogs),
             "permission-helper" => Some(Self::PermissionHelper),
-            "toast-stack" => Some(Self::ToastStack),
             _ => None,
         }
     }
@@ -94,19 +92,6 @@ impl AppSurface {
                 transparent: false,
                 always_on_top: true,
             },
-            Self::ToastStack => SurfaceSpec {
-                key: "toast-stack",
-                label: "toast-stack",
-                title: "CopyTranslator Toast Stack",
-                width: 420.0,
-                height: 260.0,
-                min_width: 420.0,
-                min_height: 180.0,
-                resizable: false,
-                decorations: false,
-                transparent: true,
-                always_on_top: true,
-            },
         }
     }
 }
@@ -136,8 +121,6 @@ pub fn open_surface_window(app: &AppHandle, surface: AppSurface) -> Result<(), S
         .build()
         .map_err(|error| error.to_string())?;
 
-    if surface != AppSurface::ToastStack {
-        window.center().map_err(|error| error.to_string())?;
-    }
+    window.center().map_err(|error| error.to_string())?;
     Ok(())
 }

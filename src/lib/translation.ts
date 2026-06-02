@@ -21,5 +21,5 @@ export const fallbackTranslationState: TranslationPreviewState = {
   errorText: null,
   providerTitle: "Local Model",
   model: "Hy-MT2 1.8B 4-bit",
-  toastDuration: 2
+  toastDuration: 4
 };

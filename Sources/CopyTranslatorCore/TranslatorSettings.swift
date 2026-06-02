@@ -87,7 +87,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         targetLanguage: String = "Korean",
         hasCompletedLocalModelSelection: Bool = false,
         toastPosition: ToastPosition = .bottomRight,
-        toastDuration: TimeInterval = 2
+        toastDuration: TimeInterval = 4
     ) {
         self.provider = provider
         self.hyMT2Model = hyMT2Model

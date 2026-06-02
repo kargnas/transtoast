@@ -9,7 +9,8 @@ final class TranslationPopoverController {
     private let compactHeight: CGFloat = 150
     private let tallHeight: CGFloat = 176
     private let maxHeight: CGFloat = 560
-    private let automaticDismissDuration: TimeInterval = 2
+    private let minimumDismissDuration: TimeInterval = 4
+    private let maximumDismissDuration: TimeInterval = 10
 
     private var panel: TranslationPopoverPanel?
     private var dismissWorkItem: DispatchWorkItem?
@@ -93,14 +94,22 @@ final class TranslationPopoverController {
             }
         }
         dismissWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + automaticDismissDuration, execute: workItem)
-        contentView?.startDismissCountdown(duration: automaticDismissDuration)
+        let duration = contentView?.dismissDuration(
+            minimum: minimumDismissDuration,
+            maximum: maximumDismissDuration
+        ) ?? minimumDismissDuration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: workItem)
+        contentView?.startDismissCountdown(duration: duration)
     }
 
     private func pauseDismissTimer() {
         dismissWorkItem?.cancel()
         dismissWorkItem = nil
-        contentView?.pauseDismissCountdown(duration: automaticDismissDuration)
+        let duration = contentView?.dismissDuration(
+            minimum: minimumDismissDuration,
+            maximum: maximumDismissDuration
+        ) ?? minimumDismissDuration
+        contentView?.pauseDismissCountdown(duration: duration)
     }
 
     private func resumeDismissTimer() {
@@ -453,6 +462,30 @@ private final class TranslationPopoverContentView: NSView {
         countdownTimer?.invalidate()
         countdownTimer = nil
         countdownEndDate = nil
+    }
+
+    func dismissDuration(minimum: TimeInterval, maximum: TimeInterval) -> TimeInterval {
+        guard visibleMode != "loading" else {
+            return minimum
+        }
+
+        let font = bodyLabel.font ?? NSFont.preferredFont(forTextStyle: .body)
+        let lineHeight = max(1, font.ascender - font.descender + font.leading)
+        let bodyWidth = max(1, bodyLabel.frame.width)
+        let bodyHeight = ceil(
+            (bodyLabel.stringValue as NSString).boundingRect(
+                with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: font]
+            ).height
+        )
+        let bodyLineCount = max(1, Int(ceil(bodyHeight / lineHeight)))
+        guard bodyLineCount >= 5 else {
+            return minimum
+        }
+
+        let extraLines = min(6, bodyLineCount - 4)
+        return min(maximum, minimum + TimeInterval(extraLines))
     }
 
     func setHovering(_ hovering: Bool) {

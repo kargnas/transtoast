@@ -339,7 +339,6 @@ fn perform_settings_action(
             "Screenshot Translation",
         ),
         "showRequestLogs" => open_surface_action(&app, AppSurface::RequestLogs, "Request Logs"),
-        "showStackedToasts" => open_surface_action(&app, AppSurface::ToastStack, "Stacked Toasts"),
         "showLocalModelSetup" => {
             open_surface_action(&app, AppSurface::LocalModelSetup, "Model Setup")
         }

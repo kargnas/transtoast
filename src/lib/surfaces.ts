@@ -3,8 +3,7 @@ export type AppSurface =
   | "translation"
   | "local-model-setup"
   | "request-logs"
-  | "permission-helper"
-  | "toast-stack";
+  | "permission-helper";
 
 export function currentSurface(): AppSurface {
   const surface = new URLSearchParams(window.location.search).get("surface");
@@ -12,8 +11,7 @@ export function currentSurface(): AppSurface {
     surface === "translation" ||
     surface === "local-model-setup" ||
     surface === "request-logs" ||
-    surface === "permission-helper" ||
-    surface === "toast-stack"
+    surface === "permission-helper"
   ) {
     return surface;
   }

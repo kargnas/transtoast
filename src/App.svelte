@@ -8,7 +8,6 @@
     Info,
     Keyboard,
     Languages,
-    Layers,
     Play,
     RotateCcw,
     ScrollText,
@@ -185,7 +184,6 @@
       runTextTest: "Text Test",
       translateScreenshot: "Screenshot Translation",
       showRequestLogs: "Request Logs",
-      showStackedToasts: "Stacked Toasts",
       showLocalModelSetup: "Model Setup",
       openInputMonitoring: "Input Monitoring",
       openAccessibility: "Accessibility",
@@ -356,7 +354,6 @@
               <button onclick={() => runAction("runTextTest")}><Play size={14} />Run Text Test</button>
               <button onclick={() => runAction("translateScreenshot")}><Camera size={14} />Translate Screenshot</button>
               <button onclick={() => runAction("showRequestLogs")}><ScrollText size={14} />Request Logs</button>
-              <button onclick={() => runAction("showStackedToasts")}><Layers size={14} />Stack Toasts</button>
             </div>
           </div>
         </section>
