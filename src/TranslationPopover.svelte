@@ -15,6 +15,11 @@
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
   let dismissTimer: number | undefined;
+  let countdownInterval: number | undefined;
+  let countdownStartedAt = $state(0);
+  let countdownDuration = $state(fallbackTranslationState.toastDuration);
+  let countdownRemaining = $state(fallbackTranslationState.toastDuration);
+  let countdownPaused = $state(false);
 
   const languagePair = $derived(`${shortLanguage(preview.sourceLanguage)} → ${shortLanguage(preview.targetLanguage)}`);
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
@@ -25,13 +30,19 @@
   );
   const compactMode = $derived(visibleMode === "translated" || visibleMode === "original");
   const tallMode = $derived(debugMode || visibleMode === "loading" || visibleMode === "error");
+  const showCountdown = $derived(!debugMode && visibleMode !== "loading");
+  const countdownLabel = $derived(`${countdownRemaining.toFixed(1)}s`);
+  const countdownProgress = $derived(`${Math.max(0, Math.min(1, countdownRemaining / countdownDuration)) * 100}%`);
 
   onMount(() => {
     isTauri = "__TAURI_INTERNALS__" in window;
     if (isTauri) {
       void loadPreview();
     }
-    return () => clearAutoDismiss();
+    return () => {
+      clearAutoDismiss();
+      clearCountdown();
+    };
   });
 
   async function loadPreview() {
@@ -107,18 +118,48 @@
 
   function scheduleAutoDismiss() {
     clearAutoDismiss();
+    clearCountdown();
     if (debugMode || visibleMode === "loading") return;
 
     const seconds = Number.isFinite(preview.toastDuration) ? preview.toastDuration : fallbackTranslationState.toastDuration;
+    countdownDuration = Math.max(1, seconds);
+    countdownRemaining = countdownDuration;
+    countdownPaused = false;
+    countdownStartedAt = performance.now();
+    countdownInterval = window.setInterval(updateCountdown, 100);
     dismissTimer = window.setTimeout(() => {
       void closePopover();
-    }, Math.max(1, seconds) * 1000);
+    }, countdownDuration * 1000);
   }
 
   function clearAutoDismiss() {
     if (dismissTimer !== undefined) {
       window.clearTimeout(dismissTimer);
       dismissTimer = undefined;
+    }
+  }
+
+  function pauseAutoDismiss() {
+    clearAutoDismiss();
+    clearCountdown();
+    if (debugMode || visibleMode === "loading") return;
+    countdownDuration = Math.max(1, Number.isFinite(preview.toastDuration) ? preview.toastDuration : fallbackTranslationState.toastDuration);
+    countdownRemaining = countdownDuration;
+    countdownPaused = true;
+  }
+
+  function clearCountdown() {
+    if (countdownInterval !== undefined) {
+      window.clearInterval(countdownInterval);
+      countdownInterval = undefined;
+    }
+  }
+
+  function updateCountdown() {
+    const elapsed = (performance.now() - countdownStartedAt) / 1000;
+    countdownRemaining = Math.max(0, countdownDuration - elapsed);
+    if (countdownRemaining <= 0) {
+      clearCountdown();
     }
   }
 </script>
@@ -133,10 +174,18 @@
     aria-label="Translation result"
     tabindex="-1"
     onmousedown={startDragging}
-    onmouseenter={clearAutoDismiss}
+    class:hover-paused={countdownPaused}
+    style={`--countdown-progress: ${countdownProgress}`}
+    onmouseenter={pauseAutoDismiss}
     onmouseleave={scheduleAutoDismiss}
   >
     <div class="translation-bubble-inner">
+      {#if showCountdown}
+        <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
+          <span class="dismiss-countdown-fill"></span>
+          <span class="dismiss-countdown-label">{countdownLabel}</span>
+        </div>
+      {/if}
       {#if visibleMode === "loading"}
         <div class="loading-title">
           <span class="status-dot"></span>

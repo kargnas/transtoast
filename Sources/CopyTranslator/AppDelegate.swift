@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startPasteboardMonitor()
         print("CopyTranslator ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
+        let runsPopoverSmoke = CommandLine.arguments.contains("--show-popover-smoke")
         if CommandLine.arguments.contains("--show-settings") {
             showSettingsWindow()
         }
@@ -70,7 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--show-stacked-toasts") {
             showStackedTestToasts()
         }
-        if !settingsStore.settings.hasCompletedLocalModelSelection {
+        if runsPopoverSmoke {
+            showTranslationPopoverSmoke()
+        } else if !settingsStore.settings.hasCompletedLocalModelSelection {
             showLocalModelSetup()
         }
     }
@@ -467,6 +470,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             providerTitle: settings.provider.title,
             model: activeModelTitle(settings: settings)
         ), sourceTitle: sourceTitle)
+    }
+
+    private func showTranslationPopoverSmoke() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            let screenFrame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+                ?? CGRect(x: 0, y: 0, width: 1_440, height: 900)
+            let caretBounds = CGRect(
+                x: screenFrame.midX,
+                y: screenFrame.midY,
+                width: 10,
+                height: 18
+            )
+            translationPopoverController.show(
+                payload: TranslationPreviewPayload(
+                    mode: "translated",
+                    sourceLanguage: "English",
+                    targetLanguage: "Korean",
+                    originalText: "Hover smoke text",
+                    translatedText: "마우스 오버 테스트",
+                    errorText: nil,
+                    providerTitle: "Smoke",
+                    model: "Smoke"
+                ),
+                settings: settingsStore.settings,
+                caretBounds: caretBounds
+            )
+        }
     }
 
     private func showTranslationPopover(_ payload: TranslationPreviewPayload, sourceTitle: String) {

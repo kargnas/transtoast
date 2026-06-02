@@ -382,10 +382,19 @@ kbd {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 252, 253, 0.82));
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transition:
+    border-color 140ms ease,
+    transform 160ms ease;
+  --countdown-progress: 100%;
 }
 
 .translation-bubble.compact {
   min-height: 116px;
+}
+
+.translation-bubble.hover-paused {
+  border-color: rgba(0, 122, 255, 0.42);
+  transform: scale(1.012);
 }
 
 .translation-bubble::before {
@@ -425,6 +434,45 @@ kbd {
 
 .translation-bubble.compact .bubble-footer {
   margin-top: 10px;
+}
+
+.dismiss-countdown {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 42px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(235, 236, 240, 0.82);
+  color: #5c5c62;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 140ms ease,
+    transform 160ms ease;
+}
+
+.dismiss-countdown-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--countdown-progress);
+  border-radius: inherit;
+  background: rgba(0, 122, 255, 0.2);
+  transition: width 100ms linear;
+}
+
+.dismiss-countdown-label {
+  position: relative;
+  display: grid;
+  height: 100%;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 560;
+}
+
+.translation-bubble.hover-paused .dismiss-countdown {
+  background: rgba(0, 122, 255, 0.12);
+  transform: scale(1.08);
 }
 
 .loading-title {
