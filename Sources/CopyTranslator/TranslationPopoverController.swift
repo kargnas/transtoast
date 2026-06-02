@@ -40,6 +40,7 @@ final class TranslationPopoverController {
             frame: CGRect(origin: .zero, size: size),
             payload: payload,
             arrowEdge: placement.arrowEdge,
+            arrowX: placement.arrowX,
             onClose: { [weak self] in
                 self?.close()
             }
@@ -111,51 +112,35 @@ final class TranslationPopoverController {
         for size: CGSize,
         caretBounds: CGRect?,
         settings: TranslatorSettings
-    ) -> (origin: CGPoint, arrowEdge: TranslationPopoverArrowEdge) {
-        if let caretBounds,
-           let screen = screen(containing: caretBounds) {
-            let visibleFrame = screen.visibleFrame
-            let x = clamp(
-                caretBounds.midX - size.width / 2,
-                visibleFrame.minX + margin,
-                visibleFrame.maxX - size.width - margin
-            )
+    ) -> (origin: CGPoint, arrowEdge: PopoverArrowEdge, arrowX: CGFloat) {
+        let screen = caretBounds.flatMap(screen(containing:)) ?? NSScreen.main ?? NSScreen.screens.first
+        let visibleFrame = screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1_440, height: 900)
+        let result = PopoverPlacementCalculator.place(
+            size: PopoverSize(width: Double(size.width), height: Double(size.height)),
+            anchor: caretBounds.map {
+                PopoverRect(
+                    x: Double($0.minX),
+                    y: Double($0.minY),
+                    width: Double($0.width),
+                    height: Double($0.height)
+                )
+            },
+            workArea: PopoverRect(
+                x: Double(visibleFrame.minX),
+                y: Double(visibleFrame.minY),
+                width: Double(visibleFrame.width),
+                height: Double(visibleFrame.height)
+            ),
+            fallbackPosition: fallbackPosition(for: settings.toastPosition),
+            margin: Double(margin),
+            gap: Double(caretGap)
+        )
 
-            let belowY = caretBounds.minY - caretGap - size.height
-            if belowY >= visibleFrame.minY + margin {
-                return (CGPoint(x: x, y: belowY), .top)
-            }
-
-            let aboveY = caretBounds.maxY + caretGap
-            if aboveY + size.height <= visibleFrame.maxY - margin {
-                return (CGPoint(x: x, y: aboveY), .bottom)
-            }
-
-            let y = clamp(
-                belowY,
-                visibleFrame.minY + margin,
-                visibleFrame.maxY - size.height - margin
-            )
-            return (CGPoint(x: x, y: y), y < caretBounds.minY ? .top : .bottom)
-        }
-
-        let visibleFrame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
-            ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let left = visibleFrame.minX + margin
-        let right = visibleFrame.maxX - size.width - margin
-        let bottom = visibleFrame.minY + margin
-        let top = visibleFrame.maxY - size.height - margin
-
-        switch settings.toastPosition {
-        case .bottomRight:
-            return (CGPoint(x: right, y: bottom), .none)
-        case .bottomLeft:
-            return (CGPoint(x: left, y: bottom), .none)
-        case .topRight:
-            return (CGPoint(x: right, y: top), .none)
-        case .topLeft:
-            return (CGPoint(x: left, y: top), .none)
-        }
+        return (
+            CGPoint(x: result.originX, y: result.originY),
+            result.arrowEdge,
+            CGFloat(result.arrowX)
+        )
     }
 
     private func screen(containing rect: CGRect) -> NSScreen? {
@@ -163,11 +148,17 @@ final class TranslationPopoverController {
         return NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main
     }
 
-    private func clamp(_ value: CGFloat, _ minValue: CGFloat, _ maxValue: CGFloat) -> CGFloat {
-        if minValue > maxValue {
-            return minValue
+    private func fallbackPosition(for position: ToastPosition) -> PopoverFallbackPosition {
+        switch position {
+        case .bottomRight:
+            .bottomRight
+        case .bottomLeft:
+            .bottomLeft
+        case .topRight:
+            .topRight
+        case .topLeft:
+            .topLeft
         }
-        return min(max(value, minValue), maxValue)
     }
 }
 
@@ -176,15 +167,10 @@ final class TranslationPopoverPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-private enum TranslationPopoverArrowEdge {
-    case top
-    case bottom
-    case none
-}
-
 private final class TranslationPopoverContentView: NSView {
     private let payload: TranslationPreviewPayload
-    private let arrowEdge: TranslationPopoverArrowEdge
+    private let arrowEdge: PopoverArrowEdge
+    private let arrowX: CGFloat
     private let onClose: () -> Void
 
     private var visibleMode: String
@@ -200,11 +186,13 @@ private final class TranslationPopoverContentView: NSView {
     init(
         frame: CGRect,
         payload: TranslationPreviewPayload,
-        arrowEdge: TranslationPopoverArrowEdge,
+        arrowEdge: PopoverArrowEdge,
+        arrowX: CGFloat,
         onClose: @escaping () -> Void
     ) {
         self.payload = payload
         self.arrowEdge = arrowEdge
+        self.arrowX = arrowX
         self.onClose = onClose
         visibleMode = payload.mode
         super.init(frame: frame)
@@ -236,7 +224,7 @@ private final class TranslationPopoverContentView: NSView {
             return
         }
 
-        let midX = bounds.midX
+        let midX = arrowX
         let arrowWidth: CGFloat = 28
         let arrowHeight: CGFloat = 18
         let path = NSBezierPath()
