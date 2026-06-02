@@ -75,7 +75,7 @@ export const fallbackState: SettingsState = {
     targetLanguage: "Korean",
     hasCompletedLocalModelSelection: false,
     toastPosition: "bottomRight",
-    toastDuration: 6
+    toastDuration: 2
   },
   defaults: {
     provider: "localHyMT2",
@@ -89,7 +89,7 @@ export const fallbackState: SettingsState = {
     targetLanguage: "Korean",
     hasCompletedLocalModelSelection: false,
     toastPosition: "bottomRight",
-    toastDuration: 6
+    toastDuration: 2
   },
   overrides: {
     provider: false,

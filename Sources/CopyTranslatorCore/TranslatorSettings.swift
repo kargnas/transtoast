@@ -87,7 +87,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         targetLanguage: String = "Korean",
         hasCompletedLocalModelSelection: Bool = false,
         toastPosition: ToastPosition = .bottomRight,
-        toastDuration: TimeInterval = 6
+        toastDuration: TimeInterval = 2
     ) {
         self.provider = provider
         self.hyMT2Model = hyMT2Model
@@ -137,7 +137,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         targetLanguage = try container.decodeIfPresent(String.self, forKey: .targetLanguage) ?? "Korean"
         hasCompletedLocalModelSelection = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedLocalModelSelection) ?? false
         toastPosition = try container.decodeIfPresent(ToastPosition.self, forKey: .toastPosition) ?? .bottomRight
-        toastDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .toastDuration) ?? 6
+        toastDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .toastDuration) ?? Self().toastDuration
     }
 
     public func encode(to encoder: Encoder) throws {

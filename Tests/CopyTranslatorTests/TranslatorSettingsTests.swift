@@ -15,6 +15,7 @@ import Testing
     #expect(settings.targetLanguage == "Korean")
     #expect(settings.hasCompletedLocalModelSelection == false)
     #expect(settings.toastPosition == .bottomRight)
+    #expect(settings.toastDuration == 2)
 }
 
 @Test func decodesLegacySettingsWithScreenContextKey() throws {

@@ -78,6 +78,16 @@
     visibleMode = visibleMode === "original" ? "translated" : "original";
   }
 
+  async function startDragging(event: MouseEvent) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!isTauri || event.button !== 0 || target?.closest("button")) return;
+    try {
+      await getCurrentWindow().startDragging();
+    } catch {
+      // Dragging is best-effort in browser preview and unsupported shells.
+    }
+  }
+
   async function closePopover() {
     if (!isTauri) return;
     try {
@@ -114,11 +124,17 @@
 </script>
 
 <main class="translation-stage" class:debug={debugMode} class:tall={tallMode} aria-label="Translation popup">
-  <section
+  <div
     class="translation-bubble"
     class:above={arrowAbove}
     class:compact={compactMode}
     class:error={visibleMode === "error"}
+    role="dialog"
+    aria-label="Translation result"
+    tabindex="-1"
+    onmousedown={startDragging}
+    onmouseenter={clearAutoDismiss}
+    onmouseleave={scheduleAutoDismiss}
   >
     <div class="translation-bubble-inner">
       {#if visibleMode === "loading"}
@@ -158,7 +174,7 @@
         </footer>
       {/if}
     </div>
-  </section>
+  </div>
 
   {#if debugMode}
     <nav class="preview-switcher" aria-label="Preview state">

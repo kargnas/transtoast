@@ -9,9 +9,12 @@ final class TranslationPopoverController {
     private let compactHeight: CGFloat = 150
     private let tallHeight: CGFloat = 176
     private let maxHeight: CGFloat = 560
+    private let automaticDismissDuration: TimeInterval = 2
 
     private var panel: TranslationPopoverPanel?
     private var dismissWorkItem: DispatchWorkItem?
+    private var clickMonitorTokens: [Any] = []
+    private var currentMode: String?
 
     func show(
         payload: TranslationPreviewPayload,
@@ -36,6 +39,7 @@ final class TranslationPopoverController {
         panel.level = .floating
         panel.ignoresMouseEvents = false
         panel.isReleasedWhenClosed = false
+        panel.isMovableByWindowBackground = true
         panel.contentView = TranslationPopoverContentView(
             frame: CGRect(origin: .zero, size: size),
             payload: payload,
@@ -43,33 +47,92 @@ final class TranslationPopoverController {
             arrowX: placement.arrowX,
             onClose: { [weak self] in
                 self?.close()
+            },
+            onMouseEntered: { [weak self] in
+                self?.pauseDismissTimer()
+            },
+            onMouseExited: { [weak self] in
+                self?.resumeDismissTimer()
             }
         )
 
         self.panel = panel
+        currentMode = payload.mode
+        installClickMonitors(for: panel)
         panel.orderFrontRegardless()
-        scheduleDismissIfNeeded(mode: payload.mode, duration: settings.toastDuration)
+        scheduleDismissIfNeeded(mode: payload.mode)
     }
 
     func close() {
         dismissWorkItem?.cancel()
         dismissWorkItem = nil
+        removeClickMonitors()
         panel?.orderOut(nil)
         panel = nil
+        currentMode = nil
     }
 
-    private func scheduleDismissIfNeeded(mode: String, duration: TimeInterval) {
+    private func scheduleDismissIfNeeded(mode: String) {
         guard mode != "loading" else {
             return
         }
 
+        dismissWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             Task { @MainActor in
                 self?.close()
             }
         }
         dismissWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(1, duration), execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + automaticDismissDuration, execute: workItem)
+    }
+
+    private func pauseDismissTimer() {
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+    }
+
+    private func resumeDismissTimer() {
+        guard let currentMode else {
+            return
+        }
+        scheduleDismissIfNeeded(mode: currentMode)
+    }
+
+    private func installClickMonitors(for panel: NSPanel) {
+        removeClickMonitors()
+
+        if let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self, weak panel] event in
+            guard let self,
+                  let panel,
+                  event.window !== panel else {
+                return event
+            }
+            self.close()
+            return event
+        }) {
+            clickMonitorTokens.append(localMonitor)
+        }
+
+        if let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self, weak panel] _ in
+            Task { @MainActor in
+                guard let self,
+                      let panel,
+                      !panel.frame.contains(NSEvent.mouseLocation) else {
+                    return
+                }
+                self.close()
+            }
+        }) {
+            clickMonitorTokens.append(globalMonitor)
+        }
+    }
+
+    private func removeClickMonitors() {
+        for token in clickMonitorTokens {
+            NSEvent.removeMonitor(token)
+        }
+        clickMonitorTokens.removeAll()
     }
 
     private func size(for payload: TranslationPreviewPayload) -> CGSize {
@@ -172,8 +235,11 @@ private final class TranslationPopoverContentView: NSView {
     private let arrowEdge: PopoverArrowEdge
     private let arrowX: CGFloat
     private let onClose: () -> Void
+    private let onMouseEntered: () -> Void
+    private let onMouseExited: () -> Void
 
     private var visibleMode: String
+    private var hoverTrackingArea: NSTrackingArea?
     private let titleLabel = NSTextField(labelWithString: "")
     private let bodyLabel = NSTextField(wrappingLabelWithString: "")
     private let languageLabel = NSTextField(labelWithString: "")
@@ -188,12 +254,16 @@ private final class TranslationPopoverContentView: NSView {
         payload: TranslationPreviewPayload,
         arrowEdge: PopoverArrowEdge,
         arrowX: CGFloat,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        onMouseEntered: @escaping () -> Void,
+        onMouseExited: @escaping () -> Void
     ) {
         self.payload = payload
         self.arrowEdge = arrowEdge
         self.arrowX = arrowX
         self.onClose = onClose
+        self.onMouseEntered = onMouseEntered
+        self.onMouseExited = onMouseExited
         visibleMode = payload.mode
         super.init(frame: frame)
         setup()
@@ -251,6 +321,35 @@ private final class TranslationPopoverContentView: NSView {
     override func layout() {
         super.layout()
         layoutContent()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        hoverTrackingArea = trackingArea
+        addTrackingArea(trackingArea)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        onMouseEntered()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onMouseExited()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 
     private var bubbleRect: CGRect {
@@ -374,6 +473,8 @@ private final class TranslationPopoverContentView: NSView {
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 72, height: 24)
             closeButton.frame = CGRect(x: content.maxX - 58, y: content.maxY - 30, width: 58, height: 28)
             closeButton.title = "취소"
+            closeButton.image = nil
+            closeButton.imagePosition = .noImage
             bodyLabel.frame = CGRect(x: content.minX, y: content.maxY - 80, width: content.width, height: 42)
             progressIndicator.frame = CGRect(x: content.minX, y: content.minY + 31, width: content.width, height: 8)
             languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 20)
@@ -390,6 +491,9 @@ private final class TranslationPopoverContentView: NSView {
 
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 40, height: 24)
             closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
+            closeButton.title = ""
+            closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
+            closeButton.imagePosition = .imageOnly
             bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68)
             languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width - 40, height: 20)
 
