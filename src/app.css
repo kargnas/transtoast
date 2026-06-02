@@ -600,6 +600,18 @@ kbd {
   flex: 0 0 auto;
 }
 
+.model-select {
+  width: 104px;
+  height: 32px;
+  min-width: 0;
+  border: 1px solid #d7d7dc;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 560;
+}
+
 .action-row {
   display: inline-flex;
   align-items: center;

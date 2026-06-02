@@ -13,6 +13,16 @@ struct TranslationPreviewPayload: Encodable {
     var model: String
 }
 
+struct TranslationModelOption: Equatable {
+    var provider: TranslationProvider
+    var value: String
+    var title: String
+
+    var id: String {
+        "\(provider.rawValue):\(value)"
+    }
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
@@ -320,23 +330,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
                 show(result: result, title: "Screenshot", inputText: "[screen screenshot]", imageInfo: imageInfo)
             } catch {
-                show(error: error, title: "Screenshot")
+                show(error: error, title: "Screenshot", inputText: "[screen screenshot]")
             }
         }
     }
 
     private func performTextTranslation(
         _ text: String,
-        sourceTitle: String
+        sourceTitle: String,
+        settings overrideSettings: TranslatorSettings? = nil
     ) {
-        showTranslationLoading(originalText: text, sourceTitle: sourceTitle)
+        let settings = overrideSettings ?? settingsStore.settings
+        showTranslationLoading(originalText: text, sourceTitle: sourceTitle, settings: settings)
         Task { [weak self] in
             guard let self else {
                 return
             }
 
             do {
-                let settings = settingsStore.settings
                 let screenContext = await contextImagePNGDataIfNeeded(settings: settings)
                 let imageInfo = Self.imageInfo(for: screenContext.pngData, diagnostic: screenContext.diagnostic)
                 let result = try await translationService.translateText(
@@ -345,9 +356,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     credentials: credentialsProvider.credentials(),
                     contextImagePNGData: screenContext.pngData
                 )
-                show(result: result, title: sourceTitle, inputText: text, imageInfo: imageInfo)
+                show(result: result, title: sourceTitle, inputText: text, imageInfo: imageInfo, settings: settings)
             } catch {
-                show(error: error, title: sourceTitle)
+                show(error: error, title: sourceTitle, inputText: text, settings: settings)
             }
         }
     }
@@ -361,14 +372,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @MainActor
-    private func show(result: TranslationResult, title: String, inputText: String, imageInfo: String?) {
+    private func show(
+        result: TranslationResult,
+        title: String,
+        inputText: String,
+        imageInfo: String?,
+        settings: TranslatorSettings? = nil
+    ) {
         requestLogStore.add(source: title, input: inputText, result: result, imageInfo: imageInfo)
-        showTranslationResult(result, inputText: inputText)
+        showTranslationResult(result, inputText: inputText, settings: settings ?? settingsStore.settings)
     }
 
     @MainActor
-    private func show(error: Error, title: String) {
-        showTranslationError(error, sourceTitle: title)
+    private func show(
+        error: Error,
+        title: String,
+        inputText: String? = nil,
+        settings: TranslatorSettings? = nil
+    ) {
+        showTranslationError(
+            error,
+            sourceTitle: title,
+            originalText: inputText ?? title,
+            settings: settings ?? settingsStore.settings
+        )
     }
 
     @objc private func setProvider(_ sender: NSMenuItem) {
@@ -425,8 +452,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    private func showTranslationLoading(originalText: String, sourceTitle: String) {
-        let settings = settingsStore.settings
+    private func showTranslationLoading(
+        originalText: String,
+        sourceTitle: String,
+        settings: TranslatorSettings? = nil
+    ) {
+        let settings = settings ?? settingsStore.settings
         let languages = resolvedLanguages(for: originalText, settings: settings)
         showTranslationPopover(TranslationPreviewPayload(
             mode: "loading",
@@ -437,11 +468,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             errorText: nil,
             providerTitle: settings.provider.title,
             model: activeModelTitle(settings: settings)
-        ), sourceTitle: sourceTitle)
+        ), sourceTitle: sourceTitle, settings: settings)
     }
 
-    private func showTranslationResult(_ result: TranslationResult, inputText: String) {
-        let settings = settingsStore.settings
+    private func showTranslationResult(
+        _ result: TranslationResult,
+        inputText: String,
+        settings: TranslatorSettings? = nil
+    ) {
+        let settings = settings ?? settingsStore.settings
         let languages = resolvedLanguages(for: inputText, settings: settings)
         showTranslationPopover(TranslationPreviewPayload(
             mode: "translated",
@@ -452,21 +487,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             errorText: nil,
             providerTitle: result.providerTitle,
             model: result.model
-        ), sourceTitle: result.providerTitle)
+        ), sourceTitle: result.providerTitle, settings: settings)
     }
 
-    private func showTranslationError(_ error: Error, sourceTitle: String) {
-        let settings = settingsStore.settings
+    private func showTranslationError(
+        _ error: Error,
+        sourceTitle: String,
+        originalText: String,
+        settings: TranslatorSettings? = nil
+    ) {
+        let settings = settings ?? settingsStore.settings
         showTranslationPopover(TranslationPreviewPayload(
             mode: "error",
             sourceLanguage: settings.sourceLanguage,
             targetLanguage: settings.targetLanguage,
-            originalText: sourceTitle,
+            originalText: originalText,
             translatedText: "",
             errorText: error.localizedDescription,
             providerTitle: settings.provider.title,
             model: activeModelTitle(settings: settings)
-        ), sourceTitle: sourceTitle)
+        ), sourceTitle: sourceTitle, settings: settings)
     }
 
     private func showTranslationPopoverSmoke() {
@@ -497,7 +537,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func showTranslationPopover(_ payload: TranslationPreviewPayload, sourceTitle: String) {
+    private func showTranslationPopover(
+        _ payload: TranslationPreviewPayload,
+        sourceTitle: String,
+        settings displaySettings: TranslatorSettings? = nil
+    ) {
+        let settings = displaySettings ?? settingsStore.settings
         let caretBounds: CGRect?
         if payload.mode == "loading" {
             caretBounds = KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
@@ -509,9 +554,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         translationPopoverController.show(
             payload: payload,
-            settings: settingsStore.settings,
-            caretBounds: caretBounds
+            settings: settings,
+            caretBounds: caretBounds,
+            modelOptions: modelOptions(for: payload.originalText, settings: settings),
+            selectedModelOptionID: selectedModelOptionID(settings: settings),
+            onModelSelected: { [weak self] option in
+                self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
+            }
         )
+    }
+
+    private func retranslate(
+        _ text: String,
+        sourceTitle: String,
+        option: TranslationModelOption
+    ) {
+        guard text != "[screen screenshot]" else {
+            return
+        }
+
+        var settings = settingsStore.settings
+        switch option.provider {
+        case .localHyMT2:
+            settings.provider = .localHyMT2
+            settings.localModelID = option.value
+        case .openRouter:
+            settings.provider = .openRouter
+            settings.openRouterTextModel = option.value
+        }
+        performTextTranslation(text, sourceTitle: sourceTitle, settings: settings)
+    }
+
+    private func modelOptions(
+        for text: String,
+        settings: TranslatorSettings
+    ) -> [TranslationModelOption] {
+        guard text != "[screen screenshot]" else {
+            return []
+        }
+
+        let languages = resolvedLanguages(for: text, settings: settings)
+        var options = LocalModelRegistry.models(customModelsPath: settings.customLocalModelsPath)
+            .filter { model in
+                model.backendScriptName != nil
+                    && model.supports(
+                        sourceLanguage: languages.sourceLanguage,
+                        targetLanguage: languages.targetLanguage
+                    )
+            }
+            .map { model in
+                TranslationModelOption(
+                    provider: .localHyMT2,
+                    value: model.id,
+                    title: model.title
+                )
+            }
+
+        let openRouterModel = settings.openRouterTextModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !openRouterModel.isEmpty {
+            options.append(TranslationModelOption(
+                provider: .openRouter,
+                value: openRouterModel,
+                title: openRouterModel
+            ))
+        }
+        return options
+    }
+
+    private func selectedModelOptionID(settings: TranslatorSettings) -> String {
+        switch settings.provider {
+        case .localHyMT2:
+            TranslationModelOption(provider: .localHyMT2, value: settings.localModelID, title: "").id
+        case .openRouter:
+            TranslationModelOption(provider: .openRouter, value: settings.openRouterTextModel, title: "").id
+        }
     }
 
     private func resolvedLanguages(

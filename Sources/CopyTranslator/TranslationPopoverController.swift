@@ -22,7 +22,10 @@ final class TranslationPopoverController {
     func show(
         payload: TranslationPreviewPayload,
         settings: TranslatorSettings,
-        caretBounds: CGRect?
+        caretBounds: CGRect?,
+        modelOptions: [TranslationModelOption] = [],
+        selectedModelOptionID: String? = nil,
+        onModelSelected: ((TranslationModelOption) -> Void)? = nil
     ) {
         close()
 
@@ -56,7 +59,10 @@ final class TranslationPopoverController {
             },
             onMouseExited: { [weak self] in
                 self?.resumeDismissTimer()
-            }
+            },
+            modelOptions: modelOptions,
+            selectedModelOptionID: selectedModelOptionID,
+            onModelSelected: onModelSelected
         )
         panel.contentView = contentView
 
@@ -312,6 +318,9 @@ private final class TranslationPopoverContentView: NSView {
     private let onClose: () -> Void
     private let onMouseEntered: () -> Void
     private let onMouseExited: () -> Void
+    private let modelOptions: [TranslationModelOption]
+    private let selectedModelOptionID: String?
+    private let onModelSelected: ((TranslationModelOption) -> Void)?
     private let strings = PopoverStrings.current
 
     private var visibleMode: String
@@ -327,6 +336,7 @@ private final class TranslationPopoverContentView: NSView {
     private let countdownPill = NSView()
     private let countdownFill = NSView()
     private let countdownLabel = NSTextField(labelWithString: "")
+    private let modelButton = NSButton(title: "", target: nil, action: nil)
     private let originalButton = NSButton(title: "", target: nil, action: nil)
     private let copyButton = NSButton(title: "", target: nil, action: nil)
     private let closeButton = NSButton(title: "", target: nil, action: nil)
@@ -340,7 +350,10 @@ private final class TranslationPopoverContentView: NSView {
         arrowX: CGFloat,
         onClose: @escaping () -> Void,
         onMouseEntered: @escaping () -> Void,
-        onMouseExited: @escaping () -> Void
+        onMouseExited: @escaping () -> Void,
+        modelOptions: [TranslationModelOption],
+        selectedModelOptionID: String?,
+        onModelSelected: ((TranslationModelOption) -> Void)?
     ) {
         self.payload = payload
         self.arrowEdge = arrowEdge
@@ -348,6 +361,9 @@ private final class TranslationPopoverContentView: NSView {
         self.onClose = onClose
         self.onMouseEntered = onMouseEntered
         self.onMouseExited = onMouseExited
+        self.modelOptions = modelOptions
+        self.selectedModelOptionID = selectedModelOptionID
+        self.onModelSelected = onModelSelected
         visibleMode = payload.mode
         super.init(frame: frame)
         setup()
@@ -601,6 +617,8 @@ private final class TranslationPopoverContentView: NSView {
         countdownLabel.textColor = .secondaryLabelColor
         countdownPill.addSubview(countdownLabel)
 
+        configureButton(modelButton, imageName: "cpu", action: #selector(showModelMenu))
+        modelButton.toolTip = "Change model"
         configureButton(originalButton, imageName: "eye", action: #selector(toggleOriginal))
         configureButton(copyButton, imageName: "doc.on.doc", action: #selector(copyText))
         configureButton(closeButton, imageName: "xmark", action: #selector(close))
@@ -677,6 +695,7 @@ private final class TranslationPopoverContentView: NSView {
             languageLabel.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = false
+            modelButton.isHidden = true
             originalButton.isHidden = true
             copyButton.isHidden = true
             closeButton.isHidden = false
@@ -703,17 +722,27 @@ private final class TranslationPopoverContentView: NSView {
             languageLabel.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = true
+            modelButton.isHidden = modelOptions.count < 2
             originalButton.isHidden = true
             copyButton.isHidden = true
             closeButton.isHidden = false
             countdownPill.isHidden = false
 
-            titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 40, height: 24)
+            titleLabel.frame = CGRect(
+                x: content.minX,
+                y: content.maxY - 28,
+                width: content.width - (modelButton.isHidden ? 40 : 120),
+                height: 24
+            )
             closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
             closeButton.imagePosition = .imageOnly
+            modelButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             layoutCountdownPill(x: closeButton.frame.minX - 48, y: content.maxY - 27)
+            if !modelButton.isHidden {
+                layoutCountdownPill(x: modelButton.frame.minX - 50, y: content.maxY - 25)
+            }
             bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68)
             modelLabel.frame = CGRect(x: content.maxX - 92, y: content.minY, width: 92, height: 20)
             languageLabel.frame = CGRect(
@@ -729,6 +758,7 @@ private final class TranslationPopoverContentView: NSView {
             languageLabel.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = true
+            modelButton.isHidden = modelOptions.count < 2
             originalButton.isHidden = false
             copyButton.isHidden = false
             closeButton.isHidden = false
@@ -740,7 +770,9 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
             copyButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             originalButton.frame = CGRect(x: copyButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            layoutCountdownPill(x: originalButton.frame.minX - 50, y: content.maxY - 25)
+            modelButton.frame = CGRect(x: originalButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
+            let countdownAnchor = modelButton.isHidden ? originalButton.frame.minX : modelButton.frame.minX
+            layoutCountdownPill(x: countdownAnchor - 50, y: content.maxY - 25)
             bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 44, width: content.width, height: content.height - 80)
             modelLabel.frame = CGRect(x: content.minX, y: content.minY + 20, width: content.width, height: 16)
             languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 18)
@@ -788,6 +820,7 @@ private final class TranslationPopoverContentView: NSView {
         let controlViews: [NSView] = [
             originalButton,
             copyButton,
+            modelButton,
             closeButton,
             countdownPill,
         ]
@@ -834,6 +867,31 @@ private final class TranslationPopoverContentView: NSView {
         pasteboard.clearContents()
         pasteboard.setString(visibleMode == "original" ? payload.originalText : payload.translatedText, forType: .string)
         showCopiedState()
+    }
+
+    @objc private func showModelMenu() {
+        guard modelOptions.count >= 2 else {
+            return
+        }
+
+        let menu = NSMenu()
+        for option in modelOptions {
+            let item = NSMenuItem(title: option.title, action: #selector(selectModel(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = option.id
+            item.state = option.id == selectedModelOptionID ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: CGPoint(x: modelButton.frame.minX, y: modelButton.frame.maxY + 4), in: self)
+    }
+
+    @objc private func selectModel(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              id != selectedModelOptionID,
+              let option = modelOptions.first(where: { $0.id == id }) else {
+            return
+        }
+        onModelSelected?(option)
     }
 
     @objc private func close() {

@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import { Check, Copy, Eye, Languages, X } from "@lucide/svelte";
   import { fallbackTranslationState, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
+  import { fallbackState, type SettingsState } from "./lib/settings";
 
   const params = new URLSearchParams(window.location.search);
   const debugMode = params.get("debug") === "1";
@@ -14,6 +15,8 @@
   let preview = $state<TranslationPreviewState>(fallbackTranslationState);
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
+  let modelOptions = $state<PreviewModelOption[]>([]);
+  let selectedModelValue = $state("");
   let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
   let countdownInterval: number | undefined;
@@ -51,8 +54,14 @@
   const countdownProgress = $derived(`${countdownProgressValue * 100}%`);
   const dismissOpacity = $derived((0.62 + countdownProgressValue * 0.38).toFixed(3));
 
+  type PreviewModelOption = {
+    label: string;
+    value: string;
+  };
+
   onMount(() => {
     isTauri = "__TAURI_INTERNALS__" in window;
+    applyModelOptions(fallbackState);
     if (isTauri) {
       void loadPreview();
     }
@@ -71,7 +80,38 @@
       preview = fallbackTranslationState;
       visibleMode = requestedMode ?? "translated";
     }
+    if (isTauri) {
+      await loadModelOptions();
+    } else {
+      syncSelectedModel();
+    }
     scheduleAutoDismiss();
+  }
+
+  async function loadModelOptions() {
+    try {
+      applyModelOptions(await invoke<SettingsState>("load_settings"));
+    } catch {
+      applyModelOptions(fallbackState);
+    }
+  }
+
+  function applyModelOptions(state: SettingsState) {
+    modelOptions = [
+      ...state.options.localModels.map((option) => ({
+        label: option.label,
+        value: `localHyMT2:${option.value}`
+      })),
+      {
+        label: state.settings.openRouterTextModel,
+        value: `openRouter:${state.settings.openRouterTextModel}`
+      }
+    ];
+    syncSelectedModel();
+  }
+
+  function syncSelectedModel() {
+    selectedModelValue = modelOptions.find((option) => option.label === preview.model)?.value ?? modelOptions[0]?.value ?? "";
   }
 
   function modeFromQuery(value: string | null): TranslationMode | null {
@@ -104,6 +144,19 @@
 
   function toggleOriginal() {
     visibleMode = visibleMode === "original" ? "translated" : "original";
+  }
+
+  function selectModel(event: Event) {
+    const value = event.currentTarget instanceof HTMLSelectElement ? event.currentTarget.value : "";
+    const option = modelOptions.find((candidate) => candidate.value === value);
+    if (!option) return;
+    selectedModelValue = value;
+    preview = {
+      ...preview,
+      model: option.label
+    };
+    visibleMode = "translated";
+    scheduleAutoDismiss();
   }
 
   async function startDragging(event: MouseEvent) {
@@ -232,6 +285,13 @@
               <span class="dismiss-countdown-label">{countdownLabel}</span>
             </div>
           {/if}
+          {#if modelOptions.length > 1}
+            <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+              {#each modelOptions as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          {/if}
           <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </div>
         <footer class="bubble-footer">
@@ -247,6 +307,13 @@
               <span class="dismiss-countdown-fill"></span>
               <span class="dismiss-countdown-label">{countdownLabel}</span>
             </div>
+          {/if}
+          {#if modelOptions.length > 1}
+            <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+              {#each modelOptions as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
           {/if}
           <button class="icon-button" aria-label={visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal} onclick={toggleOriginal}>
             {#if visibleMode === "original"}<Languages size={16} />{:else}<Eye size={16} />{/if}
