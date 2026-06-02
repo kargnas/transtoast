@@ -290,39 +290,19 @@ private struct PopoverStrings {
     var cancel: String
     var copied: String
     var close: String
-    var usesKoreanLanguageNames: Bool
 
-    static var current: Self {
-        if ProcessInfo.processInfo.environment["COPY_TRANSLATOR_UI_LANGUAGE"] == "ko" {
-            return Self(
-                translating: "번역 중...",
-                translatingClipboard: "클립보드의 텍스트를 번역하고 있어요.",
-                translatingScreenshot: "스크린샷을 캡처하고 번역하고 있어요.",
-                errorTitle: "오류",
-                translationFailed: "번역에 실패했습니다.",
-                showOriginal: "원본 보기",
-                showTranslation: "번역 보기",
-                cancel: "취소",
-                copied: "복사됨",
-                close: "닫기",
-                usesKoreanLanguageNames: true
-            )
-        }
-
-        return Self(
-            translating: "Translating...",
-            translatingClipboard: "Translating clipboard text.",
-            translatingScreenshot: "Capturing and translating the screenshot.",
-            errorTitle: "Error",
-            translationFailed: "Translation failed.",
-            showOriginal: "Original",
-            showTranslation: "Translation",
-            cancel: "Cancel",
-            copied: "Copied",
-            close: "Close",
-            usesKoreanLanguageNames: false
-        )
-    }
+    static let current = Self(
+        translating: "Translating...",
+        translatingClipboard: "Translating clipboard text.",
+        translatingScreenshot: "Capturing and translating the screenshot.",
+        errorTitle: "Error",
+        translationFailed: "Translation failed.",
+        showOriginal: "Original",
+        showTranslation: "Translation",
+        cancel: "Cancel",
+        copied: "Copied",
+        close: "Close"
+    )
 }
 
 private final class TranslationPopoverContentView: NSView {
@@ -656,7 +636,7 @@ private final class TranslationPopoverContentView: NSView {
     }
 
     private func render() {
-        languageLabel.stringValue = "⌘  \(shortLanguage(payload.targetLanguage))"
+        languageLabel.stringValue = "⌘  \(payload.targetLanguage)"
         modelLabel.stringValue = payload.model.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch visibleMode {
@@ -875,22 +855,4 @@ private final class TranslationPopoverContentView: NSView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
     }
 
-    private func shortLanguage(_ language: String) -> String {
-        guard strings.usesKoreanLanguageNames else {
-            return language
-        }
-        switch language {
-        case "English": return "영어"
-        case "Korean": return "한국어"
-        case "Simplified Chinese": return "중국어"
-        case "Japanese": return "일본어"
-        case "Spanish": return "스페인어"
-        case "German": return "독일어"
-        case "French": return "프랑스어"
-        case "Indonesian": return "인도네시아어"
-        case "Arabic": return "아랍어"
-        case "Auto": return "자동"
-        default: return language
-        }
-    }
 }

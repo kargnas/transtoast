@@ -22,8 +22,20 @@
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
   let countdownPaused = $state(false);
 
-  const uiStrings = localeStrings();
-  const targetLanguage = $derived(shortLanguage(preview.targetLanguage));
+  const uiStrings = {
+    translating: "Translating...",
+    translatingClipboard: "Translating clipboard text.",
+    translatingScreenshot: "Capturing and translating the screenshot.",
+    error: "Error",
+    translationFailed: "Translation failed.",
+    showOriginal: "Original",
+    showTranslation: "Translation",
+    cancel: "Cancel",
+    close: "Close",
+    copyCurrent: "Copy",
+    copied: "Copied"
+  };
+  const targetLanguage = $derived(preview.targetLanguage);
   const modelName = $derived(preview.model.trim());
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
   const loadingMessage = $derived(
@@ -62,65 +74,11 @@
     scheduleAutoDismiss();
   }
 
-  function localeStrings() {
-    if (params.get("ui") === "ko") {
-      return {
-        translating: "번역 중...",
-        translatingClipboard: "클립보드의 텍스트를 번역하고 있어요.",
-        translatingScreenshot: "스크린샷을 캡처하고 번역하고 있어요.",
-        error: "오류",
-        translationFailed: "번역에 실패했습니다.",
-        showOriginal: "원본 보기",
-        showTranslation: "번역 보기",
-        cancel: "취소",
-        close: "닫기",
-        copyCurrent: "복사",
-        copied: "복사됨",
-        usesKoreanLanguageNames: true
-      };
-    }
-
-    return {
-      translating: "Translating...",
-      translatingClipboard: "Translating clipboard text.",
-      translatingScreenshot: "Capturing and translating the screenshot.",
-      error: "Error",
-      translationFailed: "Translation failed.",
-      showOriginal: "Original",
-      showTranslation: "Translation",
-      cancel: "Cancel",
-      close: "Close",
-      copyCurrent: "Copy",
-      copied: "Copied",
-      usesKoreanLanguageNames: false
-    };
-  }
-
   function modeFromQuery(value: string | null): TranslationMode | null {
     if (value === "loading" || value === "translated" || value === "original" || value === "error") {
       return value;
     }
     return null;
-  }
-
-  function shortLanguage(language: string) {
-    if (!uiStrings.usesKoreanLanguageNames) {
-      return language;
-    }
-
-    const names: Record<string, string> = {
-      English: "영어",
-      Korean: "한국어",
-      "Simplified Chinese": "중국어",
-      Japanese: "일본어",
-      Spanish: "스페인어",
-      German: "독일어",
-      French: "프랑스어",
-      Indonesian: "인도네시아어",
-      Arabic: "아랍어",
-      Auto: "자동"
-    };
-    return names[language] ?? language;
   }
 
   async function copyText() {
