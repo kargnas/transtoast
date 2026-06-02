@@ -473,13 +473,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let requiresCaretAnchor = payload.originalText != "[screen screenshot]"
         let caretBounds: CGRect?
         if payload.mode == "loading" {
-            let focusedCaretBounds = KeyboardCaretLocator.focusedTextCaretBounds()
+            let focusedCaretBounds = KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
             caretBounds = focusedCaretBounds
                 ?? (requiresCaretAnchor ? KeyboardCaretLocator.frontmostWindowAnchorBounds() : nil)
             lastTranslationCaretBounds = caretBounds
         } else {
             caretBounds = lastTranslationCaretBounds
-                ?? KeyboardCaretLocator.focusedTextCaretBounds()
+                ?? KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
                 ?? (requiresCaretAnchor ? KeyboardCaretLocator.frontmostWindowAnchorBounds() : nil)
         }
 

@@ -8,6 +8,7 @@ final class TranslationPopoverController {
     private let windowWidth: CGFloat = 356
     private let compactHeight: CGFloat = 150
     private let tallHeight: CGFloat = 176
+    private let maxHeight: CGFloat = 560
 
     private var panel: TranslationPopoverPanel?
     private var dismissWorkItem: DispatchWorkItem?
@@ -19,10 +20,7 @@ final class TranslationPopoverController {
     ) {
         close()
 
-        let size = CGSize(
-            width: windowWidth,
-            height: payload.mode == "loading" || payload.mode == "error" ? tallHeight : compactHeight
-        )
+        let size = size(for: payload)
         let placement = placement(for: size, caretBounds: caretBounds, settings: settings)
         let panel = TranslationPopoverPanel(
             contentRect: CGRect(origin: placement.origin, size: size),
@@ -71,6 +69,42 @@ final class TranslationPopoverController {
         }
         dismissWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + max(1, duration), execute: workItem)
+    }
+
+    private func size(for payload: TranslationPreviewPayload) -> CGSize {
+        let height: CGFloat
+        switch payload.mode {
+        case "loading":
+            height = tallHeight
+        case "error":
+            height = textPanelHeight(for: payload.errorText ?? "번역에 실패했습니다.", minimum: tallHeight)
+        default:
+            height = textPanelHeight(
+                for: [payload.originalText, payload.translatedText].max(by: { $0.count < $1.count }) ?? payload.translatedText,
+                minimum: compactHeight
+            )
+        }
+
+        return CGSize(width: windowWidth, height: height)
+    }
+
+    private func textPanelHeight(for text: String, minimum: CGFloat) -> CGFloat {
+        let horizontalInset: CGFloat = 24
+        let contentInset: CGFloat = 22
+        let arrowHeight: CGFloat = 18
+        let bottomControlsHeight: CGFloat = 50
+        let verticalPadding: CGFloat = 32
+        let bodyWidth = windowWidth - horizontalInset * 2 - contentInset * 2
+        let font = NSFont.preferredFont(forTextStyle: .body)
+        let bodyHeight = ceil(
+            (text as NSString).boundingRect(
+                with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: font]
+            ).height
+        )
+
+        return min(max(minimum, bodyHeight + bottomControlsHeight + verticalPadding + arrowHeight), maxHeight)
     }
 
     private func placement(
@@ -270,8 +304,8 @@ private final class TranslationPopoverContentView: NSView {
         titleLabel.textColor = .labelColor
         bodyLabel.font = .preferredFont(forTextStyle: .body)
         bodyLabel.textColor = .labelColor
-        bodyLabel.maximumNumberOfLines = 3
-        bodyLabel.lineBreakMode = .byTruncatingTail
+        bodyLabel.maximumNumberOfLines = 0
+        bodyLabel.lineBreakMode = .byWordWrapping
         languageLabel.font = .preferredFont(forTextStyle: .caption1)
         languageLabel.textColor = .secondaryLabelColor
 
@@ -368,7 +402,7 @@ private final class TranslationPopoverContentView: NSView {
 
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 40, height: 24)
             closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
-            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: 72)
+            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68)
             languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width - 40, height: 20)
 
         default:
@@ -381,7 +415,7 @@ private final class TranslationPopoverContentView: NSView {
             moreButton.isHidden = false
             closeButton.isHidden = true
 
-            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 50, width: content.width, height: 54)
+            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 50, width: content.width, height: content.height - 50)
             languageLabel.frame = CGRect(x: content.minX, y: content.minY + 5, width: 105, height: 22)
             moreButton.frame = CGRect(x: content.maxX - 38, y: content.minY, width: 38, height: 30)
             copyButton.frame = CGRect(x: moreButton.frame.minX - 44, y: content.minY, width: 38, height: 30)
