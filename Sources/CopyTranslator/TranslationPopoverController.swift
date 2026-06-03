@@ -339,7 +339,8 @@ private final class TranslationPopoverContentView: NSView {
     private var countdownDuration: TimeInterval = 2
     private var copyResetWorkItem: DispatchWorkItem?
     private let titleLabel = NSTextField(labelWithString: "")
-    private let bodyLabel = NSTextField(wrappingLabelWithString: "")
+    private let bodyScrollView = NSScrollView()
+    private let bodyTextView = NSTextView(frame: .zero)
     private let languageLabel = NSTextField(labelWithString: "")
     private let modelLabel = NSTextField(labelWithString: "")
     private let countdownPill = NSView()
@@ -526,11 +527,11 @@ private final class TranslationPopoverContentView: NSView {
             return minimum
         }
 
-        let font = bodyLabel.font ?? NSFont.preferredFont(forTextStyle: .body)
+        let font = bodyTextView.font ?? NSFont.preferredFont(forTextStyle: .body)
         let lineHeight = max(1, font.ascender - font.descender + font.leading)
-        let bodyWidth = max(1, bodyLabel.frame.width)
+        let bodyWidth = max(1, bodyScrollView.frame.width)
         let bodyHeight = ceil(
-            (bodyLabel.stringValue as NSString).boundingRect(
+            (bodyTextView.string as NSString).boundingRect(
                 with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: [.font: font]
@@ -583,7 +584,7 @@ private final class TranslationPopoverContentView: NSView {
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
 
-        for label in [titleLabel, bodyLabel, languageLabel, modelLabel] {
+        for label in [titleLabel, languageLabel, modelLabel] {
             label.drawsBackground = false
             label.isBordered = false
             label.isEditable = false
@@ -593,16 +594,35 @@ private final class TranslationPopoverContentView: NSView {
 
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.textColor = .labelColor
-        bodyLabel.font = .preferredFont(forTextStyle: .body)
-        bodyLabel.textColor = .labelColor
-        bodyLabel.maximumNumberOfLines = 0
-        bodyLabel.lineBreakMode = .byWordWrapping
         languageLabel.font = .preferredFont(forTextStyle: .caption1)
         languageLabel.textColor = .secondaryLabelColor
         languageLabel.lineBreakMode = .byTruncatingTail
         modelLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
         modelLabel.textColor = .tertiaryLabelColor
         modelLabel.lineBreakMode = .byTruncatingMiddle
+
+        bodyScrollView.drawsBackground = false
+        bodyScrollView.borderType = .noBorder
+        bodyScrollView.hasHorizontalScroller = false
+        bodyScrollView.hasVerticalScroller = true
+        bodyScrollView.autohidesScrollers = true
+        bodyScrollView.scrollerStyle = .overlay
+        bodyScrollView.documentView = bodyTextView
+        addSubview(bodyScrollView)
+
+        bodyTextView.drawsBackground = false
+        bodyTextView.backgroundColor = .clear
+        bodyTextView.isEditable = false
+        bodyTextView.isSelectable = false
+        bodyTextView.font = .preferredFont(forTextStyle: .body)
+        bodyTextView.textColor = .labelColor
+        bodyTextView.textContainerInset = .zero
+        bodyTextView.textContainer?.lineFragmentPadding = 0
+        bodyTextView.textContainer?.widthTracksTextView = true
+        bodyTextView.textContainer?.heightTracksTextView = false
+        bodyTextView.isHorizontallyResizable = false
+        bodyTextView.isVerticallyResizable = true
+        bodyTextView.autoresizingMask = [.width]
 
         countdownPill.wantsLayer = true
         countdownPill.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.82).cgColor
@@ -671,16 +691,16 @@ private final class TranslationPopoverContentView: NSView {
             hideCountdown()
             titleLabel.stringValue = strings.translating
             titleLabel.textColor = .controlAccentColor
-            bodyLabel.stringValue = payload.originalText == "[screen screenshot]"
+            bodyTextView.string = payload.originalText == "[screen screenshot]"
                 ? strings.translatingScreenshot
                 : strings.translatingClipboard
         case "error":
             titleLabel.stringValue = strings.errorTitle
             titleLabel.textColor = .systemRed
-            bodyLabel.stringValue = payload.errorText ?? strings.translationFailed
+            bodyTextView.string = payload.errorText ?? strings.translationFailed
         default:
             titleLabel.stringValue = ""
-            bodyLabel.stringValue = visibleMode == "original" ? payload.originalText : payload.translatedText
+            bodyTextView.string = visibleMode == "original" ? payload.originalText : payload.translatedText
             originalButton.title = ""
             originalButton.image = NSImage(
                 systemSymbolName: visibleMode == "original" ? "arrow.left.arrow.right" : "eye",
@@ -700,7 +720,7 @@ private final class TranslationPopoverContentView: NSView {
         switch visibleMode {
         case "loading":
             titleLabel.isHidden = false
-            bodyLabel.isHidden = false
+            bodyScrollView.isHidden = false
             languageLabel.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = false
@@ -715,7 +735,7 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.cancel)
             closeButton.imagePosition = .imageOnly
-            bodyLabel.frame = CGRect(x: content.minX, y: content.maxY - 80, width: content.width, height: 42)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.maxY - 80, width: content.width, height: 42))
             progressIndicator.frame = CGRect(x: content.minX, y: content.minY + 31, width: content.width, height: 8)
             modelLabel.frame = CGRect(x: content.maxX - 132, y: content.minY, width: 132, height: 20)
             languageLabel.frame = CGRect(
@@ -727,7 +747,7 @@ private final class TranslationPopoverContentView: NSView {
 
         case "error":
             titleLabel.isHidden = false
-            bodyLabel.isHidden = false
+            bodyScrollView.isHidden = false
             languageLabel.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = true
@@ -752,7 +772,7 @@ private final class TranslationPopoverContentView: NSView {
             if !modelButton.isHidden {
                 layoutCountdownPill(x: modelButton.frame.minX - 50, y: content.maxY - 25)
             }
-            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68))
             modelLabel.frame = CGRect(x: content.maxX - 92, y: content.minY, width: 92, height: 20)
             languageLabel.frame = CGRect(
                 x: content.minX,
@@ -763,7 +783,7 @@ private final class TranslationPopoverContentView: NSView {
 
         default:
             titleLabel.isHidden = true
-            bodyLabel.isHidden = false
+            bodyScrollView.isHidden = false
             languageLabel.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = true
@@ -782,10 +802,33 @@ private final class TranslationPopoverContentView: NSView {
             modelButton.frame = CGRect(x: originalButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             let countdownAnchor = modelButton.isHidden ? originalButton.frame.minX : modelButton.frame.minX
             layoutCountdownPill(x: countdownAnchor - 50, y: content.maxY - 25)
-            bodyLabel.frame = CGRect(x: content.minX, y: content.minY + 44, width: content.width, height: content.height - 80)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 44, width: content.width, height: content.height - 80))
             modelLabel.frame = CGRect(x: content.minX, y: content.minY + 20, width: content.width, height: 16)
             languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 18)
         }
+    }
+
+    private func layoutBodyScrollView(_ frame: CGRect) {
+        bodyScrollView.frame = frame
+        let documentWidth = max(1, frame.width - bodyScrollView.contentInsets.left - bodyScrollView.contentInsets.right)
+        let documentHeight = max(frame.height, bodyTextHeight(width: documentWidth))
+        bodyTextView.minSize = CGSize(width: documentWidth, height: 0)
+        bodyTextView.maxSize = CGSize(width: documentWidth, height: .greatestFiniteMagnitude)
+        bodyTextView.textContainer?.containerSize = CGSize(width: documentWidth, height: .greatestFiniteMagnitude)
+        bodyTextView.frame = CGRect(x: 0, y: 0, width: documentWidth, height: documentHeight)
+        bodyScrollView.contentView.scroll(to: .zero)
+        bodyScrollView.reflectScrolledClipView(bodyScrollView.contentView)
+    }
+
+    private func bodyTextHeight(width: CGFloat) -> CGFloat {
+        let font = bodyTextView.font ?? NSFont.preferredFont(forTextStyle: .body)
+        return ceil(
+            (bodyTextView.string as NSString).boundingRect(
+                with: CGSize(width: max(1, width), height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: font]
+            ).height
+        ) + 4
     }
 
     private func layoutCountdownPill(x: CGFloat, y: CGFloat) {
