@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import {
+    ArrowUpDown,
     Ban,
     Camera,
     Check,
@@ -34,6 +35,8 @@
   } from "./lib/settings";
 
   type Section = "general" | "models" | "shortcuts" | "excluded" | "advanced" | "info";
+  type OpenRouterSortKey = "model" | "inputPrice" | "outputPrice" | "context";
+  type SortDirection = "asc" | "desc";
   type OpenRouterAPIKeyState = {
     configured: boolean;
     path: string;
@@ -49,6 +52,10 @@
   let openRouterAPIKeyInput = $state("");
   let openTranslationModelMenu = $state<"general" | "models" | null>(null);
   let activeTranslationModelProvider = $state<TranslationProvider>("localHyMT2");
+  let openRouterSort = $state<{ key: OpenRouterSortKey; direction: SortDirection }>({
+    key: "inputPrice",
+    direction: "asc"
+  });
 
   const sectionTitles: Record<Section, string> = {
     general: "General",
@@ -346,15 +353,28 @@
     return settingsState?.options.openRouterModels.find((option) => option.value === value)?.label ?? value;
   }
 
-  function translationModelLabel(settings: Settings) {
+  function translationModelProviderLabel(provider: TranslationProvider) {
+    return provider === "localHyMT2" ? "Local Model" : "OpenRouter LLM";
+  }
+
+  function translationModelProviderDetail(settings: Settings) {
+    return settings.provider === "localHyMT2" ? "Local runtime active" : "OpenRouter API active";
+  }
+
+  function translationModelName(settings: Settings) {
     return settings.provider === "localHyMT2"
-      ? `Local Model / ${localModelLabel(settings.localModelID)}`
-      : `OpenRouter LLM / ${openRouterModelLabel(settings.openRouterTextModel)}`;
+      ? localModelLabel(settings.localModelID)
+      : openRouterModelLabel(settings.openRouterTextModel);
   }
 
   function formatPrice(model: OpenRouterModelOption) {
     if (model.isFree) return "Free";
     return `$${formatCompactPrice(model.promptPricePerMillion)} in / $${formatCompactPrice(model.completionPricePerMillion)} out per 1M`;
+  }
+
+  function formatUnitPrice(value: number) {
+    if (value === 0) return "Free";
+    return `$${formatCompactPrice(value)}`;
   }
 
   function formatCompactPrice(value: number) {
@@ -382,6 +402,44 @@
     return String(value);
   }
 
+  function sortOpenRouterModels(models: OpenRouterModelOption[]) {
+    const sorted = [...models];
+    sorted.sort((left, right) => {
+      const multiplier = openRouterSort.direction === "asc" ? 1 : -1;
+      if (openRouterSort.key === "model") {
+        return left.label.localeCompare(right.label) * multiplier;
+      }
+      if (openRouterSort.key === "inputPrice") {
+        return (
+          left.promptPricePerMillion - right.promptPricePerMillion ||
+          left.completionPricePerMillion - right.completionPricePerMillion ||
+          left.label.localeCompare(right.label)
+        ) * multiplier;
+      }
+      if (openRouterSort.key === "outputPrice") {
+        return (
+          left.completionPricePerMillion - right.completionPricePerMillion ||
+          left.promptPricePerMillion - right.promptPricePerMillion ||
+          left.label.localeCompare(right.label)
+        ) * multiplier;
+      }
+      return (left.contextWindow - right.contextWindow || left.label.localeCompare(right.label)) * multiplier;
+    });
+    return sorted;
+  }
+
+  function updateOpenRouterSort(key: OpenRouterSortKey) {
+    openRouterSort = {
+      key,
+      direction: openRouterSort.key === key && openRouterSort.direction === "asc" ? "desc" : "asc"
+    };
+  }
+
+  function sortLabel(key: OpenRouterSortKey) {
+    if (openRouterSort.key !== key) return "Sort";
+    return openRouterSort.direction === "asc" ? "Asc" : "Desc";
+  }
+
 </script>
 
 {#snippet translationModelPicker(scope: "general" | "models", state: SettingsState)}
@@ -393,7 +451,11 @@
       aria-expanded={openTranslationModelMenu === scope}
       onclick={() => toggleTranslationModelMenu(scope)}
     >
-      <span>{translationModelLabel(state.settings)}</span>
+      <span class:open-router={state.settings.provider === "openRouter"} class="trigger-provider">
+        {#if state.settings.provider === "localHyMT2"}<Cpu size={13} />{:else}<Cloud size={13} />{/if}
+        {translationModelProviderLabel(state.settings.provider)}
+      </span>
+      <span class="trigger-model">{translationModelName(state.settings)}</span>
       <ChevronDown size={14} />
     </button>
 
@@ -530,6 +592,7 @@
             <div class="setting-row model-picker-row">
               <span class="setting-copy">
                 <strong>Translation Model</strong>
+                <span>{translationModelProviderDetail(settingsState.settings)}</span>
               </span>
               {@render translationModelPicker("general", settingsState)}
               <button
@@ -641,6 +704,7 @@
             <div class="setting-row model-picker-row">
               <span class="setting-copy">
                 <strong>Translation Model</strong>
+                <span>{translationModelProviderDetail(settingsState.settings)}</span>
               </span>
               {@render translationModelPicker("models", settingsState)}
               <button
@@ -756,30 +820,76 @@
                 <RotateCcw size={13} />
               </button>
             </label>
-            {#each settingsState.options.openRouterModels as model}
-              <div class="model-row">
-                <button
-                  class="favorite-button"
-                  class:active={settingsState.settings.favoriteOpenRouterModels.includes(model.value)}
-                  title="Toggle favorite"
-                  onclick={() => toggleFavorite("favoriteOpenRouterModels", model.value)}
-                >
-                  <Star size={14} />
-                </button>
-                <div class="model-copy">
-                  <strong>{model.label}</strong>
-                  <span>
-                    {formatPrice(model)} · {modelMetaText(model)}
-                  </span>
-                </div>
-                <div class="model-actions">
-                  <button class="inline-action" onclick={() => useOpenRouterTextModel(model.value)}><Cloud size={13} />Text</button>
-                  {#if model.modalities.includes("image")}
-                    <button class="inline-action" onclick={() => useOpenRouterVisionModel(model.value)}>Vision</button>
-                  {/if}
-                </div>
-              </div>
-            {/each}
+            <div class="openrouter-table-wrap">
+              <table class="openrouter-table">
+                <thead>
+                  <tr>
+                    <th class="favorite-column" aria-label="Favorite"></th>
+                    <th>
+                      <button type="button" class:active={openRouterSort.key === "model"} onclick={() => updateOpenRouterSort("model")}>
+                        Model <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("model")}</span>
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" class:active={openRouterSort.key === "inputPrice"} onclick={() => updateOpenRouterSort("inputPrice")}>
+                        Input <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("inputPrice")}</span>
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" class:active={openRouterSort.key === "outputPrice"} onclick={() => updateOpenRouterSort("outputPrice")}>
+                        Output <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("outputPrice")}</span>
+                      </button>
+                    </th>
+                    <th>Modalities</th>
+                    <th>
+                      <button type="button" class:active={openRouterSort.key === "context"} onclick={() => updateOpenRouterSort("context")}>
+                        Context <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("context")}</span>
+                      </button>
+                    </th>
+                    <th>Release</th>
+                    <th>Use</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each sortOpenRouterModels(settingsState.options.openRouterModels) as model}
+                    <tr class={settingsState.settings.provider === "openRouter" && settingsState.settings.openRouterTextModel === model.value ? "selected-model" : ""}>
+                      <td class="favorite-column">
+                        <button
+                          class="favorite-button"
+                          class:active={settingsState.settings.favoriteOpenRouterModels.includes(model.value)}
+                          title="Toggle favorite"
+                          onclick={() => toggleFavorite("favoriteOpenRouterModels", model.value)}
+                        >
+                          <Star size={14} />
+                        </button>
+                      </td>
+                      <td class="model-name-cell">
+                        <strong>{model.label}</strong>
+                        <span>{model.value}</span>
+                        <div class="model-badges">
+                          {#if model.isRecommended}<em>Recommended</em>{/if}
+                          {#if model.isFree}<em>Free</em>{/if}
+                          {#if model.isReasoning}<em>Reasoning</em>{/if}
+                        </div>
+                      </td>
+                      <td class="price-cell">{formatUnitPrice(model.promptPricePerMillion)}</td>
+                      <td class="price-cell">{formatUnitPrice(model.completionPricePerMillion)}</td>
+                      <td>{modalityText(model)}</td>
+                      <td>{formatContextWindow(model.contextWindow)}</td>
+                      <td>{model.releaseDate}</td>
+                      <td>
+                        <div class="model-actions">
+                          <button class="inline-action" onclick={() => useOpenRouterTextModel(model.value)}><Cloud size={13} />Text</button>
+                          {#if model.modalities.includes("image")}
+                            <button class="inline-action" onclick={() => useOpenRouterVisionModel(model.value)}>Vision</button>
+                          {/if}
+                        </div>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       {:else if activeSection === "shortcuts"}
