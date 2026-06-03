@@ -45,6 +45,7 @@ public enum ToastPosition: String, CaseIterable, Codable, Sendable {
     case bottomLeft
     case topRight
     case topLeft
+    case custom
 
     public var title: String {
         switch self {
@@ -52,7 +53,18 @@ public enum ToastPosition: String, CaseIterable, Codable, Sendable {
         case .bottomLeft: "Bottom Left"
         case .topRight: "Top Right"
         case .topLeft: "Top Left"
+        case .custom: "Custom"
         }
+    }
+}
+
+public struct ToastCustomPosition: Codable, Equatable, Sendable {
+    public var x: Double
+    public var y: Double
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
     }
 }
 
@@ -74,6 +86,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
     public var targetLanguage: String
     public var hasCompletedLocalModelSelection: Bool
     public var toastPosition: ToastPosition
+    public var toastCustomPosition: ToastCustomPosition?
     public var toastDuration: TimeInterval
 
     public init(
@@ -91,6 +104,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         targetLanguage: String = "Korean",
         hasCompletedLocalModelSelection: Bool = false,
         toastPosition: ToastPosition = .bottomRight,
+        toastCustomPosition: ToastCustomPosition? = nil,
         toastDuration: TimeInterval = 4
     ) {
         self.provider = provider
@@ -107,6 +121,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         self.targetLanguage = targetLanguage
         self.hasCompletedLocalModelSelection = hasCompletedLocalModelSelection
         self.toastPosition = toastPosition
+        self.toastCustomPosition = toastCustomPosition
         self.toastDuration = toastDuration
     }
 
@@ -125,6 +140,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         case targetLanguage
         case hasCompletedLocalModelSelection
         case toastPosition
+        case toastCustomPosition
         case toastDuration
     }
 
@@ -147,6 +163,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         targetLanguage = try container.decodeIfPresent(String.self, forKey: .targetLanguage) ?? "Korean"
         hasCompletedLocalModelSelection = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedLocalModelSelection) ?? false
         toastPosition = try container.decodeIfPresent(ToastPosition.self, forKey: .toastPosition) ?? .bottomRight
+        toastCustomPosition = try container.decodeIfPresent(ToastCustomPosition.self, forKey: .toastCustomPosition)
         toastDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .toastDuration) ?? Self().toastDuration
     }
 
@@ -169,6 +186,7 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         try container.encodeIfDifferent(targetLanguage, from: defaults.targetLanguage, forKey: .targetLanguage)
         try container.encodeIfDifferent(hasCompletedLocalModelSelection, from: defaults.hasCompletedLocalModelSelection, forKey: .hasCompletedLocalModelSelection)
         try container.encodeIfDifferent(toastPosition, from: defaults.toastPosition, forKey: .toastPosition)
+        try container.encodeIfDifferent(toastCustomPosition, from: defaults.toastCustomPosition, forKey: .toastCustomPosition)
         try container.encodeIfDifferent(toastDuration, from: defaults.toastDuration, forKey: .toastDuration)
     }
 }

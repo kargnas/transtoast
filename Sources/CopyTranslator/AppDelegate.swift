@@ -550,7 +550,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let position = ToastPosition(rawValue: rawValue) else {
             return
         }
-        settingsStore.settings.toastPosition = position
+        var settings = settingsStore.settings
+        settings.toastPosition = position
+        if position != .custom {
+            settings.toastCustomPosition = nil
+        }
+        settingsStore.settings = settings
+        rebuildMenu()
+    }
+
+    private func saveCustomToastPosition(_ origin: CGPoint) {
+        guard origin.x.isFinite, origin.y.isFinite else {
+            return
+        }
+
+        let customPosition = ToastCustomPosition(x: Double(origin.x), y: Double(origin.y))
+        var settings = settingsStore.settings
+        if settings.toastPosition == .custom,
+           settings.toastCustomPosition == customPosition {
+            return
+        }
+        settings.toastPosition = .custom
+        settings.toastCustomPosition = customPosition
+        settingsStore.settings = settings
         rebuildMenu()
     }
 
@@ -687,6 +709,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onModelSelected: { [weak self] option in
                 self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
+            },
+            onPositionChanged: { [weak self] origin in
+                self?.saveCustomToastPosition(origin)
             }
         )
     }

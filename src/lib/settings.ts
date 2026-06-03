@@ -1,5 +1,5 @@
 export type TranslationProvider = "localHyMT2" | "openRouter";
-export type ToastPosition = "bottomRight" | "bottomLeft" | "topRight" | "topLeft";
+export type ToastPosition = "bottomRight" | "bottomLeft" | "topRight" | "topLeft" | "custom";
 
 export type SettingField =
   | "provider"
@@ -28,6 +28,7 @@ export type Settings = {
   targetLanguage: string;
   hasCompletedLocalModelSelection: boolean;
   toastPosition: ToastPosition;
+  toastCustomPosition: { x: number; y: number } | null;
   toastDuration: number;
 };
 
@@ -96,6 +97,7 @@ export const fallbackState: SettingsState = {
     targetLanguage: "Korean",
     hasCompletedLocalModelSelection: false,
     toastPosition: "bottomRight",
+    toastCustomPosition: null,
     toastDuration: 4
   },
   defaults: {
@@ -112,6 +114,7 @@ export const fallbackState: SettingsState = {
     targetLanguage: "Korean",
     hasCompletedLocalModelSelection: false,
     toastPosition: "bottomRight",
+    toastCustomPosition: null,
     toastDuration: 4
   },
   overrides: {
@@ -356,7 +359,8 @@ export const fallbackState: SettingsState = {
       { label: "Bottom Right", value: "bottomRight" },
       { label: "Bottom Left", value: "bottomLeft" },
       { label: "Top Right", value: "topRight" },
-      { label: "Top Left", value: "topLeft" }
+      { label: "Top Left", value: "topLeft" },
+      { label: "Custom", value: "custom" }
     ]
   },
   permissions: {

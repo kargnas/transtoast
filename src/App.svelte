@@ -287,8 +287,18 @@
   }
 
   function toastPositionValue(value: string): ToastPosition {
-    if (value === "bottomLeft" || value === "topRight" || value === "topLeft") return value;
+    if (value === "bottomLeft" || value === "topRight" || value === "topLeft" || value === "custom") return value;
     return "bottomRight";
+  }
+
+  async function updateToastPosition(value: string) {
+    if (!settingsState) return;
+    const toastPosition = toastPositionValue(value);
+    await saveSettings({
+      ...settingsState.settings,
+      toastPosition,
+      toastCustomPosition: toastPosition === "custom" ? settingsState.settings.toastCustomPosition : null
+    });
   }
 
   function isOverride(settings: Settings, defaults: Settings, field: SettingField) {
@@ -479,7 +489,7 @@
               </span>
               <select
                 value={settingsState.settings.toastPosition}
-                onchange={(event) => updateField("toastPosition", toastPositionValue(event.currentTarget.value))}
+                onchange={(event) => updateToastPosition(event.currentTarget.value)}
               >
                 {#each settingsState.options.toastPositions as option}
                   <option value={option.value}>{option.label}</option>

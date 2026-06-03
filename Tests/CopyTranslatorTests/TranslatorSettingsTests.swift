@@ -17,6 +17,7 @@ import Testing
     #expect(settings.targetLanguage == "Korean")
     #expect(settings.hasCompletedLocalModelSelection == false)
     #expect(settings.toastPosition == .bottomRight)
+    #expect(settings.toastCustomPosition == nil)
     #expect(settings.toastDuration == 4)
 }
 
@@ -61,6 +62,20 @@ import Testing
     #expect(object["openRouterVisionModel"] == nil)
     #expect(object["sourceLanguage"] == nil)
     #expect(object["targetLanguage"] == nil)
+}
+
+@Test func encodingPersistsCustomToastPositionOverride() throws {
+    let settings = TranslatorSettings(
+        toastPosition: .custom,
+        toastCustomPosition: ToastCustomPosition(x: 128, y: 256)
+    )
+    let data = try JSONEncoder().encode(settings)
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let customPosition = try #require(object["toastCustomPosition"] as? [String: Any])
+
+    #expect(object["toastPosition"] as? String == "custom")
+    #expect(customPosition["x"] as? Double == 128)
+    #expect(customPosition["y"] as? Double == 256)
 }
 
 @Test func explicitModelValuesAreNotMigratedOnDecode() throws {

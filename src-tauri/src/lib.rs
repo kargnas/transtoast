@@ -46,6 +46,8 @@ struct Settings {
     has_completed_local_model_selection: bool,
     #[serde(rename = "toastPosition")]
     toast_position: ToastPosition,
+    #[serde(rename = "toastCustomPosition")]
+    toast_custom_position: Option<ToastCustomPosition>,
     #[serde(rename = "toastDuration")]
     toast_duration: f64,
 }
@@ -68,6 +70,14 @@ enum ToastPosition {
     TopRight,
     #[serde(rename = "topLeft")]
     TopLeft,
+    #[serde(rename = "custom")]
+    Custom,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+struct ToastCustomPosition {
+    x: f64,
+    y: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -107,6 +117,8 @@ struct StoredSettings {
     has_completed_local_model_selection: Option<bool>,
     #[serde(rename = "toastPosition")]
     toast_position: Option<ToastPosition>,
+    #[serde(rename = "toastCustomPosition")]
+    toast_custom_position: Option<ToastCustomPosition>,
     #[serde(rename = "toastDuration")]
     toast_duration: Option<f64>,
 }
@@ -282,6 +294,12 @@ struct TranslationPreviewRequest {
     caret_override: Option<ScreenRect>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct PhysicalToastPosition {
+    x: f64,
+    y: f64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct ScreenRect {
     x: f64,
@@ -342,7 +360,10 @@ fn reset_setting(app: AppHandle, field: String) -> Result<SettingsState, String>
         "localModelID" => settings.local_model_id = defaults.local_model_id,
         "sourceLanguage" => settings.source_language = defaults.source_language,
         "targetLanguage" => settings.target_language = defaults.target_language,
-        "toastPosition" => settings.toast_position = defaults.toast_position,
+        "toastPosition" => {
+            settings.toast_position = defaults.toast_position;
+            settings.toast_custom_position = defaults.toast_custom_position;
+        }
         "localHyMT2BackendPath" => {
             settings.local_hy_mt2_backend_path = defaults.local_hy_mt2_backend_path
         }
@@ -457,6 +478,17 @@ fn load_translation_preview(app: AppHandle) -> Result<TranslationPreviewState, S
 fn close_translation_preview(app: AppHandle) -> Result<(), String> {
     app.exit(0);
     Ok(())
+}
+
+#[tauri::command]
+fn save_translation_preview_position(
+    app: AppHandle,
+    position: PhysicalToastPosition,
+) -> Result<(), String> {
+    let mut settings = load_effective_settings(&app)?;
+    settings.toast_position = ToastPosition::Custom;
+    settings.toast_custom_position = Some(logical_toast_position(&app, position));
+    write_settings(&app, normalize_settings(settings))
 }
 
 #[tauri::command]
@@ -594,6 +626,7 @@ pub fn run() {
             load_request_logs,
             clear_request_logs,
             load_translation_preview,
+            save_translation_preview_position,
             open_screen_recording_settings,
             close_translation_preview
         ])
@@ -674,6 +707,20 @@ fn translation_window_placement(
     let monitors = app.available_monitors().unwrap_or_default();
     let fallback_monitor = app.primary_monitor().ok().flatten();
     let caret = caret_override.or_else(focused_text_caret_bounds);
+
+    if matches!(settings.toast_position, ToastPosition::Custom) {
+        let work_area = work_area_for_custom_position(&monitors, settings.toast_custom_position)
+            .or_else(|| fallback_monitor.as_ref().map(work_area_from_monitor))
+            .or_else(|| monitors.first().map(work_area_from_monitor))
+            .unwrap_or(WorkArea {
+                x: 0.0,
+                y: 0.0,
+                width: 1440.0,
+                height: 900.0,
+                scale: 1.0,
+            });
+        return fallback_placement(settings, work_area, logical_width, logical_height);
+    }
 
     if let Some(caret) = caret {
         if let Some(work_area) = work_area_for_caret(&monitors, &caret)
@@ -779,11 +826,58 @@ fn fallback_placement(
         ToastPosition::BottomLeft => (left, bottom),
         ToastPosition::TopRight => (right, top),
         ToastPosition::TopLeft => (left, top),
+        ToastPosition::Custom => settings
+            .toast_custom_position
+            .map(|position| {
+                (
+                    clamp(position.x, left, right),
+                    clamp(position.y, top, bottom),
+                )
+            })
+            .unwrap_or((right, bottom)),
     };
 
     TranslationWindowPlacement {
         position: physical_position(x, y, work_area.scale),
         arrow: TranslationArrowPlacement::Fallback,
+    }
+}
+
+fn work_area_for_custom_position(
+    monitors: &[Monitor],
+    position: Option<ToastCustomPosition>,
+) -> Option<WorkArea> {
+    let position = position?;
+    monitors
+        .iter()
+        .map(work_area_from_monitor)
+        .find(|work_area| {
+            position.x >= work_area.x
+                && position.x <= work_area.max_x()
+                && position.y >= work_area.y
+                && position.y <= work_area.max_y()
+        })
+}
+
+fn logical_toast_position(app: &AppHandle, position: PhysicalToastPosition) -> ToastCustomPosition {
+    let scale = app
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .find(|monitor| {
+            let monitor_position = monitor.position();
+            let monitor_size = monitor.size();
+            position.x >= monitor_position.x as f64
+                && position.x <= monitor_position.x as f64 + monitor_size.width as f64
+                && position.y >= monitor_position.y as f64
+                && position.y <= monitor_position.y as f64 + monitor_size.height as f64
+        })
+        .map(Monitor::scale_factor)
+        .unwrap_or(1.0);
+
+    ToastCustomPosition {
+        x: position.x / scale,
+        y: position.y / scale,
     }
 }
 
@@ -989,6 +1083,9 @@ fn apply_stored_settings(stored: StoredSettings) -> Settings {
     if let Some(value) = stored.toast_position {
         settings.toast_position = value;
     }
+    if let Some(value) = stored.toast_custom_position {
+        settings.toast_custom_position = Some(value);
+    }
     if let Some(value) = stored.toast_duration {
         settings.toast_duration = value;
     }
@@ -1057,6 +1154,10 @@ impl StoredSettings {
                 .then_some(settings.has_completed_local_model_selection),
             toast_position: (settings.toast_position != defaults.toast_position)
                 .then(|| settings.toast_position.clone()),
+            toast_custom_position: (settings.toast_custom_position
+                != defaults.toast_custom_position)
+                .then_some(settings.toast_custom_position)
+                .flatten(),
             toast_duration: ((settings.toast_duration - defaults.toast_duration).abs()
                 > f64::EPSILON)
                 .then_some(settings.toast_duration),
@@ -1078,6 +1179,7 @@ impl StoredSettings {
             && self.target_language.is_none()
             && self.has_completed_local_model_selection.is_none()
             && self.toast_position.is_none()
+            && self.toast_custom_position.is_none()
             && self.toast_duration.is_none()
     }
 }
@@ -1104,6 +1206,7 @@ fn default_settings() -> Settings {
         target_language: "Korean".to_string(),
         has_completed_local_model_selection: false,
         toast_position: ToastPosition::BottomRight,
+        toast_custom_position: None,
         toast_duration: 6.0,
     }
 }
@@ -1114,12 +1217,25 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     settings.open_router_text_model = settings.open_router_text_model.trim().to_string();
     settings.open_router_vision_model = settings.open_router_vision_model.trim().to_string();
     settings.favorite_local_model_ids = normalized_string_list(settings.favorite_local_model_ids);
-    settings.favorite_open_router_models = normalized_string_list(settings.favorite_open_router_models);
+    settings.favorite_open_router_models =
+        normalized_string_list(settings.favorite_open_router_models);
     settings.source_language = settings.source_language.trim().to_string();
     settings.target_language = settings.target_language.trim().to_string();
     if !settings.toast_duration.is_finite() || settings.toast_duration <= 0.0 {
         settings.toast_duration = default_settings().toast_duration;
     }
+    settings.toast_custom_position = match (
+        settings.toast_position.clone(),
+        settings.toast_custom_position,
+    ) {
+        (ToastPosition::Custom, Some(position))
+            if position.x.is_finite() && position.y.is_finite() =>
+        {
+            Some(position)
+        }
+        (ToastPosition::Custom, _) => None,
+        _ => None,
+    };
     settings
 }
 
@@ -1160,7 +1276,8 @@ fn override_map(settings: &Settings, defaults: &Settings) -> BTreeMap<String, bo
         ),
         (
             "toastPosition".to_string(),
-            settings.toast_position != defaults.toast_position,
+            settings.toast_position != defaults.toast_position
+                || settings.toast_custom_position != defaults.toast_custom_position,
         ),
         (
             "localHyMT2BackendPath".to_string(),
@@ -1226,6 +1343,7 @@ fn settings_options() -> SettingsOptions {
             option("Bottom Left", "bottomLeft", None),
             option("Top Right", "topRight", None),
             option("Top Left", "topLeft", None),
+            option("Custom", "custom", None),
         ],
     }
 }
@@ -1449,7 +1567,10 @@ fn openrouter_model(
         note: note.map(ToString::to_string),
         prompt_price_per_million,
         completion_price_per_million,
-        modalities: modalities.iter().map(|value| (*value).to_string()).collect(),
+        modalities: modalities
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
         release_date: release_date.to_string(),
         context_window,
         is_reasoning,
@@ -1714,7 +1835,11 @@ fn read_env_key(path: &Path, key: &str) -> Result<Option<String>, String> {
         }
         if let Some((line_key, value)) = trimmed.split_once('=') {
             if line_key.trim() == key {
-                let value = value.trim().trim_matches('"').trim_matches('\'').to_string();
+                let value = value
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
                 return Ok((!value.is_empty()).then_some(value));
             }
         }
@@ -2055,6 +2180,34 @@ mod tests {
     }
 
     #[test]
+    fn stored_settings_keeps_custom_toast_position() {
+        let defaults = default_settings();
+        let mut settings = defaults.clone();
+        settings.toast_position = ToastPosition::Custom;
+        settings.toast_custom_position = Some(ToastCustomPosition { x: 128.0, y: 256.0 });
+
+        let stored = StoredSettings::from_effective(&settings, &defaults);
+
+        assert_eq!(stored.toast_position, Some(ToastPosition::Custom));
+        assert_eq!(
+            stored.toast_custom_position,
+            Some(ToastCustomPosition { x: 128.0, y: 256.0 })
+        );
+    }
+
+    #[test]
+    fn normalize_clears_custom_position_for_corner_toast_position() {
+        let mut settings = default_settings();
+        settings.toast_position = ToastPosition::TopLeft;
+        settings.toast_custom_position = Some(ToastCustomPosition { x: 128.0, y: 256.0 });
+
+        let settings = normalize_settings(settings);
+
+        assert_eq!(settings.toast_position, ToastPosition::TopLeft);
+        assert_eq!(settings.toast_custom_position, None);
+    }
+
+    #[test]
     fn legacy_hymt2_model_migrates_to_local_model_id() {
         let settings = apply_stored_settings(StoredSettings {
             provider: Some(TranslationProvider::OpenRouter),
@@ -2131,6 +2284,18 @@ mod tests {
         assert_eq!(placement.arrow, TranslationArrowPlacement::Fallback);
         assert_eq!(placement.position.x, 48);
         assert_eq!(placement.position.y, 48);
+    }
+
+    #[test]
+    fn fallback_placement_uses_custom_toast_position() {
+        let mut settings = default_settings();
+        settings.toast_position = ToastPosition::Custom;
+        settings.toast_custom_position = Some(ToastCustomPosition { x: 250.0, y: 180.0 });
+        let placement = fallback_placement(&settings, test_work_area(), 356.0, 150.0);
+
+        assert_eq!(placement.arrow, TranslationArrowPlacement::Fallback);
+        assert_eq!(placement.position.x, 500);
+        assert_eq!(placement.position.y, 360);
     }
 
     fn test_work_area() -> WorkArea {
