@@ -20,6 +20,9 @@
   let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
   let countdownInterval: number | undefined;
+  let moveSaveTimer: number | undefined;
+  let windowMoveUnlisten: (() => void) | undefined;
+  let pendingMovedPosition: WindowPosition | null = null;
   let countdownStartedAt = $state(0);
   let countdownDuration = $state(fallbackTranslationState.toastDuration);
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
@@ -66,16 +69,37 @@
     value: string;
   };
 
+  type WindowPosition = {
+    x: number;
+    y: number;
+  };
+
   onMount(() => {
     isTauri = "__TAURI_INTERNALS__" in window;
+    let disposed = false;
     applyModelOptions(fallbackState);
     if (isTauri) {
       void loadPreview();
+      void getCurrentWindow()
+        .onMoved(({ payload }) => queueMovedPosition(payload))
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+          } else {
+            windowMoveUnlisten = unlisten;
+          }
+        })
+        .catch(() => {
+          // Move persistence is best-effort when window events are unavailable.
+        });
     }
     return () => {
+      disposed = true;
       clearAutoDismiss();
       clearCountdown();
       clearCopyReset();
+      windowMoveUnlisten?.();
+      flushMovedPosition();
     };
   });
 
@@ -180,6 +204,39 @@
       await getCurrentWindow().startDragging();
     } catch {
       // Dragging is best-effort in browser preview and unsupported shells.
+    }
+  }
+
+  function queueMovedPosition(position: WindowPosition) {
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
+    pendingMovedPosition = position;
+    if (moveSaveTimer !== undefined) {
+      window.clearTimeout(moveSaveTimer);
+    }
+    moveSaveTimer = window.setTimeout(() => {
+      void saveMovedPosition();
+    }, 180);
+  }
+
+  function flushMovedPosition() {
+    if (moveSaveTimer !== undefined) {
+      window.clearTimeout(moveSaveTimer);
+      moveSaveTimer = undefined;
+    }
+    if (pendingMovedPosition) {
+      void saveMovedPosition();
+    }
+  }
+
+  async function saveMovedPosition() {
+    const position = pendingMovedPosition;
+    pendingMovedPosition = null;
+    moveSaveTimer = undefined;
+    if (!isTauri || !position) return;
+    try {
+      await invoke("save_translation_preview_position", { position });
+    } catch {
+      // Drag persistence should not block closing or translation controls.
     }
   }
 

@@ -15,6 +15,8 @@ final class TranslationPopoverController {
     private var panel: TranslationPopoverPanel?
     private var dismissWorkItem: DispatchWorkItem?
     private var hoverPollTimer: Timer?
+    private var positionSaveWorkItem: DispatchWorkItem?
+    private var pendingPositionSave: (() -> Void)?
     private var clickMonitorTokens: [Any] = []
     private var currentMode: String?
     private var onUserClose: (() -> Void)?
@@ -28,7 +30,8 @@ final class TranslationPopoverController {
         selectedModelOptionID: String? = nil,
         onUserClose: (() -> Void)? = nil,
         onPermissionRequested: (() -> Void)? = nil,
-        onModelSelected: ((TranslationModelOption) -> Void)? = nil
+        onModelSelected: ((TranslationModelOption) -> Void)? = nil,
+        onPositionChanged: ((CGPoint) -> Void)? = nil
     ) {
         close()
 
@@ -49,6 +52,9 @@ final class TranslationPopoverController {
         panel.ignoresMouseEvents = false
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = true
+        panel.onMoved = { [weak self] origin in
+            self?.schedulePositionSave(origin, onPositionChanged: onPositionChanged)
+        }
         let contentView = TranslationPopoverContentView(
             frame: CGRect(origin: .zero, size: size),
             payload: payload,
@@ -83,6 +89,7 @@ final class TranslationPopoverController {
     func close() {
         dismissWorkItem?.cancel()
         dismissWorkItem = nil
+        flushPendingPositionSave()
         hoverPollTimer?.invalidate()
         hoverPollTimer = nil
         removeClickMonitors()
@@ -129,6 +136,34 @@ final class TranslationPopoverController {
             return
         }
         scheduleDismissIfNeeded(mode: currentMode)
+    }
+
+    private func schedulePositionSave(
+        _ origin: CGPoint,
+        onPositionChanged: ((CGPoint) -> Void)?
+    ) {
+        guard let onPositionChanged else {
+            return
+        }
+
+        positionSaveWorkItem?.cancel()
+        pendingPositionSave = {
+            onPositionChanged(origin)
+        }
+        let workItem = DispatchWorkItem {
+            self.pendingPositionSave?()
+            self.pendingPositionSave = nil
+            self.positionSaveWorkItem = nil
+        }
+        positionSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: workItem)
+    }
+
+    private func flushPendingPositionSave() {
+        positionSaveWorkItem?.cancel()
+        positionSaveWorkItem = nil
+        pendingPositionSave?()
+        pendingPositionSave = nil
     }
 
     private func installClickMonitors(for panel: NSPanel) {
@@ -242,6 +277,16 @@ final class TranslationPopoverController {
         caretBounds: CGRect?,
         settings: TranslatorSettings
     ) -> (origin: CGPoint, arrowEdge: PopoverArrowEdge, arrowX: CGFloat) {
+        if settings.toastPosition == .custom,
+           let toastCustomPosition = settings.toastCustomPosition {
+            let origin = customOrigin(
+                toastCustomPosition,
+                size: size,
+                screen: screen(containing: CGPoint(x: toastCustomPosition.x, y: toastCustomPosition.y))
+            )
+            return (origin, .none, size.width / 2)
+        }
+
         let screen = caretBounds.flatMap(screen(containing:)) ?? NSScreen.main ?? NSScreen.screens.first
         let visibleFrame = screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1_440, height: 900)
         let result = PopoverPlacementCalculator.place(
@@ -277,6 +322,22 @@ final class TranslationPopoverController {
         return NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main
     }
 
+    private func screen(containing point: CGPoint) -> NSScreen? {
+        NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
+    }
+
+    private func customOrigin(
+        _ position: ToastCustomPosition,
+        size: CGSize,
+        screen: NSScreen?
+    ) -> CGPoint {
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1_440, height: 900)
+        return CGPoint(
+            x: clamp(CGFloat(position.x), visibleFrame.minX + margin, visibleFrame.maxX - size.width - margin),
+            y: clamp(CGFloat(position.y), visibleFrame.minY + margin, visibleFrame.maxY - size.height - margin)
+        )
+    }
+
     private func fallbackPosition(for position: ToastPosition) -> PopoverFallbackPosition {
         switch position {
         case .bottomRight:
@@ -287,13 +348,38 @@ final class TranslationPopoverController {
             .topRight
         case .topLeft:
             .topLeft
+        case .custom:
+            .bottomRight
         }
+    }
+
+    private func clamp(_ value: CGFloat, _ minValue: CGFloat, _ maxValue: CGFloat) -> CGFloat {
+        if minValue > maxValue {
+            return minValue
+        }
+        return min(max(value, minValue), maxValue)
     }
 }
 
-final class TranslationPopoverPanel: NSPanel {
+final class TranslationPopoverPanel: NSPanel, NSWindowDelegate {
+    var onMoved: ((CGPoint) -> Void)?
+
+    override init(
+        contentRect: NSRect,
+        styleMask style: NSWindow.StyleMask,
+        backing backingStoreType: NSWindow.BackingStoreType,
+        defer flag: Bool
+    ) {
+        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+        delegate = self
+    }
+
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    func windowDidMove(_ notification: Notification) {
+        onMoved?(frame.origin)
+    }
 }
 
 private struct PopoverStrings {
