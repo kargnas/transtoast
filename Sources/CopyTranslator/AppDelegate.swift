@@ -1,6 +1,7 @@
 import AppKit
 import CopyTranslatorCore
 import CoreGraphics
+import UserNotifications
 
 struct TranslationPreviewPayload: Encodable {
     var mode: String
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let translationService = TranslationService()
     private let requestLogStore = RequestLogStore()
     private let translationPopoverController = TranslationPopoverController()
+    private let localModelWarmupNotifier = LocalModelWarmupNotifier()
     private var statusItem: NSStatusItem?
     private var keyboardMonitor: KeyboardMonitor?
     private var pasteboardMonitor: PasteboardMonitor?
@@ -37,6 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keepAliveWindow: NSWindow?
     private var lastClipboardTriggerAt: Date?
     private var lastTranslationCaretBounds: CGRect?
+    private var currentTextTranslationTask: Task<Void, Never>?
+    private var currentTextTranslationUsesLocalBackend = false
+    private var lastReadyLocalModelID: String?
     private var isUserQuitting = false
     private var hasStarted = false
     private var lifetimeActivity: NSObjectProtocol?
@@ -60,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureMainMenu()
         createKeepAliveWindow()
         configureStatusItem()
+        localModelWarmupNotifier.requestAuthorization()
         startKeyboardMonitor()
         startScreenshotHotKey()
         startPasteboardMonitor()
@@ -341,14 +347,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings overrideSettings: TranslatorSettings? = nil
     ) {
         let settings = overrideSettings ?? settingsStore.settings
+        let previousTask = currentTextTranslationTask
+        let previousUsesLocalBackend = currentTextTranslationUsesLocalBackend
+        let usesLocalBackend = settings.provider == .localHyMT2
+        let warmupModel = localWarmupModel(settings: settings)
+        let shouldAnnounceWarmup = warmupModel.map { $0.id != lastReadyLocalModelID } ?? false
+
+        previousTask?.cancel()
+        currentTextTranslationUsesLocalBackend = usesLocalBackend
+        if shouldAnnounceWarmup, let warmupModel {
+            localModelWarmupNotifier.warmingUp(modelTitle: warmupModel.title)
+        }
         showTranslationLoading(originalText: text, sourceTitle: sourceTitle, settings: settings)
-        Task { [weak self] in
+        let task = Task { [weak self] in
+            if usesLocalBackend && previousUsesLocalBackend {
+                await previousTask?.value
+            }
             guard let self else {
+                return
+            }
+            guard !Task.isCancelled else {
                 return
             }
 
             do {
                 let screenContext = await contextImagePNGDataIfNeeded(settings: settings)
+                guard !Task.isCancelled else {
+                    return
+                }
                 let imageInfo = Self.imageInfo(for: screenContext.pngData, diagnostic: screenContext.diagnostic)
                 let result = try await translationService.translateText(
                     text,
@@ -356,11 +382,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     credentials: credentialsProvider.credentials(),
                     contextImagePNGData: screenContext.pngData
                 )
+                guard !Task.isCancelled else {
+                    return
+                }
+                if shouldAnnounceWarmup, let warmupModel {
+                    lastReadyLocalModelID = warmupModel.id
+                    localModelWarmupNotifier.completed(modelTitle: warmupModel.title)
+                }
                 show(result: result, title: sourceTitle, inputText: text, imageInfo: imageInfo, settings: settings)
+            } catch is CancellationError {
+                return
             } catch {
+                if shouldAnnounceWarmup, let warmupModel {
+                    localModelWarmupNotifier.failed(modelTitle: warmupModel.title, error: error)
+                }
                 show(error: error, title: sourceTitle, inputText: text, settings: settings)
             }
         }
+        currentTextTranslationTask = task
     }
 
     private func contextImagePNGDataIfNeeded(settings: TranslatorSettings) async -> ScreenContextCaptureResult {
@@ -558,6 +597,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             caretBounds: caretBounds,
             modelOptions: modelOptions(for: payload.originalText, settings: settings),
             selectedModelOptionID: selectedModelOptionID(settings: settings),
+            onUserClose: { [weak self] in
+                if payload.mode == "loading" {
+                    self?.currentTextTranslationTask?.cancel()
+                }
+            },
             onModelSelected: { [weak self] option in
                 self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
             }
@@ -651,6 +695,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .openRouter:
             settings.openRouterTextModel
         }
+    }
+
+    private func localWarmupModel(settings: TranslatorSettings) -> LocalModelSpec? {
+        guard settings.provider == .localHyMT2 else {
+            return nil
+        }
+        return LocalModelRegistry.model(
+            id: settings.localModelID,
+            customModelsPath: settings.customLocalModelsPath
+        ) ?? LocalModelRegistry.defaultModel(customModelsPath: settings.customLocalModelsPath)
     }
 
     private func launchTauriHelper(

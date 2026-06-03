@@ -17,6 +17,7 @@ final class TranslationPopoverController {
     private var hoverPollTimer: Timer?
     private var clickMonitorTokens: [Any] = []
     private var currentMode: String?
+    private var onUserClose: (() -> Void)?
     private var isPointerInsidePanel = false
 
     func show(
@@ -25,6 +26,7 @@ final class TranslationPopoverController {
         caretBounds: CGRect?,
         modelOptions: [TranslationModelOption] = [],
         selectedModelOptionID: String? = nil,
+        onUserClose: (() -> Void)? = nil,
         onModelSelected: ((TranslationModelOption) -> Void)? = nil
     ) {
         close()
@@ -52,7 +54,7 @@ final class TranslationPopoverController {
             arrowEdge: placement.arrowEdge,
             arrowX: placement.arrowX,
             onClose: { [weak self] in
-                self?.close()
+                self?.closeFromUser()
             },
             onMouseEntered: { [weak self] in
                 self?.pauseDismissTimer()
@@ -67,6 +69,7 @@ final class TranslationPopoverController {
         panel.contentView = contentView
 
         self.panel = panel
+        self.onUserClose = onUserClose
         currentMode = payload.mode
         isPointerInsidePanel = false
         installClickMonitors(for: panel)
@@ -85,6 +88,7 @@ final class TranslationPopoverController {
         panel?.orderOut(nil)
         panel = nil
         currentMode = nil
+        onUserClose = nil
         isPointerInsidePanel = false
     }
 
@@ -134,7 +138,7 @@ final class TranslationPopoverController {
                   event.window !== panel else {
                 return event
             }
-            self.close()
+            self.closeFromUser()
             return event
         }) {
             clickMonitorTokens.append(localMonitor)
@@ -147,7 +151,7 @@ final class TranslationPopoverController {
                       !panel.frame.contains(NSEvent.mouseLocation) else {
                     return
                 }
-                self.close()
+                self.closeFromUser()
             }
         }) {
             clickMonitorTokens.append(globalMonitor)
@@ -188,6 +192,11 @@ final class TranslationPopoverController {
 
     private var contentView: TranslationPopoverContentView? {
         panel?.contentView as? TranslationPopoverContentView
+    }
+
+    private func closeFromUser() {
+        onUserClose?()
+        close()
     }
 
     private func size(for payload: TranslationPreviewPayload) -> CGSize {

@@ -1,4 +1,6 @@
 import Foundation
+import Dispatch
+import Darwin
 
 public struct TranslationResult: Equatable, Sendable {
     public let text: String
@@ -74,6 +76,7 @@ public enum TranslationError: LocalizedError, Sendable {
 
 public final class TranslationService: @unchecked Sendable {
     private let session: URLSession
+    private let localBackendGate = LocalBackendExecutionGate()
 
     public init(session: URLSession = .shared) {
         self.session = session
@@ -330,41 +333,60 @@ public final class TranslationService: @unchecked Sendable {
             "hf_token": credentials.huggingFaceToken ?? "",
         ]
         let payloadData = try JSONSerialization.data(withJSONObject: payload)
+        let backendGate = localBackendGate
+        let processHandle = LocalBackendProcessHandle()
 
-        let outputData = try await Task.detached(priority: .userInitiated) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["uv", "run", backendPath]
+        let outputData = try await withTaskCancellationHandler {
+            try await Task.detached(priority: .userInitiated) {
+                try backendGate.waitForTurn(cancelledBy: processHandle)
+                defer {
+                    backendGate.releaseTurn()
+                }
+                try processHandle.checkCancellation()
 
-            var environment = ProcessInfo.processInfo.environment
-            if let token = credentials.huggingFaceToken {
-                environment["HF_TOKEN"] = token
-            }
-            process.environment = environment
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                process.arguments = ["uv", "run", backendPath]
 
-            let input = Pipe()
-            let output = Pipe()
-            let error = Pipe()
-            process.standardInput = input
-            process.standardOutput = output
-            process.standardError = error
+                var environment = ProcessInfo.processInfo.environment
+                if let token = credentials.huggingFaceToken {
+                    environment["HF_TOKEN"] = token
+                }
+                process.environment = environment
 
-            try process.run()
-            input.fileHandleForWriting.write(payloadData)
-            try input.fileHandleForWriting.close()
-            process.waitUntilExit()
+                let input = Pipe()
+                let output = Pipe()
+                let error = Pipe()
+                process.standardInput = input
+                process.standardOutput = output
+                process.standardError = error
 
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            let errorData = error.fileHandleForReading.readDataToEndOfFile()
+                processHandle.set(process)
+                defer {
+                    processHandle.clear()
+                }
 
-            guard process.terminationStatus == 0 else {
-                let stdout = String(data: data, encoding: .utf8) ?? ""
-                let stderr = String(data: errorData, encoding: .utf8) ?? ""
-                throw TranslationError.localModelUnavailable((stdout + "\n" + stderr).trimmingCharacters(in: .whitespacesAndNewlines))
-            }
+                try process.run()
+                try processHandle.checkCancellationTerminatingActiveProcess()
+                input.fileHandleForWriting.write(payloadData)
+                try input.fileHandleForWriting.close()
+                process.waitUntilExit()
+                try processHandle.checkCancellation()
 
-            return data
-        }.value
+                let data = output.fileHandleForReading.readDataToEndOfFile()
+                let errorData = error.fileHandleForReading.readDataToEndOfFile()
+
+                guard process.terminationStatus == 0 else {
+                    let stdout = String(data: data, encoding: .utf8) ?? ""
+                    let stderr = String(data: errorData, encoding: .utf8) ?? ""
+                    throw TranslationError.localModelUnavailable((stdout + "\n" + stderr).trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+
+                return data
+            }.value
+        } onCancel: {
+            processHandle.cancelAndTerminate()
+        }
 
         let object = try JSONSerialization.jsonObject(with: outputData)
         guard let dictionary = object as? [String: Any] else {
@@ -593,6 +615,103 @@ private struct OpenRouterCompletion {
     let translation: String
     let description: String?
     let usage: TranslationUsage?
+}
+
+private final class LocalBackendExecutionGate: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 1)
+
+    func waitForTurn(cancelledBy processHandle: LocalBackendProcessHandle) throws {
+        while semaphore.wait(timeout: .now() + .milliseconds(50)) == .timedOut {
+            try processHandle.checkCancellation()
+        }
+    }
+
+    func releaseTurn() {
+        semaphore.signal()
+    }
+}
+
+private final class LocalBackendProcessHandle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+    private var isCancelled = false
+
+    func set(_ process: Process) {
+        lock.lock()
+        self.process = process
+        let shouldTerminate = isCancelled
+        lock.unlock()
+
+        if shouldTerminate {
+            terminate(process)
+        }
+    }
+
+    func clear() {
+        lock.lock()
+        process = nil
+        lock.unlock()
+    }
+
+    func cancelAndTerminate() {
+        lock.lock()
+        isCancelled = true
+        let runningProcess = process
+        lock.unlock()
+
+        guard let runningProcess else {
+            return
+        }
+        terminate(runningProcess)
+    }
+
+    func checkCancellation() throws {
+        lock.lock()
+        let isCancelled = isCancelled
+        lock.unlock()
+
+        if isCancelled {
+            throw CancellationError()
+        }
+    }
+
+    func checkCancellationTerminatingActiveProcess() throws {
+        lock.lock()
+        let isCancelled = isCancelled
+        let runningProcess = process
+        lock.unlock()
+
+        guard isCancelled else {
+            return
+        }
+
+        if let runningProcess {
+            terminate(runningProcess)
+        }
+        throw CancellationError()
+    }
+
+    private func terminate(_ process: Process) {
+        guard process.isRunning else {
+            return
+        }
+
+        process.terminate()
+        let pid = process.processIdentifier
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + .seconds(1)) { [weak self] in
+            self?.forceKillIfStillRunning(pid: pid)
+        }
+    }
+
+    private func forceKillIfStillRunning(pid: pid_t) {
+        lock.lock()
+        let shouldKill = process?.processIdentifier == pid && process?.isRunning == true
+        lock.unlock()
+
+        if shouldKill {
+            kill(pid, SIGKILL)
+        }
+    }
 }
 
 private extension String {
