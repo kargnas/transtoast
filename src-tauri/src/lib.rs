@@ -269,6 +269,8 @@ struct TranslationPreviewState {
     model: String,
     #[serde(rename = "costCredits")]
     cost_credits: Option<f64>,
+    #[serde(rename = "permissionAction")]
+    permission_action: Option<String>,
     #[serde(rename = "toastDuration", default = "default_toast_duration_value")]
     toast_duration: f64,
 }
@@ -434,6 +436,14 @@ fn perform_settings_action(
 }
 
 #[tauri::command]
+fn open_screen_recording_settings() -> Result<ActionResult, String> {
+    open_privacy_url(
+        "Screen Recording",
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+    )
+}
+
+#[tauri::command]
 fn load_translation_preview(app: AppHandle) -> Result<TranslationPreviewState, String> {
     let settings = load_effective_settings(&app).unwrap_or_else(|_| default_settings());
     read_translation_preview_state(&app).map(|state| {
@@ -584,6 +594,7 @@ pub fn run() {
             load_request_logs,
             clear_request_logs,
             load_translation_preview,
+            open_screen_recording_settings,
             close_translation_preview
         ])
         .run(tauri::generate_context!())
@@ -878,6 +889,7 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
             }
         },
         cost_credits: None,
+        permission_action: None,
         toast_duration: settings.toast_duration,
     }
 }

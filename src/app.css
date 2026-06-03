@@ -625,6 +625,17 @@ kbd {
   gap: 2px;
 }
 
+.error-footer .footer-meta {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.permission-request-button {
+  flex: 0 0 auto;
+  gap: 6px;
+  min-width: 138px;
+}
+
 .language {
   display: inline-flex;
   align-items: center;

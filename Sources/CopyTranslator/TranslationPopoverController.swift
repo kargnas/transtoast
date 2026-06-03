@@ -27,6 +27,7 @@ final class TranslationPopoverController {
         modelOptions: [TranslationModelOption] = [],
         selectedModelOptionID: String? = nil,
         onUserClose: (() -> Void)? = nil,
+        onPermissionRequested: (() -> Void)? = nil,
         onModelSelected: ((TranslationModelOption) -> Void)? = nil
     ) {
         close()
@@ -64,6 +65,7 @@ final class TranslationPopoverController {
             },
             modelOptions: modelOptions,
             selectedModelOptionID: selectedModelOptionID,
+            onPermissionRequested: onPermissionRequested,
             onModelSelected: onModelSelected
         )
         panel.contentView = contentView
@@ -305,6 +307,7 @@ private struct PopoverStrings {
     var cancel: String
     var copied: String
     var close: String
+    var requestPermission: String
 
     static let current = Self(
         translating: "Translating...",
@@ -316,7 +319,8 @@ private struct PopoverStrings {
         showTranslation: "Translation",
         cancel: "Cancel",
         copied: "Copied",
-        close: "Close"
+        close: "Close",
+        requestPermission: "Request Permission"
     )
 }
 
@@ -329,6 +333,7 @@ private final class TranslationPopoverContentView: NSView {
     private let onMouseExited: () -> Void
     private let modelOptions: [TranslationModelOption]
     private let selectedModelOptionID: String?
+    private let onPermissionRequested: (() -> Void)?
     private let onModelSelected: ((TranslationModelOption) -> Void)?
     private let strings = PopoverStrings.current
 
@@ -350,6 +355,7 @@ private final class TranslationPopoverContentView: NSView {
     private let originalButton = NSButton(title: "", target: nil, action: nil)
     private let copyButton = NSButton(title: "", target: nil, action: nil)
     private let closeButton = NSButton(title: "", target: nil, action: nil)
+    private let permissionButton = NSButton(title: "", target: nil, action: nil)
     private let progressIndicator = NSProgressIndicator()
     private var isHovering = false
 
@@ -363,6 +369,7 @@ private final class TranslationPopoverContentView: NSView {
         onMouseExited: @escaping () -> Void,
         modelOptions: [TranslationModelOption],
         selectedModelOptionID: String?,
+        onPermissionRequested: (() -> Void)?,
         onModelSelected: ((TranslationModelOption) -> Void)?
     ) {
         self.payload = payload
@@ -373,6 +380,7 @@ private final class TranslationPopoverContentView: NSView {
         self.onMouseExited = onMouseExited
         self.modelOptions = modelOptions
         self.selectedModelOptionID = selectedModelOptionID
+        self.onPermissionRequested = onPermissionRequested
         self.onModelSelected = onModelSelected
         visibleMode = payload.mode
         super.init(frame: frame)
@@ -651,6 +659,8 @@ private final class TranslationPopoverContentView: NSView {
         configureButton(originalButton, imageName: "eye", action: #selector(toggleOriginal))
         configureButton(copyButton, imageName: "doc.on.doc", action: #selector(copyText))
         configureButton(closeButton, imageName: "xmark", action: #selector(close))
+        configureButton(permissionButton, title: strings.requestPermission, action: #selector(requestPermission))
+        permissionButton.toolTip = "Open Screen Recording settings"
 
         progressIndicator.style = .bar
         progressIndicator.isIndeterminate = true
@@ -758,6 +768,7 @@ private final class TranslationPopoverContentView: NSView {
             originalButton.isHidden = true
             copyButton.isHidden = true
             closeButton.isHidden = false
+            permissionButton.isHidden = true
             countdownPill.isHidden = true
 
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 72, height: 24)
@@ -785,6 +796,7 @@ private final class TranslationPopoverContentView: NSView {
             originalButton.isHidden = true
             copyButton.isHidden = true
             closeButton.isHidden = false
+            permissionButton.isHidden = !showsScreenRecordingPermissionAction
             countdownPill.isHidden = false
 
             titleLabel.frame = CGRect(
@@ -803,11 +815,16 @@ private final class TranslationPopoverContentView: NSView {
                 layoutCountdownPill(x: modelButton.frame.minX - 50, y: content.maxY - 25)
             }
             layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68))
-            modelLabel.frame = CGRect(x: content.maxX - 92, y: content.minY, width: 92, height: 20)
+            if permissionButton.isHidden {
+                modelLabel.frame = CGRect(x: content.maxX - 92, y: content.minY, width: 92, height: 20)
+            } else {
+                modelLabel.isHidden = true
+                permissionButton.frame = CGRect(x: content.maxX - 140, y: content.minY - 3, width: 140, height: 28)
+            }
             languageLabel.frame = CGRect(
                 x: content.minX,
                 y: content.minY,
-                width: modelLabel.isHidden ? content.width - 40 : max(72, modelLabel.frame.minX - content.minX - 8),
+                width: footerLeadingWidth(content: content),
                 height: 20
             )
 
@@ -821,6 +838,7 @@ private final class TranslationPopoverContentView: NSView {
             originalButton.isHidden = false
             copyButton.isHidden = false
             closeButton.isHidden = false
+            permissionButton.isHidden = true
             countdownPill.isHidden = false
 
             closeButton.title = ""
@@ -904,6 +922,7 @@ private final class TranslationPopoverContentView: NSView {
             copyButton,
             modelButton,
             closeButton,
+            permissionButton,
             countdownPill,
         ]
 
@@ -978,6 +997,29 @@ private final class TranslationPopoverContentView: NSView {
 
     @objc private func close() {
         onClose()
+    }
+
+    @objc private func requestPermission() {
+        onPermissionRequested?()
+        onClose()
+    }
+
+    private var showsScreenRecordingPermissionAction: Bool {
+        guard visibleMode == "error",
+              onPermissionRequested != nil else {
+            return false
+        }
+        if payload.permissionAction == "screenRecording" {
+            return true
+        }
+        return payload.errorText?.lowercased().contains("screen recording permission") ?? false
+    }
+
+    private func footerLeadingWidth(content: CGRect) -> CGFloat {
+        if !permissionButton.isHidden {
+            return max(72, permissionButton.frame.minX - content.minX - 8)
+        }
+        return modelLabel.isHidden ? content.width - 40 : max(72, modelLabel.frame.minX - content.minX - 8)
     }
 
     private func showCopiedState() {
