@@ -757,9 +757,11 @@
           <div class="setting-group">
             <label class="setting-row">
               <span class="setting-copy">
-                <strong>Backend Path</strong>
+                <strong>Local Backend Script</strong>
+                <span class="setting-note">Optional override for the local translation runner. Leave blank to use the bundled script or the selected model's backend.</span>
               </span>
               <input
+                placeholder="Automatic"
                 value={settingsState.settings.localHyMT2BackendPath ?? ""}
                 onblur={(event) => updateNullableField("localHyMT2BackendPath", event.currentTarget.value)}
               />
@@ -775,9 +777,11 @@
             </label>
             <label class="setting-row">
               <span class="setting-copy">
-                <strong>Custom Models JSON</strong>
+                <strong>Custom Model Catalog</strong>
+                <span class="setting-note">JSON file that adds local model choices. Blank uses ~/.config/copy-translator/local-models.json when present.</span>
               </span>
               <input
+                placeholder="~/.config/copy-translator/local-models.json"
                 value={settingsState.settings.customLocalModelsPath ?? ""}
                 onblur={(event) => updateNullableField("customLocalModelsPath", event.currentTarget.value)}
               />

@@ -200,6 +200,14 @@ h2 {
   white-space: nowrap;
 }
 
+.setting-copy span.setting-note {
+  display: -webkit-box;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 select,
 input {
   width: 100%;
