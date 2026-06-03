@@ -827,14 +827,15 @@ kbd {
 
 .dismiss-countdown {
   position: relative;
-  width: 42px;
-  height: 18px;
-  margin: 4px 0 0 auto;
+  width: 38px;
+  height: 20px;
+  margin: 7px 2px 0 auto;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(235, 236, 240, 0.82);
+  background: rgba(235, 236, 240, 0.76);
   color: #5c5c62;
   font-variant-numeric: tabular-nums;
+  line-height: 20px;
   transition:
     background 140ms ease,
     transform 160ms ease;
@@ -854,8 +855,10 @@ kbd {
   display: grid;
   height: 100%;
   place-items: center;
+  padding: 0 7px;
   font-size: 10px;
   font-weight: 560;
+  line-height: 20px;
 }
 
 .translation-bubble.hover-paused .dismiss-countdown {
@@ -961,28 +964,31 @@ kbd {
 .language-select-shell {
   display: inline-flex;
   align-items: center;
-  min-width: 96px;
-  max-width: 128px;
+  min-width: 102px;
+  max-width: 134px;
   height: 28px;
-  gap: 5px;
-  border: 1px solid rgba(178, 178, 184, 0.82);
+  gap: 6px;
+  border: 1px solid rgba(178, 178, 184, 0.52);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: #fff;
   color: #45454a;
 }
 
 .language-select-shell svg {
   flex: 0 0 auto;
-  margin-left: 8px;
+  margin-left: 10px;
 }
 
 .language-select {
   width: 100%;
   min-width: 0;
   height: 26px;
+  padding: 0 10px 0 0;
   border: 0;
-  background: transparent;
+  background: #fff;
   color: #45454a;
+  appearance: none;
+  -webkit-appearance: none;
   font-size: 12px;
   font-weight: 610;
   text-align: left;
@@ -1034,9 +1040,9 @@ kbd {
   height: 28px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(178, 178, 184, 0.62);
+  border: 1px solid rgba(178, 178, 184, 0.46);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: transparent;
   color: var(--text);
 }
 
@@ -1068,8 +1074,8 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(178, 178, 184, 0.62);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(178, 178, 184, 0.46);
+  background: transparent;
   color: var(--text);
 }
 
