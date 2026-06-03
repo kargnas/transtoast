@@ -435,6 +435,9 @@ private final class TranslationPopoverContentView: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let bodyScrollView = NSScrollView()
     private let bodyTextView = NSTextView(frame: .zero)
+    private let languagePill = NSView()
+    private let languageIconLabel = NSTextField(labelWithString: "◎")
+    private let languageTextLabel = NSTextField(labelWithString: "")
     private let languageButton = NSButton(title: "", target: nil, action: nil)
     private let modelLabel = NSTextField(labelWithString: "")
     private let countdownPill = NSView()
@@ -490,7 +493,7 @@ private final class TranslationPopoverContentView: NSView {
         super.draw(dirtyRect)
 
         let bubble = bubbleRect
-        let fillColor = NSColor.white.withAlphaComponent(0.86)
+        let fillColor = NSColor.white.withAlphaComponent(0.94)
         let strokeColor = NSColor.black.withAlphaComponent(isHovering ? 0.42 : 0.34)
         let bubblePath = NSBezierPath(roundedRect: bubble, xRadius: 16, yRadius: 16)
         fillColor.setFill()
@@ -699,23 +702,35 @@ private final class TranslationPopoverContentView: NSView {
         modelLabel.textColor = .tertiaryLabelColor
         modelLabel.lineBreakMode = .byTruncatingMiddle
 
+        languagePill.wantsLayer = true
+        languagePill.layer?.backgroundColor = NSColor.white.cgColor
+        languagePill.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.38).cgColor
+        languagePill.layer?.borderWidth = 1
+        languagePill.layer?.cornerRadius = 8
+        languagePill.layer?.masksToBounds = true
+        addSubview(languagePill)
+
+        for label in [languageIconLabel, languageTextLabel] {
+            label.drawsBackground = false
+            label.isBordered = false
+            label.isEditable = false
+            label.isSelectable = false
+            label.textColor = .labelColor
+            languagePill.addSubview(label)
+        }
+        languageIconLabel.alignment = .center
+        languageIconLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        languageTextLabel.alignment = .left
+        languageTextLabel.font = .preferredFont(forTextStyle: .caption1)
+
         languageButton.target = self
         languageButton.action = #selector(showLanguageMenu)
         languageButton.bezelStyle = .regularSquare
         languageButton.isBordered = false
-        languageButton.controlSize = .regular
-        languageButton.font = .preferredFont(forTextStyle: .caption1)
         languageButton.focusRingType = .none
-        languageButton.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
-        languageButton.imagePosition = .imageLeading
-        languageButton.alignment = .left
-        languageButton.toolTip = "Change target language"
+        languageButton.title = ""
         languageButton.wantsLayer = true
-        languageButton.layer?.backgroundColor = NSColor.white.cgColor
-        languageButton.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.42).cgColor
-        languageButton.layer?.borderWidth = 1
-        languageButton.layer?.cornerRadius = 8
-        languageButton.layer?.masksToBounds = true
+        languageButton.layer?.backgroundColor = NSColor.clear.cgColor
         addSubview(languageButton)
 
         bodyScrollView.drawsBackground = false
@@ -742,7 +757,7 @@ private final class TranslationPopoverContentView: NSView {
         bodyTextView.autoresizingMask = [.width]
 
         countdownPill.wantsLayer = true
-        countdownPill.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.82).cgColor
+        countdownPill.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.84).cgColor
         countdownPill.layer?.cornerRadius = 8
         countdownPill.layer?.masksToBounds = true
         countdownPill.isHidden = true
@@ -759,7 +774,7 @@ private final class TranslationPopoverContentView: NSView {
         countdownLabel.isEditable = false
         countdownLabel.isSelectable = false
         countdownLabel.alignment = .center
-        countdownLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
+        countdownLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
         countdownLabel.textColor = .secondaryLabelColor
         countdownPill.addSubview(countdownLabel)
 
@@ -812,7 +827,7 @@ private final class TranslationPopoverContentView: NSView {
     }
 
     private func render() {
-        languageButton.title = payload.targetLanguage
+        languageTextLabel.stringValue = payload.targetLanguage
         modelLabel.stringValue = modelMetadataText()
 
         switch visibleMode {
@@ -880,6 +895,7 @@ private final class TranslationPopoverContentView: NSView {
         case "loading":
             titleLabel.isHidden = false
             bodyScrollView.isHidden = false
+            languagePill.isHidden = true
             languageButton.isHidden = true
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = false
@@ -902,6 +918,7 @@ private final class TranslationPopoverContentView: NSView {
         case "error":
             titleLabel.isHidden = false
             bodyScrollView.isHidden = false
+            languagePill.isHidden = false
             languageButton.isHidden = false
             modelLabel.isHidden = true
             progressIndicator.isHidden = true
@@ -912,15 +929,15 @@ private final class TranslationPopoverContentView: NSView {
             permissionButton.isHidden = !showsScreenRecordingPermissionAction
             countdownPill.isHidden = false
 
-            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 28, width: 96, height: 28)
+            layoutLanguagePill(CGRect(x: content.minX, y: content.maxY - 28, width: 128, height: 28))
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 64, width: content.width, height: 24)
             closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
             closeButton.imagePosition = .imageOnly
             modelButton.frame = CGRect(x: closeButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
-            layoutCountdownPill(x: content.maxX - 42, y: content.minY)
-            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 84))
+            layoutCountdownPill(x: content.maxX - 40, y: content.minY + 4)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 28, width: content.width, height: content.height - 90))
             if permissionButton.isHidden {
                 modelLabel.frame = .zero
             } else {
@@ -930,6 +947,7 @@ private final class TranslationPopoverContentView: NSView {
         default:
             titleLabel.isHidden = true
             bodyScrollView.isHidden = false
+            languagePill.isHidden = false
             languageButton.isHidden = false
             modelLabel.isHidden = true
             progressIndicator.isHidden = true
@@ -943,13 +961,13 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.close)
             closeButton.imagePosition = .imageOnly
-            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 28, width: 96, height: 28)
+            layoutLanguagePill(CGRect(x: content.minX, y: content.maxY - 28, width: 128, height: 28))
             closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
             copyButton.frame = CGRect(x: closeButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
             originalButton.frame = CGRect(x: copyButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
             modelButton.frame = CGRect(x: originalButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
-            layoutCountdownPill(x: content.maxX - 42, y: content.minY)
-            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 54))
+            layoutCountdownPill(x: content.maxX - 40, y: content.minY + 4)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 28, width: content.width, height: content.height - 60))
             modelLabel.frame = .zero
         }
     }
@@ -977,8 +995,15 @@ private final class TranslationPopoverContentView: NSView {
         ) + 4
     }
 
+    private func layoutLanguagePill(_ frame: CGRect) {
+        languagePill.frame = frame
+        languageIconLabel.frame = CGRect(x: 12, y: 5, width: 16, height: 18)
+        languageTextLabel.frame = CGRect(x: 36, y: 4, width: max(1, frame.width - 48), height: 20)
+        languageButton.frame = frame
+    }
+
     private func layoutCountdownPill(x: CGFloat, y: CGFloat) {
-        countdownPill.frame = CGRect(x: x, y: y, width: 42, height: 18)
+        countdownPill.frame = CGRect(x: x, y: y, width: 40, height: 20)
         countdownFill.frame = countdownPill.bounds
         countdownLabel.frame = countdownPill.bounds
     }
