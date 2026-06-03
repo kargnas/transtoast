@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastClipboardTriggerAt: Date?
     private var lastTranslationCaretBounds: CGRect?
     private var currentTextTranslationTask: Task<Void, Never>?
+    private var currentScreenshotTranslationTask: Task<Void, Never>?
     private var currentTextTranslationUsesLocalBackend = false
     private var lastReadyLocalModelID: String?
     private var isUserQuitting = false
@@ -320,25 +321,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func translateScreenshot() {
+        currentTextTranslationTask?.cancel()
+        currentScreenshotTranslationTask?.cancel()
         showTranslationLoading(originalText: "[screen screenshot]", sourceTitle: "Screenshot")
-        Task { [weak self] in
+        let task = Task { [weak self] in
             guard let self else {
                 return
             }
 
             do {
                 let data = try await ScreenshotCapture.captureMainDisplayPNG()
+                guard !Task.isCancelled else {
+                    return
+                }
                 let imageInfo = Self.imageInfo(for: data)
                 let result = try await translationService.translateImage(
                     pngData: data,
                     settings: settingsStore.settings,
                     credentials: credentialsProvider.credentials()
                 )
+                guard !Task.isCancelled else {
+                    return
+                }
                 show(result: result, title: "Screenshot", inputText: "[screen screenshot]", imageInfo: imageInfo)
+            } catch is CancellationError {
+                return
             } catch {
+                guard !Task.isCancelled else {
+                    return
+                }
                 show(error: error, title: "Screenshot", inputText: "[screen screenshot]")
             }
         }
+        currentScreenshotTranslationTask = task
     }
 
     private func performTextTranslation(
@@ -354,6 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shouldAnnounceWarmup = warmupModel.map { $0.id != lastReadyLocalModelID } ?? false
 
         previousTask?.cancel()
+        currentScreenshotTranslationTask?.cancel()
         currentTextTranslationUsesLocalBackend = usesLocalBackend
         if shouldAnnounceWarmup, let warmupModel {
             localModelWarmupNotifier.warmingUp(modelTitle: warmupModel.title)
@@ -599,13 +615,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             selectedModelOptionID: selectedModelOptionID(settings: settings),
             onUserClose: { [weak self] in
                 if payload.mode == "loading" {
-                    self?.currentTextTranslationTask?.cancel()
+                    self?.cancelCurrentTranslations()
                 }
             },
             onModelSelected: { [weak self] option in
                 self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
             }
         )
+    }
+
+    private func cancelCurrentTranslations() {
+        currentTextTranslationTask?.cancel()
+        currentScreenshotTranslationTask?.cancel()
     }
 
     private func retranslate(
