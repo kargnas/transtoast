@@ -701,18 +701,21 @@ private final class TranslationPopoverContentView: NSView {
 
         languageButton.target = self
         languageButton.action = #selector(showLanguageMenu)
-        languageButton.bezelStyle = .rounded
+        languageButton.bezelStyle = .regularSquare
+        languageButton.isBordered = false
         languageButton.controlSize = .regular
         languageButton.font = .preferredFont(forTextStyle: .caption1)
         languageButton.focusRingType = .none
         languageButton.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
         languageButton.imagePosition = .imageLeading
+        languageButton.alignment = .left
         languageButton.toolTip = "Change target language"
         languageButton.wantsLayer = true
-        languageButton.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.94).cgColor
-        languageButton.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.82).cgColor
+        languageButton.layer?.backgroundColor = NSColor.white.cgColor
+        languageButton.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.42).cgColor
         languageButton.layer?.borderWidth = 1
         languageButton.layer?.cornerRadius = 8
+        languageButton.layer?.masksToBounds = true
         addSubview(languageButton)
 
         bodyScrollView.drawsBackground = false
@@ -783,7 +786,8 @@ private final class TranslationPopoverContentView: NSView {
     ) {
         button.target = self
         button.action = action
-        button.bezelStyle = .rounded
+        button.bezelStyle = .regularSquare
+        button.isBordered = false
         button.controlSize = .regular
         button.font = .preferredFont(forTextStyle: .body)
         button.focusRingType = .none
@@ -794,6 +798,15 @@ private final class TranslationPopoverContentView: NSView {
             button.title = ""
             button.image = NSImage(systemSymbolName: imageName, accessibilityDescription: nil)
             button.imagePosition = .imageOnly
+        }
+        if imageName != nil {
+            button.wantsLayer = true
+            button.layer?.backgroundColor = NSColor.clear.cgColor
+            button.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.36).cgColor
+            button.layer?.borderWidth = 1
+            button.layer?.cornerRadius = 8
+            button.layer?.masksToBounds = true
+            button.contentTintColor = .labelColor
         }
         addSubview(button)
     }
