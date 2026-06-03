@@ -613,6 +613,73 @@ fn load_translation_preview(app: AppHandle) -> Result<TranslationPreviewState, S
 }
 
 #[tauri::command]
+fn translate_preview_to_language(
+    app: AppHandle,
+    target_language: String,
+) -> Result<TranslationPreviewState, String> {
+    let requested_target = target_language.trim();
+    let target_is_supported = language_options(false)
+        .iter()
+        .any(|option| option.value == requested_target);
+    if requested_target.is_empty() || !target_is_supported {
+        return Err(format!("Unsupported target language: {target_language}"));
+    }
+
+    let mut settings = load_effective_settings(&app)?;
+    settings.target_language = requested_target.to_string();
+    write_settings(&app, normalize_settings(settings.clone()))?;
+    let settings = load_effective_settings(&app)?;
+
+    let mut state = read_translation_preview_state(&app)?
+        .unwrap_or_else(|| sample_translation_preview(&settings));
+    state.target_language = requested_target.to_string();
+    state.toast_duration = settings.toast_duration;
+    state.provider_title = provider_title(&settings.provider).to_string();
+    state.model = match settings.provider {
+        TranslationProvider::LocalHyMT2 => {
+            model_title(&settings.local_model_id, &settings.provider)
+        }
+        TranslationProvider::OpenRouter => {
+            model_title(&settings.open_router_text_model, &settings.provider)
+        }
+    };
+
+    if state.original_text.trim().is_empty() || state.original_text == "[screen screenshot]" {
+        state.mode = "error".to_string();
+        state.error_text = Some("Cannot retranslate this preview without source text.".to_string());
+        write_translation_preview_state(&app, &state)?;
+        return Ok(state);
+    }
+
+    let mut translation_settings = settings;
+    translation_settings.source_language = state.source_language.clone();
+    translation_settings.target_language = requested_target.to_string();
+
+    let args = legacy_cli_args(
+        &translation_settings,
+        &["--translate-text-once", state.original_text.as_str()],
+    );
+    let binary = legacy_binary_path(&app)?;
+    let output = Command::new(&binary)
+        .args(&args)
+        .output()
+        .map_err(|error| format!("Could not run {}: {error}", binary.display()))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() && !stdout.is_empty() {
+        state.mode = "translated".to_string();
+        state.translated_text = stdout;
+        state.error_text = None;
+    } else {
+        state.mode = "error".to_string();
+        state.error_text = Some(first_non_empty(&stderr, &stdout));
+    }
+    write_translation_preview_state(&app, &state)?;
+    Ok(state)
+}
+
+#[tauri::command]
 fn close_translation_preview(app: AppHandle) -> Result<(), String> {
     app.exit(0);
     Ok(())
@@ -767,6 +834,7 @@ pub fn run() {
             load_request_logs,
             clear_request_logs,
             load_translation_preview,
+            translate_preview_to_language,
             save_translation_preview_position,
             open_screen_recording_settings,
             close_translation_preview
@@ -1096,6 +1164,21 @@ fn read_translation_preview_state(
         .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
     state.mode = normalized_translation_mode(&state.mode).to_string();
     Ok(Some(state))
+}
+
+fn write_translation_preview_state(
+    app: &AppHandle,
+    state: &TranslationPreviewState,
+) -> Result<(), String> {
+    let path = translation_preview_path(app)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+    }
+    let data = serde_json::to_string_pretty(state)
+        .map_err(|error| format!("Could not encode translation preview: {error}"))?;
+    fs::write(&path, data)
+        .map_err(|error| format!("Could not write {}: {error}", path.display()))
 }
 
 fn translation_preview_path(app: &AppHandle) -> Result<PathBuf, String> {

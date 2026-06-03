@@ -710,6 +710,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onModelSelected: { [weak self] option in
                 self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
             },
+            onTargetLanguageSelected: { [weak self] language in
+                self?.retranslate(payload.originalText, sourceTitle: sourceTitle, targetLanguage: language)
+            },
             onPositionChanged: { [weak self] origin in
                 self?.saveCustomToastPosition(origin)
             }
@@ -739,6 +742,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.provider = .openRouter
             settings.openRouterTextModel = option.value
         }
+        performTextTranslation(text, sourceTitle: sourceTitle, settings: settings)
+    }
+
+    private func retranslate(
+        _ text: String,
+        sourceTitle: String,
+        targetLanguage: String
+    ) {
+        guard text != "[screen screenshot]" else {
+            var settings = settingsStore.settings
+            settings.targetLanguage = targetLanguage
+            settingsStore.settings = settings
+            rebuildMenu()
+            return
+        }
+
+        var settings = settingsStore.settings
+        settings.targetLanguage = targetLanguage
+        settingsStore.settings = settings
+        rebuildMenu()
         performTextTranslation(text, sourceTitle: sourceTitle, settings: settings)
     }
 

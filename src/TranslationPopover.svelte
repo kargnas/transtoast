@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
-  import { Check, Copy, Eye, Languages, ShieldCheck, X } from "@lucide/svelte";
+  import { Check, Copy, Cpu, Eye, Languages, ShieldCheck, X } from "@lucide/svelte";
   import { fallbackTranslationState, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
   import { fallbackState, type SettingsState } from "./lib/settings";
 
@@ -16,7 +16,10 @@
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
   let modelOptions = $state<PreviewModelOption[]>([]);
+  let targetLanguageOptions = $state<PreviewLanguageOption[]>([]);
   let selectedModelValue = $state("");
+  let selectedTargetLanguage = $state("");
+  let isChangingLanguage = $state(false);
   let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
   let countdownInterval: number | undefined;
@@ -69,6 +72,11 @@
     value: string;
   };
 
+  type PreviewLanguageOption = {
+    label: string;
+    value: string;
+  };
+
   type WindowPosition = {
     x: number;
     y: number;
@@ -77,7 +85,7 @@
   onMount(() => {
     isTauri = "__TAURI_INTERNALS__" in window;
     let disposed = false;
-    applyModelOptions(fallbackState);
+    applySettingsState(fallbackState);
     if (isTauri) {
       void loadPreview();
       void getCurrentWindow()
@@ -121,13 +129,13 @@
 
   async function loadModelOptions() {
     try {
-      applyModelOptions(await invoke<SettingsState>("load_settings"));
+      applySettingsState(await invoke<SettingsState>("load_settings"));
     } catch {
-      applyModelOptions(fallbackState);
+      applySettingsState(fallbackState);
     }
   }
 
-  function applyModelOptions(state: SettingsState) {
+  function applySettingsState(state: SettingsState) {
     modelOptions = [
       ...state.options.localModels.map((option) => ({
         label: option.label,
@@ -138,11 +146,21 @@
         value: `openRouter:${state.settings.openRouterTextModel}`
       }
     ];
+    targetLanguageOptions = state.options.targetLanguages;
     syncSelectedModel();
+    syncSelectedTargetLanguage();
   }
 
   function syncSelectedModel() {
     selectedModelValue = modelOptions.find((option) => option.label === preview.model)?.value ?? modelOptions[0]?.value ?? "";
+  }
+
+  function syncSelectedTargetLanguage() {
+    selectedTargetLanguage =
+      targetLanguageOptions.find((option) => option.value === preview.targetLanguage)?.value ??
+      preview.targetLanguage ??
+      targetLanguageOptions[0]?.value ??
+      "";
   }
 
   function modeFromQuery(value: string | null): TranslationMode | null {
@@ -197,9 +215,53 @@
     scheduleAutoDismiss();
   }
 
+  async function selectTargetLanguage(event: Event) {
+    const value = event.currentTarget instanceof HTMLSelectElement ? event.currentTarget.value : "";
+    const option = targetLanguageOptions.find((candidate) => candidate.value === value);
+    if (!option || option.value === preview.targetLanguage) return;
+
+    selectedTargetLanguage = option.value;
+    isChangingLanguage = true;
+    const previousMode = visibleMode;
+    visibleMode = "loading";
+    clearAutoDismiss();
+    clearCountdown();
+
+    try {
+      if (isTauri) {
+        preview = await invoke<TranslationPreviewState>("translate_preview_to_language", {
+          targetLanguage: option.value
+        });
+      } else {
+        preview = {
+          ...preview,
+          targetLanguage: option.value,
+          translatedText: `${preview.originalText} (${option.label})`
+        };
+      }
+      visibleMode = preview.mode === "error" ? "error" : "translated";
+      await loadModelOptions();
+    } catch (error) {
+      preview = {
+        ...preview,
+        mode: "error",
+        targetLanguage: option.value,
+        errorText: error instanceof Error ? error.message : String(error)
+      };
+      visibleMode = "error";
+    } finally {
+      isChangingLanguage = false;
+      if (visibleMode === "loading") {
+        visibleMode = previousMode;
+      }
+      syncSelectedTargetLanguage();
+      scheduleAutoDismiss();
+    }
+  }
+
   async function startDragging(event: MouseEvent) {
     const target = event.target instanceof Element ? event.target : null;
-    if (!isTauri || event.button !== 0 || target?.closest("button")) return;
+    if (!isTauri || event.button !== 0 || target?.closest("button, select")) return;
     try {
       await getCurrentWindow().startDragging();
     } catch {
@@ -353,30 +415,42 @@
           </div>
         </footer>
       {:else if visibleMode === "error"}
+        <div class="popover-header">
+          <label class="language-select-shell" aria-label="Target language">
+            <Languages size={14} />
+            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
+              {#each targetLanguageOptions as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
         <div class="loading-title error-title">
           <span class="status-dot"></span>
           <span>{uiStrings.error}</span>
         </div>
         <p class="copying">{preview.errorText ?? uiStrings.translationFailed}</p>
         <div class="top-controls">
-          {#if showCountdown}
-            <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
-              <span class="dismiss-countdown-fill"></span>
-              <span class="dismiss-countdown-label">{countdownLabel}</span>
-            </div>
-          {/if}
           {#if modelOptions.length > 1}
-            <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
-              {#each modelOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </select>
+            <label class="model-select-shell" aria-label="Model">
+              <Cpu size={16} />
+              <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+                {#each modelOptions as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            </label>
           {/if}
           <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </div>
+        {#if showCountdown}
+          <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
+            <span class="dismiss-countdown-fill"></span>
+            <span class="dismiss-countdown-label">{countdownLabel}</span>
+          </div>
+        {/if}
         <footer class="bubble-footer error-footer">
           <div class="footer-meta">
-            <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
           {#if screenRecordingPermissionError}
@@ -386,19 +460,26 @@
           {/if}
         </footer>
       {:else}
-        <div class="top-controls">
-          {#if showCountdown}
-            <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
-              <span class="dismiss-countdown-fill"></span>
-              <span class="dismiss-countdown-label">{countdownLabel}</span>
-            </div>
-          {/if}
-          {#if modelOptions.length > 1}
-            <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
-              {#each modelOptions as option}
+        <div class="popover-header">
+          <label class="language-select-shell" aria-label="Target language">
+            <Languages size={14} />
+            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
+              {#each targetLanguageOptions as option}
                 <option value={option.value}>{option.label}</option>
               {/each}
             </select>
+          </label>
+        </div>
+        <div class="top-controls">
+          {#if modelOptions.length > 1}
+            <label class="model-select-shell" aria-label="Model">
+              <Cpu size={16} />
+              <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+                {#each modelOptions as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            </label>
           {/if}
           <button class="icon-button" aria-label={visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal} onclick={toggleOriginal}>
             {#if visibleMode === "original"}<Languages size={16} />{:else}<Eye size={16} />{/if}
@@ -408,10 +489,15 @@
           </button>
           <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </div>
+        {#if showCountdown}
+          <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
+            <span class="dismiss-countdown-fill"></span>
+            <span class="dismiss-countdown-label">{countdownLabel}</span>
+          </div>
+        {/if}
         <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
         <footer class="bubble-footer">
           <div class="footer-meta">
-            <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
         </footer>

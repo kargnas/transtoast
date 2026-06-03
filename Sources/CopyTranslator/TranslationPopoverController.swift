@@ -31,6 +31,7 @@ final class TranslationPopoverController {
         onUserClose: (() -> Void)? = nil,
         onPermissionRequested: (() -> Void)? = nil,
         onModelSelected: ((TranslationModelOption) -> Void)? = nil,
+        onTargetLanguageSelected: ((String) -> Void)? = nil,
         onPositionChanged: ((CGPoint) -> Void)? = nil
     ) {
         close()
@@ -72,7 +73,8 @@ final class TranslationPopoverController {
             modelOptions: modelOptions,
             selectedModelOptionID: selectedModelOptionID,
             onPermissionRequested: onPermissionRequested,
-            onModelSelected: onModelSelected
+            onModelSelected: onModelSelected,
+            onTargetLanguageSelected: onTargetLanguageSelected
         )
         panel.contentView = contentView
 
@@ -421,6 +423,7 @@ private final class TranslationPopoverContentView: NSView {
     private let selectedModelOptionID: String?
     private let onPermissionRequested: (() -> Void)?
     private let onModelSelected: ((TranslationModelOption) -> Void)?
+    private let onTargetLanguageSelected: ((String) -> Void)?
     private let strings = PopoverStrings.current
 
     private var visibleMode: String
@@ -432,7 +435,7 @@ private final class TranslationPopoverContentView: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let bodyScrollView = NSScrollView()
     private let bodyTextView = NSTextView(frame: .zero)
-    private let languageLabel = NSTextField(labelWithString: "")
+    private let languageButton = NSButton(title: "", target: nil, action: nil)
     private let modelLabel = NSTextField(labelWithString: "")
     private let countdownPill = NSView()
     private let countdownFill = NSView()
@@ -456,7 +459,8 @@ private final class TranslationPopoverContentView: NSView {
         modelOptions: [TranslationModelOption],
         selectedModelOptionID: String?,
         onPermissionRequested: (() -> Void)?,
-        onModelSelected: ((TranslationModelOption) -> Void)?
+        onModelSelected: ((TranslationModelOption) -> Void)?,
+        onTargetLanguageSelected: ((String) -> Void)?
     ) {
         self.payload = payload
         self.arrowEdge = arrowEdge
@@ -468,6 +472,7 @@ private final class TranslationPopoverContentView: NSView {
         self.selectedModelOptionID = selectedModelOptionID
         self.onPermissionRequested = onPermissionRequested
         self.onModelSelected = onModelSelected
+        self.onTargetLanguageSelected = onTargetLanguageSelected
         visibleMode = payload.mode
         super.init(frame: frame)
         setup()
@@ -678,7 +683,7 @@ private final class TranslationPopoverContentView: NSView {
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
 
-        for label in [titleLabel, languageLabel, modelLabel] {
+        for label in [titleLabel, modelLabel] {
             label.drawsBackground = false
             label.isBordered = false
             label.isEditable = false
@@ -688,12 +693,20 @@ private final class TranslationPopoverContentView: NSView {
 
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.textColor = .labelColor
-        languageLabel.font = .preferredFont(forTextStyle: .caption1)
-        languageLabel.textColor = .secondaryLabelColor
-        languageLabel.lineBreakMode = .byTruncatingTail
         modelLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
         modelLabel.textColor = .tertiaryLabelColor
         modelLabel.lineBreakMode = .byTruncatingMiddle
+
+        languageButton.target = self
+        languageButton.action = #selector(showLanguageMenu)
+        languageButton.bezelStyle = .rounded
+        languageButton.controlSize = .regular
+        languageButton.font = .preferredFont(forTextStyle: .caption1)
+        languageButton.focusRingType = .none
+        languageButton.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        languageButton.imagePosition = .imageLeading
+        languageButton.toolTip = "Change target language"
+        addSubview(languageButton)
 
         bodyScrollView.drawsBackground = false
         bodyScrollView.borderType = .noBorder
@@ -779,7 +792,7 @@ private final class TranslationPopoverContentView: NSView {
     }
 
     private func render() {
-        languageLabel.stringValue = "⌘  \(payload.targetLanguage)"
+        languageButton.title = payload.targetLanguage
         modelLabel.stringValue = modelMetadataText()
 
         switch visibleMode {
@@ -847,7 +860,7 @@ private final class TranslationPopoverContentView: NSView {
         case "loading":
             titleLabel.isHidden = false
             bodyScrollView.isHidden = false
-            languageLabel.isHidden = false
+            languageButton.isHidden = true
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = false
             modelButton.isHidden = true
@@ -864,18 +877,12 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.imagePosition = .imageOnly
             layoutBodyScrollView(CGRect(x: content.minX, y: content.maxY - 80, width: content.width, height: 42))
             progressIndicator.frame = CGRect(x: content.minX, y: content.minY + 31, width: content.width, height: 8)
-            modelLabel.frame = CGRect(x: content.maxX - 132, y: content.minY, width: 132, height: 20)
-            languageLabel.frame = CGRect(
-                x: content.minX,
-                y: content.minY,
-                width: modelLabel.isHidden ? content.width : max(72, modelLabel.frame.minX - content.minX - 8),
-                height: 20
-            )
+            modelLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 20)
 
         case "error":
             titleLabel.isHidden = false
             bodyScrollView.isHidden = false
-            languageLabel.isHidden = false
+            languageButton.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = true
             modelButton.isHidden = modelOptions.count < 2
@@ -885,39 +892,26 @@ private final class TranslationPopoverContentView: NSView {
             permissionButton.isHidden = !showsScreenRecordingPermissionAction
             countdownPill.isHidden = false
 
-            titleLabel.frame = CGRect(
-                x: content.minX,
-                y: content.maxY - 28,
-                width: content.width - (modelButton.isHidden ? 40 : 120),
-                height: 24
-            )
+            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 31, width: 112, height: 30)
+            titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 64, width: content.width, height: 24)
             closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
             closeButton.imagePosition = .imageOnly
             modelButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            layoutCountdownPill(x: closeButton.frame.minX - 48, y: content.maxY - 27)
-            if !modelButton.isHidden {
-                layoutCountdownPill(x: modelButton.frame.minX - 50, y: content.maxY - 25)
-            }
-            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 68))
+            layoutCountdownPill(x: content.maxX - 42, y: content.minY + 2)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 98))
             if permissionButton.isHidden {
-                modelLabel.frame = CGRect(x: content.maxX - 92, y: content.minY, width: 92, height: 20)
+                modelLabel.frame = CGRect(x: content.minX, y: content.minY + 2, width: content.width - 54, height: 20)
             } else {
                 modelLabel.isHidden = true
                 permissionButton.frame = CGRect(x: content.maxX - 140, y: content.minY - 3, width: 140, height: 28)
             }
-            languageLabel.frame = CGRect(
-                x: content.minX,
-                y: content.minY,
-                width: footerLeadingWidth(content: content),
-                height: 20
-            )
 
         default:
             titleLabel.isHidden = true
             bodyScrollView.isHidden = false
-            languageLabel.isHidden = false
+            languageButton.isHidden = false
             modelLabel.isHidden = modelLabel.stringValue.isEmpty
             progressIndicator.isHidden = true
             modelButton.isHidden = modelOptions.count < 2
@@ -930,15 +924,14 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.close)
             closeButton.imagePosition = .imageOnly
+            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 31, width: 112, height: 30)
             closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
             copyButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             originalButton.frame = CGRect(x: copyButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             modelButton.frame = CGRect(x: originalButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            let countdownAnchor = modelButton.isHidden ? originalButton.frame.minX : modelButton.frame.minX
-            layoutCountdownPill(x: countdownAnchor - 50, y: content.maxY - 25)
+            layoutCountdownPill(x: content.maxX - 42, y: content.minY + 2)
             layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 44, width: content.width, height: content.height - 80))
-            modelLabel.frame = CGRect(x: content.minX, y: content.minY + 20, width: content.width, height: 16)
-            languageLabel.frame = CGRect(x: content.minX, y: content.minY, width: content.width, height: 18)
+            modelLabel.frame = CGRect(x: content.minX, y: content.minY + 2, width: content.width - 54, height: 16)
         }
     }
 
@@ -1007,6 +1000,7 @@ private final class TranslationPopoverContentView: NSView {
             originalButton,
             copyButton,
             modelButton,
+            languageButton,
             closeButton,
             permissionButton,
             countdownPill,
@@ -1079,6 +1073,30 @@ private final class TranslationPopoverContentView: NSView {
             return
         }
         onModelSelected?(option)
+    }
+
+    @objc private func showLanguageMenu() {
+        guard visibleMode != "loading" else {
+            return
+        }
+
+        let menu = NSMenu()
+        for language in TranslationLanguage.targetLanguageNames {
+            let item = NSMenuItem(title: language, action: #selector(selectTargetLanguage(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = language
+            item.state = language == payload.targetLanguage ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: CGPoint(x: languageButton.frame.minX, y: languageButton.frame.maxY + 4), in: self)
+    }
+
+    @objc private func selectTargetLanguage(_ sender: NSMenuItem) {
+        guard let language = sender.representedObject as? String,
+              language != payload.targetLanguage else {
+            return
+        }
+        onTargetLanguageSelected?(language)
     }
 
     @objc private func close() {

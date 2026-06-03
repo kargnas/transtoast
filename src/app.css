@@ -822,8 +822,8 @@ kbd {
 
 .dismiss-countdown {
   position: absolute;
-  top: 10px;
-  right: 12px;
+  right: 22px;
+  bottom: 12px;
   width: 42px;
   height: 18px;
   overflow: hidden;
@@ -908,6 +908,7 @@ kbd {
   align-items: center;
   justify-content: flex-start;
   margin-top: 22px;
+  padding-right: 54px;
   color: #515154;
   font-size: 12px;
 }
@@ -946,6 +947,42 @@ kbd {
   text-overflow: ellipsis;
 }
 
+.popover-header {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  padding-right: 184px;
+}
+
+.language-select-shell {
+  display: inline-flex;
+  align-items: center;
+  min-width: 104px;
+  max-width: 150px;
+  height: 32px;
+  gap: 5px;
+  border: 1px solid rgba(215, 215, 220, 0.84);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #45454a;
+}
+
+.language-select-shell svg {
+  flex: 0 0 auto;
+  margin-left: 9px;
+}
+
+.language-select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: #45454a;
+  font-size: 12px;
+  font-weight: 610;
+}
+
 .model-label {
   min-width: 0;
   overflow: hidden;
@@ -962,7 +999,7 @@ kbd {
   margin: 0;
   max-width: none;
   min-height: 42px;
-  padding-top: 34px;
+  padding-top: 14px;
   color: var(--text);
   font-size: 16px;
   font-weight: 580;
@@ -985,21 +1022,31 @@ kbd {
   gap: 8px;
 }
 
-.top-controls .dismiss-countdown {
+.model-select-shell {
   position: relative;
-  top: auto;
-  right: auto;
-  flex: 0 0 auto;
-}
-
-.model-select {
-  width: 104px;
+  display: inline-flex;
+  width: 32px;
   height: 32px;
-  min-width: 0;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #d7d7dc;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
+}
+
+.model-select-shell svg {
+  pointer-events: none;
+}
+
+.model-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  border: 0;
+  opacity: 0;
   font-size: 11px;
   font-weight: 560;
 }
