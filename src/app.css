@@ -160,6 +160,10 @@ h2 {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.menu-setting-group {
+  overflow: visible;
+}
+
 .setting-row {
   display: grid;
   grid-template-columns: minmax(126px, 1fr) minmax(170px, 210px) 26px;
@@ -177,6 +181,11 @@ h2 {
 
 .setting-row.text-row {
   grid-template-columns: minmax(126px, 0.86fr) minmax(170px, 1fr) 26px;
+}
+
+.setting-row.model-picker-row {
+  position: relative;
+  grid-template-columns: minmax(126px, 1fr) minmax(230px, 300px) 26px;
 }
 
 .setting-copy {
@@ -251,6 +260,160 @@ input {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  border: 0;
+  background: transparent;
+}
+
+.nested-model-picker {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.nested-model-picker.open {
+  z-index: 20;
+}
+
+.nested-model-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 11px;
+  text-align: left;
+}
+
+.nested-model-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nested-model-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 22;
+  display: grid;
+  grid-template-columns: 132px minmax(220px, 1fr);
+  width: min(438px, calc(100vw - 204px));
+  max-height: 318px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.nested-model-providers {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 6px;
+  border-right: 1px solid var(--border);
+  background: rgba(246, 247, 250, 0.86);
+}
+
+.nested-model-providers button,
+.nested-model-options button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #303036;
+  text-align: left;
+}
+
+.nested-model-providers button {
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.nested-model-providers button span,
+.nested-model-options button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nested-model-providers button svg:last-child {
+  margin-left: auto;
+  color: var(--tertiary);
+}
+
+.nested-model-providers button:hover,
+.nested-model-providers button.active {
+  background: var(--blue);
+  color: #ffffff;
+}
+
+.nested-model-providers button:hover svg:last-child,
+.nested-model-providers button.active svg:last-child {
+  color: currentColor;
+}
+
+.nested-model-options {
+  display: grid;
+  align-content: start;
+  max-height: 318px;
+  overflow: auto;
+  padding: 5px;
+}
+
+.nested-model-options button {
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 5px 7px;
+}
+
+.nested-model-options button:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.nested-model-options button.selected {
+  color: var(--blue);
+}
+
+.nested-model-options strong,
+.nested-model-options small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nested-model-options strong {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.nested-model-options small {
+  margin-top: 1px;
+  color: var(--secondary);
+  font-size: 9px;
+  font-weight: 450;
 }
 
 .action-grid {
@@ -776,12 +939,26 @@ kbd {
   }
 
   .setting-row,
-  .setting-row.text-row {
+  .setting-row.text-row,
+  .setting-row.model-picker-row {
     grid-template-columns: 1fr;
   }
 
   .reset-row {
     justify-self: end;
+  }
+
+  .nested-model-menu {
+    left: 0;
+    right: auto;
+    grid-template-columns: 1fr;
+    width: min(420px, calc(100vw - 40px));
+  }
+
+  .nested-model-providers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
   }
 }
 

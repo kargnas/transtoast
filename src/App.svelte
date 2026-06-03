@@ -4,7 +4,10 @@
   import {
     Ban,
     Camera,
+    Check,
     CheckCircle2,
+    ChevronDown,
+    ChevronRight,
     Cloud,
     Cpu,
     KeyRound,
@@ -44,6 +47,8 @@
   let notices = $state<ActionResult[]>([]);
   let openRouterAPIKeyState = $state<OpenRouterAPIKeyState>({ configured: false, path: "~/.config/copy-translator/.env" });
   let openRouterAPIKeyInput = $state("");
+  let openTranslationModelMenu = $state<"general" | "models" | null>(null);
+  let activeTranslationModelProvider = $state<TranslationProvider>("localHyMT2");
 
   const sectionTitles: Record<Section, string> = {
     general: "General",
@@ -125,6 +130,25 @@
       next.openRouterTextModel = model === "default" ? settingsState.defaults.openRouterTextModel : model;
     }
     await saveSettings(next);
+  }
+
+  async function chooseTranslationModel(value: string) {
+    await selectTranslationModel(value);
+    closeTranslationModelMenu();
+  }
+
+  function toggleTranslationModelMenu(scope: "general" | "models") {
+    if (!settingsState) return;
+    if (openTranslationModelMenu === scope) {
+      closeTranslationModelMenu();
+      return;
+    }
+    activeTranslationModelProvider = settingsState.settings.provider;
+    openTranslationModelMenu = scope;
+  }
+
+  function closeTranslationModelMenu() {
+    openTranslationModelMenu = null;
   }
 
   async function toggleFavorite(field: "favoriteLocalModelIDs" | "favoriteOpenRouterModels", modelID: string) {
@@ -282,10 +306,6 @@
     return titles[action] ?? "Action";
   }
 
-  function providerValue(value: string): TranslationProvider {
-    return value === "openRouter" ? "openRouter" : "localHyMT2";
-  }
-
   function toastPositionValue(value: string): ToastPosition {
     if (value === "bottomLeft" || value === "topRight" || value === "topLeft") return value;
     return "bottomRight";
@@ -314,6 +334,12 @@
 
   function openRouterModelLabel(value: string) {
     return settingsState?.options.openRouterModels.find((option) => option.value === value)?.label ?? value;
+  }
+
+  function translationModelLabel(settings: Settings) {
+    return settings.provider === "localHyMT2"
+      ? `Local Model / ${localModelLabel(settings.localModelID)}`
+      : `OpenRouter LLM / ${openRouterModelLabel(settings.openRouterTextModel)}`;
   }
 
   function formatPrice(model: OpenRouterModelOption) {
@@ -345,10 +371,110 @@
     if (value >= 1_000) return `${formatCompactPrice(value / 1_000)}K`;
     return String(value);
   }
+
 </script>
+
+{#snippet translationModelPicker(scope: "general" | "models", state: SettingsState)}
+  <div class="nested-model-picker" class:open={openTranslationModelMenu === scope}>
+    <button
+      class="nested-model-trigger"
+      type="button"
+      aria-haspopup="menu"
+      aria-expanded={openTranslationModelMenu === scope}
+      onclick={() => toggleTranslationModelMenu(scope)}
+    >
+      <span>{translationModelLabel(state.settings)}</span>
+      <ChevronDown size={14} />
+    </button>
+
+    {#if openTranslationModelMenu === scope}
+      <div class="nested-model-menu" role="menu" aria-label="Translation Model">
+        <div class="nested-model-providers" role="group" aria-label="Model providers">
+          <button
+            type="button"
+            class:active={activeTranslationModelProvider === "localHyMT2"}
+            onmouseenter={() => (activeTranslationModelProvider = "localHyMT2")}
+            onclick={() => (activeTranslationModelProvider = "localHyMT2")}
+          >
+            <Cpu size={14} />
+            <span>Local Model</span>
+            <ChevronRight size={13} />
+          </button>
+          <button
+            type="button"
+            class:active={activeTranslationModelProvider === "openRouter"}
+            onmouseenter={() => (activeTranslationModelProvider = "openRouter")}
+            onclick={() => (activeTranslationModelProvider = "openRouter")}
+          >
+            <Cloud size={14} />
+            <span>OpenRouter LLM</span>
+            <ChevronRight size={13} />
+          </button>
+        </div>
+
+        <div class="nested-model-options" role="group" aria-label="Models">
+          {#if activeTranslationModelProvider === "localHyMT2"}
+            <button
+              type="button"
+              class:selected={translationModelValue(state.settings, state.defaults) === "localHyMT2:default"}
+              onclick={() => chooseTranslationModel("localHyMT2:default")}
+            >
+              <span>
+                <strong>Default</strong>
+                <small>{localModelLabel(state.defaults.localModelID)}</small>
+              </span>
+              {#if translationModelValue(state.settings, state.defaults) === "localHyMT2:default"}<Check size={14} />{/if}
+            </button>
+            {#each state.options.localModels as option}
+              <button
+                type="button"
+                class:selected={translationModelValue(state.settings, state.defaults) === `localHyMT2:${option.value}`}
+                onclick={() => chooseTranslationModel(`localHyMT2:${option.value}`)}
+              >
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.note ?? "Local runtime"}</small>
+                </span>
+                {#if translationModelValue(state.settings, state.defaults) === `localHyMT2:${option.value}`}<Check size={14} />{/if}
+              </button>
+            {/each}
+          {:else}
+            <button
+              type="button"
+              class:selected={translationModelValue(state.settings, state.defaults) === "openRouter:default"}
+              onclick={() => chooseTranslationModel("openRouter:default")}
+            >
+              <span>
+                <strong>Default</strong>
+                <small>{openRouterModelLabel(state.defaults.openRouterTextModel)}</small>
+              </span>
+              {#if translationModelValue(state.settings, state.defaults) === "openRouter:default"}<Check size={14} />{/if}
+            </button>
+            {#each state.options.openRouterModels as option}
+              <button
+                type="button"
+                class:selected={translationModelValue(state.settings, state.defaults) === `openRouter:${option.value}`}
+                onclick={() => chooseTranslationModel(`openRouter:${option.value}`)}
+              >
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{formatPrice(option)} · {modelMetaText(option)}</small>
+                </span>
+                {#if translationModelValue(state.settings, state.defaults) === `openRouter:${option.value}`}<Check size={14} />{/if}
+              </button>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    {/if}
+  </div>
+{/snippet}
 
 {#if settingsState}
   <div class="app-frame">
+    {#if openTranslationModelMenu}
+      <button class="menu-scrim" type="button" aria-label="Close model menu" onclick={closeTranslationModelMenu}></button>
+    {/if}
     <aside class="sidebar" aria-label="Settings sections">
       <button class:active={activeSection === "general"} onclick={() => (activeSection = "general")}>
         <SettingsIcon size={15} />
@@ -390,34 +516,19 @@
       {#if activeSection === "general"}
         <section class="pane">
           <h2>Default Behavior</h2>
-          <div class="setting-group">
-            <label class="setting-row">
+          <div class="setting-group menu-setting-group">
+            <div class="setting-row model-picker-row">
               <span class="setting-copy">
                 <strong>Translation Model</strong>
               </span>
-              <select
-                value={translationModelValue(settingsState.settings, settingsState.defaults)}
-                onchange={(event) => selectTranslationModel(event.currentTarget.value)}
-              >
-                <optgroup label="Local Model">
-                  <option value="localHyMT2:default">Default ({localModelLabel(settingsState.defaults.localModelID)})</option>
-                  {#each settingsState.options.localModels as option}
-                    <option value={`localHyMT2:${option.value}`}>{option.label}</option>
-                  {/each}
-                </optgroup>
-                <optgroup label="OpenRouter LLM">
-                  <option value="openRouter:default">Default ({openRouterModelLabel(settingsState.defaults.openRouterTextModel)})</option>
-                  {#each settingsState.options.openRouterModels as option}
-                    <option value={`openRouter:${option.value}`}>{option.label}</option>
-                  {/each}
-                </optgroup>
-              </select>
+              {@render translationModelPicker("general", settingsState)}
               <button
                 class="reset-row"
                 class:visible={settingsState.overrides.provider || settingsState.overrides.localModelID || settingsState.overrides.openRouterTextModel}
                 disabled={!settingsState.overrides.provider && !settingsState.overrides.localModelID && !settingsState.overrides.openRouterTextModel}
                 title="Reset Translation Model"
                 onclick={async () => {
+                  closeTranslationModelMenu();
                   await resetField("provider");
                   await resetField("localModelID");
                   await resetField("openRouterTextModel");
@@ -425,7 +536,7 @@
               >
                 <RotateCcw size={13} />
               </button>
-            </label>
+            </div>
 
             <label class="setting-row">
               <span class="setting-copy">
@@ -516,34 +627,19 @@
       {:else if activeSection === "models"}
         <section class="pane">
           <h2>Active Translation Model</h2>
-          <div class="setting-group">
-            <label class="setting-row">
+          <div class="setting-group menu-setting-group">
+            <div class="setting-row model-picker-row">
               <span class="setting-copy">
                 <strong>Translation Model</strong>
               </span>
-              <select
-                value={translationModelValue(settingsState.settings, settingsState.defaults)}
-                onchange={(event) => selectTranslationModel(event.currentTarget.value)}
-              >
-                <optgroup label="Local Model">
-                  <option value="localHyMT2:default">Default ({localModelLabel(settingsState.defaults.localModelID)})</option>
-                  {#each settingsState.options.localModels as option}
-                    <option value={`localHyMT2:${option.value}`}>{option.label}</option>
-                  {/each}
-                </optgroup>
-                <optgroup label="OpenRouter LLM">
-                  <option value="openRouter:default">Default ({openRouterModelLabel(settingsState.defaults.openRouterTextModel)})</option>
-                  {#each settingsState.options.openRouterModels as option}
-                    <option value={`openRouter:${option.value}`}>{option.label}</option>
-                  {/each}
-                </optgroup>
-              </select>
+              {@render translationModelPicker("models", settingsState)}
               <button
                 class="reset-row"
                 class:visible={settingsState.overrides.provider || settingsState.overrides.localModelID || settingsState.overrides.openRouterTextModel}
                 disabled={!settingsState.overrides.provider && !settingsState.overrides.localModelID && !settingsState.overrides.openRouterTextModel}
                 title="Reset Translation Model"
                 onclick={async () => {
+                  closeTranslationModelMenu();
                   await resetField("provider");
                   await resetField("localModelID");
                   await resetField("openRouterTextModel");
@@ -551,7 +647,7 @@
               >
                 <RotateCcw size={13} />
               </button>
-            </label>
+            </div>
           </div>
 
           <h2>Local Model Favorites</h2>
