@@ -29,6 +29,7 @@
   let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
   let countdownInterval: number | undefined;
+  let resultPollTimer: number | undefined;
   let moveSaveTimer: number | undefined;
   let windowMoveUnlisten: (() => void) | undefined;
   let pendingMovedPosition: WindowPosition | null = null;
@@ -112,6 +113,7 @@
       clearAutoDismiss();
       clearCountdown();
       clearCopyReset();
+      stopResultPolling();
       windowMoveUnlisten?.();
       flushMovedPosition();
     };
@@ -137,7 +139,8 @@
   async function loadPreview() {
     try {
       preview = await invoke<TranslationPreviewState>("load_translation_preview");
-      visibleMode = requestedMode ?? preview.mode;
+      // The state file is authoritative: if the result already landed before mount, skip loading.
+      visibleMode = requestedMode === "loading" && preview.mode !== "loading" ? preview.mode : (requestedMode ?? preview.mode);
     } catch {
       preview = fallbackTranslationState;
       visibleMode = requestedMode ?? "translated";
@@ -148,6 +151,40 @@
       syncSelectedModel();
     }
     scheduleAutoDismiss();
+    if (isTauri && !debugMode && visibleMode === "loading") {
+      startResultPolling();
+    }
+  }
+
+  function startResultPolling() {
+    stopResultPolling();
+    const startedAt = performance.now();
+    resultPollTimer = window.setInterval(async () => {
+      if (performance.now() - startedAt > 60000) {
+        stopResultPolling();
+        return;
+      }
+      let next: TranslationPreviewState;
+      try {
+        next = await invoke<TranslationPreviewState>("load_translation_preview");
+      } catch {
+        return;
+      }
+      if (next.mode === "loading") return;
+      stopResultPolling();
+      preview = next;
+      visibleMode = next.mode === "error" ? "error" : next.mode === "original" ? "original" : "translated";
+      syncSelectedModel();
+      syncSelectedTargetLanguage();
+      scheduleAutoDismiss();
+    }, 200);
+  }
+
+  function stopResultPolling() {
+    if (resultPollTimer !== undefined) {
+      window.clearInterval(resultPollTimer);
+      resultPollTimer = undefined;
+    }
   }
 
   async function loadModelOptions() {

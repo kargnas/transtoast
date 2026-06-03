@@ -16,23 +16,12 @@ struct TranslationPreviewPayload: Encodable {
     var permissionAction: String? = nil
 }
 
-struct TranslationModelOption: Equatable {
-    var provider: TranslationProvider
-    var value: String
-    var title: String
-
-    var id: String {
-        "\(provider.rawValue):\(value)"
-    }
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
     private let translationService = TranslationService()
     private let requestLogStore = RequestLogStore()
-    private let translationPopoverController = TranslationPopoverController()
     private let localModelWarmupNotifier = LocalModelWarmupNotifier()
     private var statusItem: NSStatusItem?
     private var keyboardMonitor: KeyboardMonitor?
@@ -559,23 +548,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
     }
 
-    private func saveCustomToastPosition(_ origin: CGPoint) {
-        guard origin.x.isFinite, origin.y.isFinite else {
-            return
-        }
-
-        let customPosition = ToastCustomPosition(x: Double(origin.x), y: Double(origin.y))
-        var settings = settingsStore.settings
-        if settings.toastPosition == .custom,
-           settings.toastCustomPosition == customPosition {
-            return
-        }
-        settings.toastPosition = .custom
-        settings.toastCustomPosition = customPosition
-        settingsStore.settings = settings
-        rebuildMenu()
-    }
-
     @objc private func showSettingsWindow() {
         _ = openTauriSurface("settings")
     }
@@ -650,30 +622,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showTranslationPopoverSmoke() {
+        showTranslationPopover(
+            TranslationPreviewPayload(
+                mode: "loading",
+                sourceLanguage: "English",
+                targetLanguage: "Korean",
+                originalText: "Hover smoke text",
+                translatedText: "",
+                providerTitle: "Smoke",
+                model: "Smoke"
+            ),
+            sourceTitle: "Smoke"
+        )
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(350))
-            let screenFrame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
-                ?? CGRect(x: 0, y: 0, width: 1_440, height: 900)
-            let caretBounds = CGRect(
-                x: screenFrame.midX,
-                y: screenFrame.midY,
-                width: 10,
-                height: 18
-            )
-            translationPopoverController.show(
-                payload: TranslationPreviewPayload(
+            try? await Task.sleep(for: .milliseconds(1200))
+            showTranslationPopover(
+                TranslationPreviewPayload(
                     mode: "translated",
                     sourceLanguage: "English",
                     targetLanguage: "Korean",
                     originalText: "Hover smoke text",
-                    translatedText: "마우스 오버 테스트",
-                    errorText: nil,
+                    translatedText: "마우스 오버 테스트가 제자리에서 갱신되었습니다.",
                     providerTitle: "Smoke",
-                    model: "Smoke",
-                    costCredits: nil
+                    model: "Smoke"
                 ),
-                settings: settingsStore.settings,
-                caretBounds: caretBounds
+                sourceTitle: "Smoke"
             )
         }
     }
@@ -683,7 +656,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sourceTitle: String,
         settings displaySettings: TranslatorSettings? = nil
     ) {
-        let settings = displaySettings ?? settingsStore.settings
         let caretBounds: CGRect?
         if payload.mode == "loading" {
             caretBounds = KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
@@ -693,123 +665,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ?? KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
         }
 
-        translationPopoverController.show(
-            payload: payload,
-            settings: settings,
-            caretBounds: caretBounds,
-            modelOptions: modelOptions(for: payload.originalText, settings: settings),
-            selectedModelOptionID: selectedModelOptionID(settings: settings),
-            onUserClose: { [weak self] in
-                if payload.mode == "loading" {
-                    self?.cancelCurrentTranslations()
-                }
-            },
-            onPermissionRequested: { [weak self] in
-                self?.openScreenRecordingSettings()
-            },
-            onModelSelected: { [weak self] option in
-                self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
-            },
-            onTargetLanguageSelected: { [weak self] language in
-                self?.retranslate(payload.originalText, sourceTitle: sourceTitle, targetLanguage: language)
-            },
-            onPositionChanged: { [weak self] origin in
-                self?.saveCustomToastPosition(origin)
-            }
+        writeTranslationPreviewState(payload)
+        // Only the loading frame launches the helper window; the result/error frame just rewrites
+        // the file and the helper, which polls while loading, swaps to it in place.
+        if payload.mode == "loading" {
+            launchTranslationToast(caretBounds: caretBounds)
+        }
+    }
+
+    private func writeTranslationPreviewState(_ payload: TranslationPreviewPayload) {
+        do {
+            try SharedAppStorage.ensureDirectoryExists()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(payload)
+            try data.write(to: SharedAppStorage.fileURL("translation-preview.json"), options: .atomic)
+        } catch {
+            print("Could not write translation preview state: \(error.localizedDescription)")
+        }
+    }
+
+    private func launchTranslationToast(caretBounds: CGRect?) {
+        var arguments = ["--translation-preview", "--translation-preview-state=loading"]
+        if let caret = translationCaretArgument(for: caretBounds) {
+            arguments.append("--translation-preview-caret=\(caret)")
+        }
+        _ = launchTauriHelper(
+            arguments: arguments,
+            activate: false,
+            replaceExistingMatching: "--translation-preview"
         )
     }
 
-    private func cancelCurrentTranslations() {
-        currentTextTranslationTask?.cancel()
-        currentScreenshotTranslationTask?.cancel()
+    // KeyboardCaretLocator returns AppKit screen coordinates (bottom-left origin). The Rust
+    // placement logic works in global Quartz coordinates (top-left origin), so flip Y against the
+    // primary display height before handing the caret rect to the Tauri helper.
+    private func translationCaretArgument(for caretBounds: CGRect?) -> String? {
+        guard let caret = caretBounds,
+              let primaryHeight = (NSScreen.screens.first ?? NSScreen.main)?.frame.height else {
+            return nil
+        }
+        let topLeftY = primaryHeight - caret.maxY
+        return "\(caret.minX),\(topLeftY),\(caret.width),\(caret.height)"
     }
 
-    private func retranslate(
-        _ text: String,
-        sourceTitle: String,
-        option: TranslationModelOption
-    ) {
-        guard text != "[screen screenshot]" else {
-            return
-        }
-
-        var settings = settingsStore.settings
-        switch option.provider {
-        case .localHyMT2:
-            settings.provider = .localHyMT2
-            settings.localModelID = option.value
-        case .openRouter:
-            settings.provider = .openRouter
-            settings.openRouterTextModel = option.value
-        }
-        performTextTranslation(text, sourceTitle: sourceTitle, settings: settings)
-    }
-
-    private func retranslate(
-        _ text: String,
-        sourceTitle: String,
-        targetLanguage: String
-    ) {
-        guard text != "[screen screenshot]" else {
-            var settings = settingsStore.settings
-            settings.targetLanguage = targetLanguage
-            settingsStore.settings = settings
-            rebuildMenu()
-            return
-        }
-
-        var settings = settingsStore.settings
-        settings.targetLanguage = targetLanguage
-        settingsStore.settings = settings
-        rebuildMenu()
-        performTextTranslation(text, sourceTitle: sourceTitle, settings: settings)
-    }
-
-    private func modelOptions(
-        for text: String,
-        settings: TranslatorSettings
-    ) -> [TranslationModelOption] {
-        guard text != "[screen screenshot]" else {
-            return []
-        }
-
-        let languages = resolvedLanguages(for: text, settings: settings)
-        var options = LocalModelRegistry.models(customModelsPath: settings.customLocalModelsPath)
-            .filter { model in
-                model.backendScriptName != nil
-                    && model.supports(
-                        sourceLanguage: languages.sourceLanguage,
-                        targetLanguage: languages.targetLanguage
-                    )
-            }
-            .map { model in
-                TranslationModelOption(
-                    provider: .localHyMT2,
-                    value: model.id,
-                    title: model.title
-                )
-            }
-
-        let openRouterModel = settings.openRouterTextModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !openRouterModel.isEmpty {
-            let spec = OpenRouterModelCatalog.model(id: openRouterModel)
-            options.append(TranslationModelOption(
-                provider: .openRouter,
-                value: openRouterModel,
-                title: spec.map { "\($0.title) · \($0.pricingTitle)" } ?? openRouterModel
-            ))
-        }
-        return options
-    }
-
-    private func selectedModelOptionID(settings: TranslatorSettings) -> String {
-        switch settings.provider {
-        case .localHyMT2:
-            TranslationModelOption(provider: .localHyMT2, value: settings.localModelID, title: "").id
-        case .openRouter:
-            TranslationModelOption(provider: .openRouter, value: settings.openRouterTextModel, title: "").id
-        }
-    }
 
     private func resolvedLanguages(
         for text: String,
