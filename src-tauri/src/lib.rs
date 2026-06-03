@@ -187,6 +187,16 @@ struct ActionResult {
     ok: bool,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct PermissionAppTarget {
+    #[serde(rename = "bundleName")]
+    bundle_name: String,
+    #[serde(rename = "bundlePath")]
+    bundle_path: String,
+    #[serde(rename = "bundleFileURL")]
+    bundle_file_url: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct RequestLogFile {
     entries: Vec<RequestLogEntryState>,
@@ -431,8 +441,28 @@ fn perform_settings_action(
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
         ),
         "requestKeyboardPrompt" => request_keyboard_prompt(),
+        "revealPermissionApp" => reveal_permission_app_impl(&app),
         _ => Err(format!("Unknown settings action: {action}")),
     }
+}
+
+#[tauri::command]
+fn permission_app_target(app: AppHandle) -> Result<PermissionAppTarget, String> {
+    let bundle_path = resolve_permission_app_bundle(&app)?;
+    Ok(PermissionAppTarget {
+        bundle_name: bundle_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("CopyTranslator.app")
+            .to_string(),
+        bundle_file_url: file_url_for_path(&bundle_path),
+        bundle_path: bundle_path.display().to_string(),
+    })
+}
+
+#[tauri::command]
+fn reveal_permission_app(app: AppHandle) -> Result<ActionResult, String> {
+    reveal_permission_app_impl(&app)
 }
 
 #[tauri::command]
@@ -587,6 +617,8 @@ pub fn run() {
             save_openrouter_api_key,
             clear_openrouter_api_key,
             perform_settings_action,
+            permission_app_target,
+            reveal_permission_app,
             open_app_surface,
             complete_local_model_setup,
             prepare_custom_local_models,
@@ -1570,6 +1602,90 @@ fn legacy_binary_path(app: &AppHandle) -> Result<PathBuf, String> {
     Err("CopyTranslator CLI binary not found. Build the Swift app first.".to_string())
 }
 
+fn resolve_permission_app_bundle(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(bundle) = app_bundle_ancestor(&current_exe) {
+            return Ok(existing_path(bundle));
+        }
+    }
+
+    let roots = candidate_roots(app);
+    for root in roots {
+        let candidates = [
+            root.join("dist/CopyTranslator.app"),
+            root.join("src-tauri/target/release/bundle/macos/CopyTranslator.app"),
+            root.join("src-tauri/target/debug/bundle/macos/CopyTranslator.app"),
+        ];
+        if let Some(path) = candidates.into_iter().find(|path| path.exists()) {
+            return Ok(existing_path(path));
+        }
+    }
+
+    Err("CopyTranslator.app bundle not found. Build and launch the app bundle first.".to_string())
+}
+
+fn app_bundle_ancestor(path: &Path) -> Option<PathBuf> {
+    path.ancestors()
+        .find(|ancestor| {
+            ancestor
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("app"))
+        })
+        .map(Path::to_path_buf)
+}
+
+fn existing_path(path: PathBuf) -> PathBuf {
+    std::fs::canonicalize(&path).unwrap_or(path)
+}
+
+fn file_url_for_path(path: &Path) -> String {
+    format!(
+        "file://{}",
+        percent_encode_url_path(&path.to_string_lossy())
+    )
+}
+
+fn percent_encode_url_path(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'/' | b'.' | b'-' | b'_' | b'~' | b':' => {
+                encoded.push(*byte as char)
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
+}
+
+fn reveal_permission_app_impl(app: &AppHandle) -> Result<ActionResult, String> {
+    let bundle_path = resolve_permission_app_bundle(app)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg("-R")
+            .arg(&bundle_path)
+            .spawn()
+            .map_err(|error| format!("Could not reveal {}: {error}", bundle_path.display()))?;
+        return Ok(action_result(
+            "CopyTranslator.app",
+            "Revealed in Finder. Drag the selected app into the open Privacy list.",
+            true,
+        ));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(action_result(
+            "CopyTranslator.app",
+            "Revealing the app bundle is macOS-only.",
+            false,
+        ))
+    }
+}
+
 fn candidate_roots(app: &AppHandle) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Some(root) = workspace_root_arg().or_else(workspace_root_env) {
@@ -2077,6 +2193,26 @@ mod tests {
         assert_eq!(
             settings.custom_local_models_path.as_deref(),
             Some("~/models.json")
+        );
+    }
+
+    #[test]
+    fn app_bundle_ancestor_finds_containing_bundle() {
+        let path = PathBuf::from("/Applications/CopyTranslator.app/Contents/MacOS/CopyTranslator");
+
+        assert_eq!(
+            app_bundle_ancestor(&path).as_deref(),
+            Some(Path::new("/Applications/CopyTranslator.app"))
+        );
+    }
+
+    #[test]
+    fn file_url_escapes_spaces_for_drag_payload() {
+        let path = Path::new("/Applications/Copy Translator.app");
+
+        assert_eq!(
+            file_url_for_path(path),
+            "file:///Applications/Copy%20Translator.app"
         );
     }
 

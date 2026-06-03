@@ -1,10 +1,17 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Accessibility, Keyboard, Monitor, MousePointer2, RefreshCw, ShieldCheck } from "@lucide/svelte";
+  import { Accessibility, FolderSearch, Keyboard, Monitor, MousePointer2, RefreshCw, ShieldCheck } from "@lucide/svelte";
   import { cloneFallbackState, type ActionResult, type SettingsState } from "./lib/settings";
 
+  type PermissionAppTarget = {
+    bundleName: string;
+    bundlePath: string;
+    bundleFileURL: string;
+  };
+
   let settingsState = $state<SettingsState | null>(null);
+  let permissionTarget = $state<PermissionAppTarget | null>(null);
   let result = $state<ActionResult | null>(null);
 
   onMount(load);
@@ -15,6 +22,12 @@
     } catch {
       settingsState = cloneFallbackState();
     }
+
+    try {
+      permissionTarget = await invoke<PermissionAppTarget>("permission_app_target");
+    } catch {
+      permissionTarget = null;
+    }
   }
 
   async function action(action: string) {
@@ -24,6 +37,21 @@
       settings: settingsState.settings
     });
     await load();
+  }
+
+  function startAppDrag(event: DragEvent) {
+    if (!permissionTarget || !event.dataTransfer) return;
+
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("text/uri-list", `${permissionTarget.bundleFileURL}\n`);
+    event.dataTransfer.setData("public.file-url", permissionTarget.bundleFileURL);
+    event.dataTransfer.setData("URL", permissionTarget.bundleFileURL);
+    event.dataTransfer.setData("text/plain", permissionTarget.bundlePath);
+    result = {
+      title: permissionTarget.bundleName,
+      message: "Drop it into the open macOS Privacy list.",
+      ok: true
+    };
   }
 </script>
 
@@ -38,10 +66,19 @@
     </header>
 
     <section class="permission-grid">
-      <article class="app-card">
+      <article
+        class="app-card"
+        class:draggable={permissionTarget !== null}
+        draggable={permissionTarget !== null}
+        ondragstart={startAppDrag}
+        title={permissionTarget ? `Drag ${permissionTarget.bundlePath} into the macOS Privacy list` : "Build and launch the app bundle before dragging"}
+      >
         <ShieldCheck size={58} />
-        <strong>CopyTranslator.app</strong>
-        <span>Use the actions on the right to add the app in macOS privacy settings. Windows support will use the same status/action contract here.</span>
+        <strong>{permissionTarget?.bundleName ?? "CopyTranslator.app"}</strong>
+        <span>Drag this card into the open macOS Privacy list. If macOS rejects the drop, reveal the app in Finder and drag the selected app.</span>
+        {#if permissionTarget}
+          <code class="app-path">{permissionTarget.bundlePath}</code>
+        {/if}
       </article>
 
       <div class="permission-column">
@@ -77,6 +114,7 @@
           <button onclick={() => action("openAccessibility")}><Accessibility size={14} />Open Accessibility Settings</button>
           <button onclick={() => action("openScreenRecording")}><Monitor size={14} />Open Screen Recording Settings</button>
           <button onclick={() => action("requestKeyboardPrompt")}><MousePointer2 size={14} />Request Keyboard Prompt</button>
+          <button onclick={() => action("revealPermissionApp")}><FolderSearch size={14} />Reveal CopyTranslator.app</button>
         </section>
 
         {#if result}
