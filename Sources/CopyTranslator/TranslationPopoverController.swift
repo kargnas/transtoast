@@ -453,6 +453,7 @@ private final class TranslationPopoverContentView: NSView {
     private let languagePill = LanguagePillView()
     private let languageIconView = NSImageView()
     private let languageTextLabel = NSTextField(labelWithString: "")
+    private let languageChevronView = NSImageView()
     private let languageButton = NSButton(title: "", target: nil, action: nil)
     private let modelLabel = NSTextField(labelWithString: "")
     private let countdownPill = NSView()
@@ -724,13 +725,18 @@ private final class TranslationPopoverContentView: NSView {
         languageIconView.contentTintColor = .labelColor
         languagePill.addSubview(languageIconView)
 
+        languageChevronView.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)
+        languageChevronView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 9, weight: .medium)
+        languageChevronView.contentTintColor = .secondaryLabelColor
+        languagePill.addSubview(languageChevronView)
+
         languageTextLabel.drawsBackground = false
         languageTextLabel.isBordered = false
         languageTextLabel.isEditable = false
         languageTextLabel.isSelectable = false
         languageTextLabel.textColor = .labelColor
         languageTextLabel.alignment = .left
-        languageTextLabel.font = .preferredFont(forTextStyle: .caption1)
+        languageTextLabel.font = .systemFont(ofSize: 13, weight: .regular)
         languageTextLabel.lineBreakMode = .byTruncatingTail
         languagePill.addSubview(languageTextLabel)
 
@@ -882,8 +888,8 @@ private final class TranslationPopoverContentView: NSView {
         return "\(model) · \(costText)"
     }
 
-    private static let bodyFont = NSFont.systemFont(ofSize: 15, weight: .medium)
-    private static let originalBodyFont = NSFont.systemFont(ofSize: 14, weight: .regular)
+    private static let bodyFont = NSFont.systemFont(ofSize: 14, weight: .regular)
+    private static let originalBodyFont = NSFont.systemFont(ofSize: 13, weight: .regular)
 
     private func setBodyText(_ text: String, original: Bool) {
         let paragraph = NSMutableParagraphStyle()
@@ -962,7 +968,7 @@ private final class TranslationPopoverContentView: NSView {
             permissionButton.isHidden = !showsScreenRecordingPermissionAction
             countdownPill.isHidden = false
 
-            layoutLanguagePill(CGRect(x: content.minX, y: content.maxY - 28, width: 128, height: 28))
+            layoutLanguagePill(CGRect(x: content.minX, y: content.maxY - 30, width: 126, height: 30))
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 64, width: content.width, height: 24)
             closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
             closeButton.title = ""
@@ -994,7 +1000,7 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.close)
             closeButton.imagePosition = .imageOnly
-            layoutLanguagePill(CGRect(x: content.minX, y: content.maxY - 28, width: 128, height: 28))
+            layoutLanguagePill(CGRect(x: content.minX, y: content.maxY - 30, width: 126, height: 30))
             closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
             copyButton.frame = CGRect(x: closeButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
             originalButton.frame = CGRect(x: copyButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
@@ -1030,8 +1036,9 @@ private final class TranslationPopoverContentView: NSView {
 
     private func layoutLanguagePill(_ frame: CGRect) {
         languagePill.frame = frame
-        languageIconView.frame = CGRect(x: 14, y: 6, width: 15, height: 16)
-        languageTextLabel.frame = CGRect(x: 40, y: 4, width: max(1, frame.width - 54), height: 20)
+        languageIconView.frame = CGRect(x: 14, y: 7, width: 16, height: 16)
+        languageChevronView.frame = CGRect(x: frame.width - 24, y: 10, width: 10, height: 10)
+        languageTextLabel.frame = CGRect(x: 40, y: 5, width: max(1, frame.width - 70), height: 20)
         languageButton.frame = frame
     }
 
