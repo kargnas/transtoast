@@ -6,7 +6,7 @@ final class TranslationPopoverController {
     private let margin: CGFloat = 24
     private let caretGap: CGFloat = 8
     private let windowWidth: CGFloat = 356
-    private let compactHeight: CGFloat = 124
+    private let compactHeight: CGFloat = 118
     private let tallHeight: CGFloat = 160
     private let maxHeight: CGFloat = 560
     private let minimumDismissDuration: TimeInterval = 4
@@ -259,8 +259,8 @@ final class TranslationPopoverController {
         let horizontalInset: CGFloat = 24
         let contentInset: CGFloat = 22
         let arrowHeight: CGFloat = 18
-        let bottomControlsHeight: CGFloat = 22
-        let verticalPadding: CGFloat = 24
+        let bottomControlsHeight: CGFloat = 18
+        let verticalPadding: CGFloat = 22
         let bodyWidth = windowWidth - horizontalInset * 2 - contentInset * 2
         let font = NSFont.preferredFont(forTextStyle: .body)
         let bodyHeight = ceil(
@@ -490,16 +490,18 @@ private final class TranslationPopoverContentView: NSView {
         super.draw(dirtyRect)
 
         let bubble = bubbleRect
-        let fillColor = NSColor.windowBackgroundColor.withAlphaComponent(0.94)
-        let strokeColor = isHovering
-            ? NSColor.controlAccentColor.withAlphaComponent(0.45)
-            : NSColor.separatorColor.withAlphaComponent(0.9)
+        let fillColor = NSColor.white.withAlphaComponent(0.86)
+        let strokeColor = NSColor.black.withAlphaComponent(isHovering ? 0.42 : 0.34)
         let bubblePath = NSBezierPath(roundedRect: bubble, xRadius: 16, yRadius: 16)
         fillColor.setFill()
         bubblePath.fill()
         strokeColor.setStroke()
-        bubblePath.lineWidth = 1
+        bubblePath.lineWidth = 0.5
         bubblePath.stroke()
+        let insetPath = NSBezierPath(roundedRect: bubble.insetBy(dx: 1, dy: 1), xRadius: 15, yRadius: 15)
+        NSColor.white.withAlphaComponent(0.88).setStroke()
+        insetPath.lineWidth = 1
+        insetPath.stroke()
 
         guard arrowEdge != .none else {
             return
@@ -706,6 +708,11 @@ private final class TranslationPopoverContentView: NSView {
         languageButton.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
         languageButton.imagePosition = .imageLeading
         languageButton.toolTip = "Change target language"
+        languageButton.wantsLayer = true
+        languageButton.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.94).cgColor
+        languageButton.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.82).cgColor
+        languageButton.layer?.borderWidth = 1
+        languageButton.layer?.cornerRadius = 8
         addSubview(languageButton)
 
         bodyScrollView.drawsBackground = false
@@ -854,7 +861,7 @@ private final class TranslationPopoverContentView: NSView {
 
     private func layoutContent() {
         let bubble = bubbleRect
-        let content = bubble.insetBy(dx: 22, dy: 16)
+        let content = bubble.insetBy(dx: 20, dy: 14)
 
         switch visibleMode {
         case "loading":
@@ -871,7 +878,7 @@ private final class TranslationPopoverContentView: NSView {
             countdownPill.isHidden = true
 
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 28, width: content.width - 72, height: 24)
-            closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
+            closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.cancel)
             closeButton.imagePosition = .imageOnly
@@ -892,13 +899,13 @@ private final class TranslationPopoverContentView: NSView {
             permissionButton.isHidden = !showsScreenRecordingPermissionAction
             countdownPill.isHidden = false
 
-            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 31, width: 112, height: 30)
+            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 28, width: 96, height: 28)
             titleLabel.frame = CGRect(x: content.minX, y: content.maxY - 64, width: content.width, height: 24)
-            closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
+            closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
             closeButton.imagePosition = .imageOnly
-            modelButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
+            modelButton.frame = CGRect(x: closeButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
             layoutCountdownPill(x: content.maxX - 42, y: content.minY)
             layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 84))
             if permissionButton.isHidden {
@@ -923,13 +930,13 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.title = ""
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: strings.close)
             closeButton.imagePosition = .imageOnly
-            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 31, width: 112, height: 30)
-            closeButton.frame = CGRect(x: content.maxX - 32, y: content.maxY - 31, width: 32, height: 30)
-            copyButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            originalButton.frame = CGRect(x: copyButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            modelButton.frame = CGRect(x: originalButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
+            languageButton.frame = CGRect(x: content.minX, y: content.maxY - 28, width: 96, height: 28)
+            closeButton.frame = CGRect(x: content.maxX - 28, y: content.maxY - 28, width: 28, height: 28)
+            copyButton.frame = CGRect(x: closeButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
+            originalButton.frame = CGRect(x: copyButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
+            modelButton.frame = CGRect(x: originalButton.frame.minX - 34, y: content.maxY - 28, width: 28, height: 28)
             layoutCountdownPill(x: content.maxX - 42, y: content.minY)
-            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 56))
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 54))
             modelLabel.frame = .zero
         }
     }

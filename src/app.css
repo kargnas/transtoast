@@ -758,9 +758,9 @@ kbd {
   position: relative;
   width: 308px;
   min-height: 112px;
-  border: 1px solid rgba(217, 217, 222, 0.9);
+  border: 0.5px solid rgba(0, 0, 0, 0.34);
   border-radius: 15px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 252, 253, 0.82));
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   opacity: var(--dismiss-opacity, 1);
@@ -777,7 +777,7 @@ kbd {
 }
 
 .translation-bubble.hover-paused {
-  border-color: rgba(0, 122, 255, 0.42);
+  border-color: rgba(0, 0, 0, 0.42);
   transform: scale(1.012);
 }
 
@@ -787,12 +787,21 @@ kbd {
   left: calc(50% - 13px);
   width: 28px;
   height: 28px;
-  border-top: 1px solid rgba(217, 217, 222, 0.9);
-  border-left: 1px solid rgba(217, 217, 222, 0.9);
+  border-top: 0.5px solid rgba(0, 0, 0, 0.34);
+  border-left: 0.5px solid rgba(0, 0, 0, 0.34);
   border-top-left-radius: 6px;
   background: inherit;
   content: "";
   transform: rotate(45deg);
+}
+
+.translation-bubble::after {
+  position: absolute;
+  inset: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 14px;
+  content: "";
+  pointer-events: none;
 }
 
 .translation-bubble.above::before {
@@ -800,8 +809,8 @@ kbd {
   bottom: -16px;
   border-top: 0;
   border-left: 0;
-  border-right: 1px solid rgba(217, 217, 222, 0.9);
-  border-bottom: 1px solid rgba(217, 217, 222, 0.9);
+  border-right: 0.5px solid rgba(0, 0, 0, 0.34);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.34);
   border-top-left-radius: 0;
   border-bottom-right-radius: 6px;
 }
@@ -809,18 +818,18 @@ kbd {
 .translation-bubble-inner {
   position: relative;
   z-index: 1;
-  padding: 16px 22px 12px;
+  padding: 14px 20px 10px;
 }
 
 .translation-bubble.compact .translation-bubble-inner {
-  padding: 12px 22px 10px;
+  padding: 10px 20px 10px;
 }
 
 .dismiss-countdown {
   position: relative;
   width: 42px;
   height: 18px;
-  margin: 8px 0 0 auto;
+  margin: 4px 0 0 auto;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(235, 236, 240, 0.82);
@@ -944,38 +953,39 @@ kbd {
 
 .popover-header {
   display: flex;
-  min-height: 32px;
+  min-height: 28px;
   align-items: center;
-  padding-right: 184px;
+  padding-right: 172px;
 }
 
 .language-select-shell {
   display: inline-flex;
   align-items: center;
-  min-width: 104px;
-  max-width: 150px;
-  height: 32px;
+  min-width: 96px;
+  max-width: 128px;
+  height: 28px;
   gap: 5px;
-  border: 1px solid rgba(215, 215, 220, 0.84);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(178, 178, 184, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
   color: #45454a;
 }
 
 .language-select-shell svg {
   flex: 0 0 auto;
-  margin-left: 9px;
+  margin-left: 8px;
 }
 
 .language-select {
   width: 100%;
   min-width: 0;
-  height: 30px;
+  height: 26px;
   border: 0;
   background: transparent;
   color: #45454a;
   font-size: 12px;
   font-weight: 610;
+  text-align: left;
 }
 
 .model-label {
@@ -994,7 +1004,7 @@ kbd {
   margin: 0;
   max-width: none;
   min-height: 28px;
-  padding-top: 8px;
+  padding: 9px 0 0;
   color: var(--text);
   font-size: 16px;
   font-weight: 580;
@@ -1010,23 +1020,23 @@ kbd {
 .top-controls {
   position: absolute;
   top: 10px;
-  right: 12px;
+  right: 20px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .model-select-shell {
   position: relative;
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d7d7dc;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(178, 178, 184, 0.62);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
   color: var(--text);
 }
 
@@ -1058,8 +1068,8 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d7d7dc;
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(178, 178, 184, 0.62);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--text);
 }
 
@@ -1074,10 +1084,10 @@ kbd {
 }
 
 .icon-button {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .preview-switcher {
