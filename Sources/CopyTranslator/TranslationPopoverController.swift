@@ -6,8 +6,8 @@ final class TranslationPopoverController {
     private let margin: CGFloat = 24
     private let caretGap: CGFloat = 8
     private let windowWidth: CGFloat = 356
-    private let compactHeight: CGFloat = 150
-    private let tallHeight: CGFloat = 176
+    private let compactHeight: CGFloat = 124
+    private let tallHeight: CGFloat = 160
     private let maxHeight: CGFloat = 560
     private let minimumDismissDuration: TimeInterval = 4
     private let maximumDismissDuration: TimeInterval = 10
@@ -259,8 +259,8 @@ final class TranslationPopoverController {
         let horizontalInset: CGFloat = 24
         let contentInset: CGFloat = 22
         let arrowHeight: CGFloat = 18
-        let bottomControlsHeight: CGFloat = 50
-        let verticalPadding: CGFloat = 32
+        let bottomControlsHeight: CGFloat = 22
+        let verticalPadding: CGFloat = 24
         let bodyWidth = windowWidth - horizontalInset * 2 - contentInset * 2
         let font = NSFont.preferredFont(forTextStyle: .body)
         let bodyHeight = ceil(
@@ -883,7 +883,7 @@ private final class TranslationPopoverContentView: NSView {
             titleLabel.isHidden = false
             bodyScrollView.isHidden = false
             languageButton.isHidden = false
-            modelLabel.isHidden = modelLabel.stringValue.isEmpty
+            modelLabel.isHidden = true
             progressIndicator.isHidden = true
             modelButton.isHidden = modelOptions.count < 2
             originalButton.isHidden = true
@@ -899,12 +899,11 @@ private final class TranslationPopoverContentView: NSView {
             closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
             closeButton.imagePosition = .imageOnly
             modelButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            layoutCountdownPill(x: content.maxX - 42, y: content.minY + 2)
-            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 35, width: content.width, height: content.height - 98))
+            layoutCountdownPill(x: content.maxX - 42, y: content.minY)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 84))
             if permissionButton.isHidden {
-                modelLabel.frame = CGRect(x: content.minX, y: content.minY + 2, width: content.width - 54, height: 20)
+                modelLabel.frame = .zero
             } else {
-                modelLabel.isHidden = true
                 permissionButton.frame = CGRect(x: content.maxX - 140, y: content.minY - 3, width: 140, height: 28)
             }
 
@@ -912,7 +911,7 @@ private final class TranslationPopoverContentView: NSView {
             titleLabel.isHidden = true
             bodyScrollView.isHidden = false
             languageButton.isHidden = false
-            modelLabel.isHidden = modelLabel.stringValue.isEmpty
+            modelLabel.isHidden = true
             progressIndicator.isHidden = true
             modelButton.isHidden = modelOptions.count < 2
             originalButton.isHidden = false
@@ -929,9 +928,9 @@ private final class TranslationPopoverContentView: NSView {
             copyButton.frame = CGRect(x: closeButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             originalButton.frame = CGRect(x: copyButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
             modelButton.frame = CGRect(x: originalButton.frame.minX - 40, y: content.maxY - 31, width: 32, height: 30)
-            layoutCountdownPill(x: content.maxX - 42, y: content.minY + 2)
-            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 44, width: content.width, height: content.height - 80))
-            modelLabel.frame = CGRect(x: content.minX, y: content.minY + 2, width: content.width - 54, height: 16)
+            layoutCountdownPill(x: content.maxX - 42, y: content.minY)
+            layoutBodyScrollView(CGRect(x: content.minX, y: content.minY + 22, width: content.width, height: content.height - 56))
+            modelLabel.frame = .zero
         }
     }
 

@@ -740,9 +740,9 @@ kbd {
   width: 100%;
   height: 100%;
   min-width: 356px;
-  min-height: 150px;
+  min-height: 132px;
   place-items: start center;
-  padding: 24px 18px 14px;
+  padding: 20px 18px 12px;
   background: transparent;
 }
 
@@ -757,7 +757,7 @@ kbd {
 .translation-bubble {
   position: relative;
   width: 308px;
-  min-height: 132px;
+  min-height: 112px;
   border: 1px solid rgba(217, 217, 222, 0.9);
   border-radius: 15px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 252, 253, 0.82));
@@ -773,7 +773,7 @@ kbd {
 }
 
 .translation-bubble.compact {
-  min-height: 132px;
+  min-height: 112px;
 }
 
 .translation-bubble.hover-paused {
@@ -809,23 +809,18 @@ kbd {
 .translation-bubble-inner {
   position: relative;
   z-index: 1;
-  padding: 19px 22px 16px;
+  padding: 16px 22px 12px;
 }
 
 .translation-bubble.compact .translation-bubble-inner {
-  padding: 14px 22px 12px;
-}
-
-.translation-bubble.compact .bubble-footer {
-  margin-top: 12px;
+  padding: 12px 22px 10px;
 }
 
 .dismiss-countdown {
-  position: absolute;
-  right: 22px;
-  bottom: 12px;
+  position: relative;
   width: 42px;
   height: 18px;
+  margin: 8px 0 0 auto;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(235, 236, 240, 0.82);
@@ -907,8 +902,8 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  margin-top: 22px;
-  padding-right: 54px;
+  margin-top: 8px;
+  padding-right: 0;
   color: #515154;
   font-size: 12px;
 }
@@ -998,18 +993,18 @@ kbd {
 .translation-text {
   margin: 0;
   max-width: none;
-  min-height: 42px;
-  padding-top: 14px;
+  min-height: 28px;
+  padding-top: 8px;
   color: var(--text);
   font-size: 16px;
   font-weight: 580;
-  line-height: 1.55;
+  line-height: 1.42;
 }
 
 .translation-text.original {
   font-size: 14px;
   font-weight: 450;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .top-controls {

@@ -443,12 +443,6 @@
           {/if}
           <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </div>
-        {#if showCountdown}
-          <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
-            <span class="dismiss-countdown-fill"></span>
-            <span class="dismiss-countdown-label">{countdownLabel}</span>
-          </div>
-        {/if}
         <footer class="bubble-footer error-footer">
           <div class="footer-meta">
             {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
@@ -459,6 +453,12 @@
             </button>
           {/if}
         </footer>
+        {#if showCountdown}
+          <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
+            <span class="dismiss-countdown-fill"></span>
+            <span class="dismiss-countdown-label">{countdownLabel}</span>
+          </div>
+        {/if}
       {:else}
         <div class="popover-header">
           <label class="language-select-shell" aria-label="Target language">
@@ -489,18 +489,13 @@
           </button>
           <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </div>
+        <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
         {#if showCountdown}
           <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
             <span class="dismiss-countdown-fill"></span>
             <span class="dismiss-countdown-label">{countdownLabel}</span>
           </div>
         {/if}
-        <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
-        <footer class="bubble-footer">
-          <div class="footer-meta">
-            {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
-          </div>
-        </footer>
       {/if}
     </div>
   </div>
