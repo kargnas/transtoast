@@ -412,6 +412,21 @@ private struct PopoverStrings {
     )
 }
 
+private final class LanguagePillView: NSView {
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let rect = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
+        NSColor.white.setFill()
+        path.fill()
+        NSColor.systemGray.withAlphaComponent(0.38).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+    }
+}
+
 private final class TranslationPopoverContentView: NSView {
     private let payload: TranslationPreviewPayload
     private let arrowEdge: PopoverArrowEdge
@@ -435,8 +450,8 @@ private final class TranslationPopoverContentView: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let bodyScrollView = NSScrollView()
     private let bodyTextView = NSTextView(frame: .zero)
-    private let languagePill = NSView()
-    private let languageIconLabel = NSTextField(labelWithString: "◎")
+    private let languagePill = LanguagePillView()
+    private let languageIconView = NSImageView()
     private let languageTextLabel = NSTextField(labelWithString: "")
     private let languageButton = NSButton(title: "", target: nil, action: nil)
     private let modelLabel = NSTextField(labelWithString: "")
@@ -702,26 +717,22 @@ private final class TranslationPopoverContentView: NSView {
         modelLabel.textColor = .tertiaryLabelColor
         modelLabel.lineBreakMode = .byTruncatingMiddle
 
-        languagePill.wantsLayer = true
-        languagePill.layer?.backgroundColor = NSColor.white.cgColor
-        languagePill.layer?.borderColor = NSColor.systemGray.withAlphaComponent(0.38).cgColor
-        languagePill.layer?.borderWidth = 1
-        languagePill.layer?.cornerRadius = 8
-        languagePill.layer?.masksToBounds = true
         addSubview(languagePill)
 
-        for label in [languageIconLabel, languageTextLabel] {
-            label.drawsBackground = false
-            label.isBordered = false
-            label.isEditable = false
-            label.isSelectable = false
-            label.textColor = .labelColor
-            languagePill.addSubview(label)
-        }
-        languageIconLabel.alignment = .center
-        languageIconLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        languageIconView.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        languageIconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        languageIconView.contentTintColor = .labelColor
+        languagePill.addSubview(languageIconView)
+
+        languageTextLabel.drawsBackground = false
+        languageTextLabel.isBordered = false
+        languageTextLabel.isEditable = false
+        languageTextLabel.isSelectable = false
+        languageTextLabel.textColor = .labelColor
         languageTextLabel.alignment = .left
         languageTextLabel.font = .preferredFont(forTextStyle: .caption1)
+        languageTextLabel.lineBreakMode = .byTruncatingTail
+        languagePill.addSubview(languageTextLabel)
 
         languageButton.target = self
         languageButton.action = #selector(showLanguageMenu)
@@ -746,7 +757,7 @@ private final class TranslationPopoverContentView: NSView {
         bodyTextView.backgroundColor = .clear
         bodyTextView.isEditable = false
         bodyTextView.isSelectable = false
-        bodyTextView.font = .preferredFont(forTextStyle: .body)
+        bodyTextView.font = Self.bodyFont
         bodyTextView.textColor = .labelColor
         bodyTextView.textContainerInset = .zero
         bodyTextView.textContainer?.lineFragmentPadding = 0
@@ -835,16 +846,19 @@ private final class TranslationPopoverContentView: NSView {
             hideCountdown()
             titleLabel.stringValue = strings.translating
             titleLabel.textColor = .controlAccentColor
-            bodyTextView.string = payload.originalText == "[screen screenshot]"
-                ? strings.translatingScreenshot
-                : strings.translatingClipboard
+            setBodyText(
+                payload.originalText == "[screen screenshot]"
+                    ? strings.translatingScreenshot
+                    : strings.translatingClipboard,
+                original: false
+            )
         case "error":
             titleLabel.stringValue = strings.errorTitle
             titleLabel.textColor = .systemRed
-            bodyTextView.string = payload.errorText ?? strings.translationFailed
+            setBodyText(payload.errorText ?? strings.translationFailed, original: false)
         default:
             titleLabel.stringValue = ""
-            bodyTextView.string = visibleMode == "original" ? payload.originalText : payload.translatedText
+            setBodyText(visibleMode == "original" ? payload.originalText : payload.translatedText, original: visibleMode == "original")
             originalButton.title = ""
             originalButton.image = NSImage(
                 systemSymbolName: visibleMode == "original" ? "arrow.left.arrow.right" : "eye",
@@ -866,6 +880,25 @@ private final class TranslationPopoverContentView: NSView {
             return costText
         }
         return "\(model) · \(costText)"
+    }
+
+    private static let bodyFont = NSFont.systemFont(ofSize: 15, weight: .medium)
+    private static let originalBodyFont = NSFont.systemFont(ofSize: 14, weight: .regular)
+
+    private func setBodyText(_ text: String, original: Bool) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 2
+        paragraph.lineBreakMode = .byWordWrapping
+        let font = original ? Self.originalBodyFont : Self.bodyFont
+        bodyTextView.textStorage?.setAttributedString(NSAttributedString(
+            string: text,
+            attributes: [
+                .font: font,
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraph,
+            ]
+        ))
+        bodyTextView.font = font
     }
 
     private func formatCostCredits(_ value: Double?) -> String? {
@@ -997,8 +1030,8 @@ private final class TranslationPopoverContentView: NSView {
 
     private func layoutLanguagePill(_ frame: CGRect) {
         languagePill.frame = frame
-        languageIconLabel.frame = CGRect(x: 12, y: 5, width: 16, height: 18)
-        languageTextLabel.frame = CGRect(x: 36, y: 4, width: max(1, frame.width - 48), height: 20)
+        languageIconView.frame = CGRect(x: 14, y: 6, width: 15, height: 16)
+        languageTextLabel.frame = CGRect(x: 40, y: 4, width: max(1, frame.width - 54), height: 20)
         languageButton.frame = frame
     }
 
