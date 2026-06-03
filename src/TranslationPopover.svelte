@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
-  import { Check, Copy, Eye, Languages, X } from "@lucide/svelte";
+  import { Check, Copy, Eye, Languages, ShieldCheck, X } from "@lucide/svelte";
   import { fallbackTranslationState, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
   import { fallbackState, type SettingsState } from "./lib/settings";
 
@@ -36,7 +36,8 @@
     cancel: "Cancel",
     close: "Close",
     copyCurrent: "Copy",
-    copied: "Copied"
+    copied: "Copied",
+    requestPermission: "Request Permission"
   };
   const targetLanguage = $derived(preview.targetLanguage);
   const modelName = $derived(preview.model.trim());
@@ -55,6 +56,10 @@
   const countdownProgressValue = $derived(Math.max(0, Math.min(1, countdownRemaining / countdownDuration)));
   const countdownProgress = $derived(`${countdownProgressValue * 100}%`);
   const dismissOpacity = $derived((0.62 + countdownProgressValue * 0.38).toFixed(3));
+  const screenRecordingPermissionError = $derived(
+    preview.permissionAction === "screenRecording" ||
+      (preview.errorText ?? "").toLowerCase().includes("screen recording permission")
+  );
 
   type PreviewModelOption = {
     label: string;
@@ -195,6 +200,15 @@
     await closePopover();
   }
 
+  async function requestScreenRecordingPermission() {
+    if (!isTauri) return;
+    try {
+      await invoke("open_screen_recording_settings");
+    } finally {
+      await closePopover();
+    }
+  }
+
   function scheduleAutoDismiss() {
     clearAutoDismiss();
     clearCountdown();
@@ -303,11 +317,16 @@
           {/if}
           <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
         </div>
-        <footer class="bubble-footer">
+        <footer class="bubble-footer error-footer">
           <div class="footer-meta">
             <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
+          {#if screenRecordingPermissionError}
+            <button class="small-button permission-request-button" onclick={requestScreenRecordingPermission}>
+              <ShieldCheck size={14} />{uiStrings.requestPermission}
+            </button>
+          {/if}
         </footer>
       {:else}
         <div class="top-controls">

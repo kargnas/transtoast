@@ -13,6 +13,7 @@ struct TranslationPreviewPayload: Encodable {
     var providerTitle: String
     var model: String
     var costCredits: Double?
+    var permissionAction: String? = nil
 }
 
 struct TranslationModelOption: Equatable {
@@ -564,7 +565,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             errorText: error.localizedDescription,
             providerTitle: settings.provider.title,
             model: activeModelTitle(settings: settings),
-            costCredits: nil
+            costCredits: nil,
+            permissionAction: permissionAction(for: error)
         ), sourceTitle: sourceTitle, settings: settings)
     }
 
@@ -622,6 +624,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if payload.mode == "loading" {
                     self?.cancelCurrentTranslations()
                 }
+            },
+            onPermissionRequested: { [weak self] in
+                self?.openScreenRecordingSettings()
             },
             onModelSelected: { [weak self] option in
                 self?.retranslate(payload.originalText, sourceTitle: sourceTitle, option: option)
@@ -721,6 +726,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .openRouter:
             settings.openRouterTextModel
         }
+    }
+
+    private func permissionAction(for error: Error) -> String? {
+        guard let screenshotError = error as? ScreenshotCaptureError,
+              case .permissionDenied = screenshotError else {
+            return nil
+        }
+        return "screenRecording"
     }
 
     private func localWarmupModel(settings: TranslatorSettings) -> LocalModelSpec? {

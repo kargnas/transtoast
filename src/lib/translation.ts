@@ -10,6 +10,7 @@ export type TranslationPreviewState = {
   providerTitle: string;
   model: string;
   costCredits: number | null;
+  permissionAction?: "screenRecording" | null;
   toastDuration: number;
 };
 
