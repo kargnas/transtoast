@@ -247,27 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(disabledTitle("CopyTranslator"))
         menu.addItem(NSMenuItem.separator())
 
-        let providerMenu = NSMenu()
-        for provider in TranslationProvider.allCases {
-            providerMenu.addItem(checkableItem(
-                title: provider.title,
-                checked: settingsStore.settings.provider == provider,
-                action: #selector(setProvider(_:)),
-                representedObject: provider.rawValue
-            ))
-        }
-        menu.addItem(submenuItem(title: "Text Provider", submenu: providerMenu))
-
-        let localModelMenu = NSMenu()
-        for model in LocalModelRegistry.models(customModelsPath: settingsStore.settings.customLocalModelsPath) {
-            localModelMenu.addItem(checkableItem(
-                title: model.title,
-                checked: settingsStore.settings.localModelID == model.id,
-                action: #selector(setLocalModel(_:)),
-                representedObject: model.id
-            ))
-        }
-        menu.addItem(submenuItem(title: "Local Model", submenu: localModelMenu))
+        menu.addItem(submenuItem(title: "Translation Model", submenu: translationModelMenu()))
 
         let sourceLanguageMenu = NSMenu()
         for language in TranslationLanguage.sourceLanguageNames {
@@ -454,20 +434,97 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    @objc private func setProvider(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let provider = TranslationProvider(rawValue: rawValue) else {
-            return
+    private func translationModelMenu() -> NSMenu {
+        let menu = NSMenu()
+        let localMenu = NSMenu()
+        let openRouterMenu = NSMenu()
+        let settings = settingsStore.settings
+        let defaults = TranslatorSettings()
+
+        localMenu.addItem(checkableItem(
+            title: "Default (\(LocalModelRegistry.defaultModel().title))",
+            checked: settings.provider == .localHyMT2 && settings.localModelID == defaults.localModelID,
+            action: #selector(setTranslationModel(_:)),
+            representedObject: "localHyMT2:\(defaults.localModelID)"
+        ))
+        localMenu.addItem(NSMenuItem.separator())
+        for model in prioritizedLocalModels(settings: settings) {
+            localMenu.addItem(checkableItem(
+                title: model.title,
+                checked: settings.provider == .localHyMT2 && settings.localModelID == model.id,
+                action: #selector(setTranslationModel(_:)),
+                representedObject: "localHyMT2:\(model.id)"
+            ))
         }
-        settingsStore.settings.provider = provider
-        rebuildMenu()
+
+        openRouterMenu.addItem(checkableItem(
+            title: "Default (\(OpenRouterModelCatalog.title(for: defaults.openRouterTextModel)))",
+            checked: settings.provider == .openRouter && settings.openRouterTextModel == defaults.openRouterTextModel,
+            action: #selector(setTranslationModel(_:)),
+            representedObject: "openRouter:\(defaults.openRouterTextModel)"
+        ))
+        openRouterMenu.addItem(NSMenuItem.separator())
+        for model in prioritizedOpenRouterModels(settings: settings) {
+            openRouterMenu.addItem(checkableItem(
+                title: "\(model.title) · \(model.pricingTitle) · \(model.modalityTitle)",
+                checked: settings.provider == .openRouter && settings.openRouterTextModel == model.id,
+                action: #selector(setTranslationModel(_:)),
+                representedObject: "openRouter:\(model.id)"
+            ))
+        }
+
+        menu.addItem(submenuItem(title: "Local Model", submenu: localMenu))
+        menu.addItem(submenuItem(title: "OpenRouter LLM", submenu: openRouterMenu))
+        return menu
     }
 
-    @objc private func setLocalModel(_ sender: NSMenuItem) {
-        guard let modelID = sender.representedObject as? String else {
+    private func prioritizedLocalModels(settings: TranslatorSettings) -> [LocalModelSpec] {
+        let models = LocalModelRegistry.models(customModelsPath: settings.customLocalModelsPath)
+        return prioritize(models, favorites: settings.favoriteLocalModelIDs, id: \.id)
+    }
+
+    private func prioritizedOpenRouterModels(settings: TranslatorSettings) -> [OpenRouterModelSpec] {
+        prioritize(OpenRouterModelCatalog.models, favorites: settings.favoriteOpenRouterModels, id: \.id)
+    }
+
+    private func prioritize<T>(_ values: [T], favorites: [String], id: KeyPath<T, String>) -> [T] {
+        values.sorted { left, right in
+            let leftID = left[keyPath: id]
+            let rightID = right[keyPath: id]
+            let leftFavorite = favorites.firstIndex(of: leftID)
+            let rightFavorite = favorites.firstIndex(of: rightID)
+            switch (leftFavorite, rightFavorite) {
+            case let (left?, right?):
+                return left < right
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                return leftID < rightID
+            }
+        }
+    }
+
+    @objc private func setTranslationModel(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String else {
             return
         }
-        settingsStore.settings.localModelID = modelID
+        let parts = value.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+              let provider = TranslationProvider(rawValue: parts[0]) else {
+            return
+        }
+
+        var settings = settingsStore.settings
+        settings.provider = provider
+        switch provider {
+        case .localHyMT2:
+            settings.localModelID = parts[1]
+        case .openRouter:
+            settings.openRouterTextModel = parts[1]
+        }
+        settingsStore.settings = settings
         rebuildMenu()
     }
 
@@ -682,10 +739,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let openRouterModel = settings.openRouterTextModel.trimmingCharacters(in: .whitespacesAndNewlines)
         if !openRouterModel.isEmpty {
+            let spec = OpenRouterModelCatalog.model(id: openRouterModel)
             options.append(TranslationModelOption(
                 provider: .openRouter,
                 value: openRouterModel,
-                title: openRouterModel
+                title: spec.map { "\($0.title) · \($0.pricingTitle)" } ?? openRouterModel
             ))
         }
         return options
@@ -719,7 +777,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 customModelsPath: settings.customLocalModelsPath
             )?.title ?? settings.localModelID
         case .openRouter:
-            settings.openRouterTextModel
+            OpenRouterModelCatalog.title(for: settings.openRouterTextModel)
         }
     }
 

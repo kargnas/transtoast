@@ -66,6 +66,8 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
     public var customLocalModelsPath: String?
     public var openRouterTextModel: String
     public var openRouterVisionModel: String
+    public var favoriteLocalModelIDs: [String]
+    public var favoriteOpenRouterModels: [String]
     // Kept so older saved settings decode cleanly; the app now attaches OpenRouter screen context automatically when trusted.
     public var includeScreenContextForLLM: Bool
     public var sourceLanguage: String
@@ -82,6 +84,8 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         customLocalModelsPath: String? = nil,
         openRouterTextModel: String = Self.defaultOpenRouterModel,
         openRouterVisionModel: String = Self.defaultOpenRouterModel,
+        favoriteLocalModelIDs: [String] = [LocalModelRegistry.defaultModelID],
+        favoriteOpenRouterModels: [String] = [Self.defaultOpenRouterModel],
         includeScreenContextForLLM: Bool = false,
         sourceLanguage: String = TranslationLanguage.auto,
         targetLanguage: String = "Korean",
@@ -96,6 +100,8 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         self.customLocalModelsPath = customLocalModelsPath
         self.openRouterTextModel = openRouterTextModel
         self.openRouterVisionModel = openRouterVisionModel
+        self.favoriteLocalModelIDs = favoriteLocalModelIDs
+        self.favoriteOpenRouterModels = favoriteOpenRouterModels
         self.includeScreenContextForLLM = includeScreenContextForLLM
         self.sourceLanguage = sourceLanguage
         self.targetLanguage = targetLanguage
@@ -112,6 +118,8 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         case customLocalModelsPath
         case openRouterTextModel
         case openRouterVisionModel
+        case favoriteLocalModelIDs
+        case favoriteOpenRouterModels
         case includeScreenContextForLLM
         case sourceLanguage
         case targetLanguage
@@ -132,6 +140,8 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         customLocalModelsPath = try container.decodeIfPresent(String.self, forKey: .customLocalModelsPath)
         openRouterTextModel = try container.decodeIfPresent(String.self, forKey: .openRouterTextModel) ?? Self.defaultOpenRouterModel
         openRouterVisionModel = try container.decodeIfPresent(String.self, forKey: .openRouterVisionModel) ?? Self.defaultOpenRouterModel
+        favoriteLocalModelIDs = try container.decodeIfPresent([String].self, forKey: .favoriteLocalModelIDs) ?? [LocalModelRegistry.defaultModelID]
+        favoriteOpenRouterModels = try container.decodeIfPresent([String].self, forKey: .favoriteOpenRouterModels) ?? [Self.defaultOpenRouterModel]
         includeScreenContextForLLM = try container.decodeIfPresent(Bool.self, forKey: .includeScreenContextForLLM) ?? false
         sourceLanguage = try container.decodeIfPresent(String.self, forKey: .sourceLanguage) ?? TranslationLanguage.auto
         targetLanguage = try container.decodeIfPresent(String.self, forKey: .targetLanguage) ?? "Korean"
@@ -152,6 +162,8 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         try container.encodeIfDifferent(customLocalModelsPath, from: defaults.customLocalModelsPath, forKey: .customLocalModelsPath)
         try container.encodeIfDifferent(openRouterTextModel, from: defaults.openRouterTextModel, forKey: .openRouterTextModel)
         try container.encodeIfDifferent(openRouterVisionModel, from: defaults.openRouterVisionModel, forKey: .openRouterVisionModel)
+        try container.encodeIfDifferent(favoriteLocalModelIDs, from: defaults.favoriteLocalModelIDs, forKey: .favoriteLocalModelIDs)
+        try container.encodeIfDifferent(favoriteOpenRouterModels, from: defaults.favoriteOpenRouterModels, forKey: .favoriteOpenRouterModels)
         try container.encodeIfDifferent(includeScreenContextForLLM, from: defaults.includeScreenContextForLLM, forKey: .includeScreenContextForLLM)
         try container.encodeIfDifferent(sourceLanguage, from: defaults.sourceLanguage, forKey: .sourceLanguage)
         try container.encodeIfDifferent(targetLanguage, from: defaults.targetLanguage, forKey: .targetLanguage)

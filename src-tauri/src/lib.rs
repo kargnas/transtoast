@@ -32,6 +32,10 @@ struct Settings {
     open_router_text_model: String,
     #[serde(rename = "openRouterVisionModel")]
     open_router_vision_model: String,
+    #[serde(rename = "favoriteLocalModelIDs")]
+    favorite_local_model_ids: Vec<String>,
+    #[serde(rename = "favoriteOpenRouterModels")]
+    favorite_open_router_models: Vec<String>,
     #[serde(rename = "includeScreenContextForLLM")]
     include_screen_context_for_llm: bool,
     #[serde(rename = "sourceLanguage")]
@@ -89,6 +93,10 @@ struct StoredSettings {
     open_router_text_model: Option<String>,
     #[serde(rename = "openRouterVisionModel")]
     open_router_vision_model: Option<String>,
+    #[serde(rename = "favoriteLocalModelIDs")]
+    favorite_local_model_ids: Option<Vec<String>>,
+    #[serde(rename = "favoriteOpenRouterModels")]
+    favorite_open_router_models: Option<Vec<String>>,
     #[serde(rename = "includeScreenContextForLLM")]
     include_screen_context_for_llm: Option<bool>,
     #[serde(rename = "sourceLanguage")]
@@ -119,6 +127,8 @@ struct SettingsOptions {
     providers: Vec<SettingOption>,
     #[serde(rename = "localModels")]
     local_models: Vec<SettingOption>,
+    #[serde(rename = "openRouterModels")]
+    open_router_models: Vec<OpenRouterModelOption>,
     #[serde(rename = "sourceLanguages")]
     source_languages: Vec<SettingOption>,
     #[serde(rename = "targetLanguages")]
@@ -133,6 +143,28 @@ struct SettingOption {
     value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     note: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenRouterModelOption {
+    label: String,
+    value: String,
+    note: Option<String>,
+    #[serde(rename = "promptPricePerMillion")]
+    prompt_price_per_million: f64,
+    #[serde(rename = "completionPricePerMillion")]
+    completion_price_per_million: f64,
+    modalities: Vec<String>,
+    #[serde(rename = "isFree")]
+    is_free: bool,
+    #[serde(rename = "isRecommended")]
+    is_recommended: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenRouterAPIKeyState {
+    configured: bool,
+    path: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -313,11 +345,38 @@ fn reset_setting(app: AppHandle, field: String) -> Result<SettingsState, String>
         "openRouterVisionModel" => {
             settings.open_router_vision_model = defaults.open_router_vision_model
         }
+        "favoriteLocalModelIDs" => {
+            settings.favorite_local_model_ids = defaults.favorite_local_model_ids
+        }
+        "favoriteOpenRouterModels" => {
+            settings.favorite_open_router_models = defaults.favorite_open_router_models
+        }
         _ => return Err(format!("Unknown setting field: {field}")),
     }
 
     write_settings(&app, settings)?;
     state_from_disk(&app)
+}
+
+#[tauri::command]
+fn load_openrouter_api_key_state() -> Result<OpenRouterAPIKeyState, String> {
+    openrouter_api_key_state()
+}
+
+#[tauri::command]
+fn save_openrouter_api_key(value: String) -> Result<OpenRouterAPIKeyState, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err("OpenRouter API key is empty.".to_string());
+    }
+    write_env_key("OPENROUTER_API_KEY", Some(trimmed))?;
+    openrouter_api_key_state()
+}
+
+#[tauri::command]
+fn clear_openrouter_api_key() -> Result<OpenRouterAPIKeyState, String> {
+    write_env_key("OPENROUTER_API_KEY", None)?;
+    openrouter_api_key_state()
 }
 
 #[tauri::command]
@@ -508,6 +567,9 @@ pub fn run() {
             load_settings,
             save_settings,
             reset_setting,
+            load_openrouter_api_key_state,
+            save_openrouter_api_key,
+            clear_openrouter_api_key,
             perform_settings_action,
             open_app_surface,
             complete_local_model_setup,
@@ -801,7 +863,14 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
         translated_text: "미래는 자신의 꿈의 아름다움을 믿는 사람들의 것이다.".to_string(),
         error_text: None,
         provider_title: provider_title(&settings.provider).to_string(),
-        model: model_title(&settings.local_model_id, &settings.provider).to_string(),
+        model: match settings.provider {
+            TranslationProvider::LocalHyMT2 => {
+                model_title(&settings.local_model_id, &settings.provider)
+            }
+            TranslationProvider::OpenRouter => {
+                model_title(&settings.open_router_text_model, &settings.provider)
+            }
+        },
         cost_credits: None,
         toast_duration: settings.toast_duration,
     }
@@ -818,9 +887,13 @@ fn provider_title(provider: &TranslationProvider) -> &'static str {
     }
 }
 
-fn model_title(model_id: &str, provider: &TranslationProvider) -> &'static str {
+fn model_title(model_id: &str, provider: &TranslationProvider) -> String {
     if matches!(provider, TranslationProvider::OpenRouter) {
-        return "google/gemini-2.5-flash-lite";
+        return openrouter_models()
+            .into_iter()
+            .find(|model| model.value == model_id)
+            .map(|model| model.label)
+            .unwrap_or_else(|| model_id.to_string());
     }
 
     match model_id {
@@ -829,6 +902,7 @@ fn model_title(model_id: &str, provider: &TranslationProvider) -> &'static str {
         "hymt2-transformers-30b" => "Hy-MT2 30B-A3B (Transformers)",
         _ => "Selected local model",
     }
+    .to_string()
 }
 
 fn state_from_disk(app: &AppHandle) -> Result<SettingsState, String> {
@@ -875,6 +949,12 @@ fn apply_stored_settings(stored: StoredSettings) -> Settings {
     }
     if let Some(value) = stored.open_router_vision_model {
         settings.open_router_vision_model = value;
+    }
+    if let Some(value) = stored.favorite_local_model_ids {
+        settings.favorite_local_model_ids = value;
+    }
+    if let Some(value) = stored.favorite_open_router_models {
+        settings.favorite_open_router_models = value;
     }
     if let Some(value) = stored.include_screen_context_for_llm {
         settings.include_screen_context_for_llm = value;
@@ -941,6 +1021,12 @@ impl StoredSettings {
             open_router_vision_model: (settings.open_router_vision_model
                 != defaults.open_router_vision_model)
                 .then(|| settings.open_router_vision_model.clone()),
+            favorite_local_model_ids: (settings.favorite_local_model_ids
+                != defaults.favorite_local_model_ids)
+                .then(|| settings.favorite_local_model_ids.clone()),
+            favorite_open_router_models: (settings.favorite_open_router_models
+                != defaults.favorite_open_router_models)
+                .then(|| settings.favorite_open_router_models.clone()),
             include_screen_context_for_llm: (settings.include_screen_context_for_llm
                 != defaults.include_screen_context_for_llm)
                 .then_some(settings.include_screen_context_for_llm),
@@ -967,6 +1053,8 @@ impl StoredSettings {
             && self.custom_local_models_path.is_none()
             && self.open_router_text_model.is_none()
             && self.open_router_vision_model.is_none()
+            && self.favorite_local_model_ids.is_none()
+            && self.favorite_open_router_models.is_none()
             && self.include_screen_context_for_llm.is_none()
             && self.source_language.is_none()
             && self.target_language.is_none()
@@ -991,6 +1079,8 @@ fn default_settings() -> Settings {
         custom_local_models_path: None,
         open_router_text_model: "google/gemini-2.5-flash-lite".to_string(),
         open_router_vision_model: "google/gemini-2.5-flash-lite".to_string(),
+        favorite_local_model_ids: vec!["hymt2-mlx-1.8b-4bit".to_string()],
+        favorite_open_router_models: vec!["google/gemini-2.5-flash-lite".to_string()],
         include_screen_context_for_llm: false,
         source_language: "Auto".to_string(),
         target_language: "Korean".to_string(),
@@ -1005,12 +1095,25 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     settings.custom_local_models_path = normalized_optional(settings.custom_local_models_path);
     settings.open_router_text_model = settings.open_router_text_model.trim().to_string();
     settings.open_router_vision_model = settings.open_router_vision_model.trim().to_string();
+    settings.favorite_local_model_ids = normalized_string_list(settings.favorite_local_model_ids);
+    settings.favorite_open_router_models = normalized_string_list(settings.favorite_open_router_models);
     settings.source_language = settings.source_language.trim().to_string();
     settings.target_language = settings.target_language.trim().to_string();
     if !settings.toast_duration.is_finite() || settings.toast_duration <= 0.0 {
         settings.toast_duration = default_settings().toast_duration;
     }
     settings
+}
+
+fn normalized_string_list(values: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for value in values {
+        let value = value.trim().to_string();
+        if !value.is_empty() && !normalized.contains(&value) {
+            normalized.push(value);
+        }
+    }
+    normalized
 }
 
 fn normalized_optional(value: Option<String>) -> Option<String> {
@@ -1057,6 +1160,14 @@ fn override_map(settings: &Settings, defaults: &Settings) -> BTreeMap<String, bo
             "openRouterVisionModel".to_string(),
             settings.open_router_vision_model != defaults.open_router_vision_model,
         ),
+        (
+            "favoriteLocalModelIDs".to_string(),
+            settings.favorite_local_model_ids != defaults.favorite_local_model_ids,
+        ),
+        (
+            "favoriteOpenRouterModels".to_string(),
+            settings.favorite_open_router_models != defaults.favorite_open_router_models,
+        ),
     ])
 }
 
@@ -1089,6 +1200,7 @@ fn settings_options() -> SettingsOptions {
             option("Kanana 1.5 2.1B AIHub Ko-En LoRA", "kanana-lora-koen", None),
             option("MADLAD-400 Swift int4", "madlad-swift-int4", None),
         ],
+        open_router_models: openrouter_models(),
         source_languages: language_options(true),
         target_languages: language_options(false),
         toast_positions: vec![
@@ -1097,6 +1209,113 @@ fn settings_options() -> SettingsOptions {
             option("Top Right", "topRight", None),
             option("Top Left", "topLeft", None),
         ],
+    }
+}
+
+fn openrouter_models() -> Vec<OpenRouterModelOption> {
+    vec![
+        openrouter_model(
+            "Google Gemini 2.5 Flash Lite",
+            "google/gemini-2.5-flash-lite",
+            Some("Recommended"),
+            0.10,
+            0.40,
+            &["text", "image", "file", "audio", "video"],
+            false,
+            true,
+        ),
+        openrouter_model(
+            "Google Gemini 2.5 Flash",
+            "google/gemini-2.5-flash",
+            None,
+            0.30,
+            2.50,
+            &["text", "image", "file", "audio", "video"],
+            false,
+            false,
+        ),
+        openrouter_model(
+            "OpenAI GPT-4o mini",
+            "openai/gpt-4o-mini",
+            None,
+            0.15,
+            0.60,
+            &["text", "image", "file"],
+            false,
+            false,
+        ),
+        openrouter_model(
+            "Anthropic Claude 3.5 Haiku",
+            "anthropic/claude-3.5-haiku",
+            None,
+            0.80,
+            4.00,
+            &["text", "image"],
+            false,
+            false,
+        ),
+        openrouter_model(
+            "Qwen3 VL 8B Instruct",
+            "qwen/qwen3-vl-8b-instruct",
+            None,
+            0.08,
+            0.50,
+            &["text", "image"],
+            false,
+            false,
+        ),
+        openrouter_model(
+            "OpenRouter Free Models Router",
+            "openrouter/free",
+            Some("Free"),
+            0.0,
+            0.0,
+            &["text", "image"],
+            true,
+            false,
+        ),
+        openrouter_model(
+            "OpenAI gpt-oss-20b (free)",
+            "openai/gpt-oss-20b:free",
+            Some("Free"),
+            0.0,
+            0.0,
+            &["text"],
+            true,
+            false,
+        ),
+        openrouter_model(
+            "Meta Llama 3.3 70B Instruct (free)",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            Some("Free"),
+            0.0,
+            0.0,
+            &["text"],
+            true,
+            false,
+        ),
+    ]
+}
+
+fn openrouter_model(
+    label: &str,
+    value: &str,
+    note: Option<&str>,
+    prompt_price_per_million: f64,
+    completion_price_per_million: f64,
+    modalities: &[&str],
+    is_free: bool,
+    is_recommended: bool,
+) -> OpenRouterModelOption {
+    OpenRouterModelOption {
+        label: label.to_string(),
+        value: value.to_string(),
+        note: note.map(ToString::to_string),
+        prompt_price_per_million,
+        completion_price_per_million,
+        modalities: modalities.iter().map(|value| (*value).to_string()).collect(),
+        is_free,
+        is_recommended,
     }
 }
 
@@ -1324,6 +1543,96 @@ fn request_log_summary(entries: &[RequestLogEntryState]) -> RequestLogSummarySta
             .map(|entry| entry.cost_credits.unwrap_or_default())
             .sum(),
     }
+}
+
+fn openrouter_api_key_state() -> Result<OpenRouterAPIKeyState, String> {
+    let path = credential_env_path()?;
+    let configured = std::env::var("OPENROUTER_API_KEY")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+        || read_env_key(&path, "OPENROUTER_API_KEY")?.is_some();
+    Ok(OpenRouterAPIKeyState {
+        configured,
+        path: path.display().to_string(),
+    })
+}
+
+fn credential_env_path() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME is not set.".to_string())?;
+    Ok(PathBuf::from(home).join(".config/copy-translator/.env"))
+}
+
+fn read_env_key(path: &Path, key: &str) -> Result<Option<String>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let data = fs::read_to_string(path)
+        .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+    for line in data.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some((line_key, value)) = trimmed.split_once('=') {
+            if line_key.trim() == key {
+                let value = value.trim().trim_matches('"').trim_matches('\'').to_string();
+                return Ok((!value.is_empty()).then_some(value));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn write_env_key(key: &str, value: Option<&str>) -> Result<(), String> {
+    let path = credential_env_path()?;
+    let mut lines = if path.exists() {
+        fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?
+            .lines()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
+    let mut replaced = false;
+    lines.retain_mut(|line| {
+        let trimmed = line.trim();
+        let matches_key = !trimmed.starts_with('#')
+            && trimmed
+                .split_once('=')
+                .map(|(line_key, _)| line_key.trim() == key)
+                .unwrap_or(false);
+        if !matches_key {
+            return true;
+        }
+        if let Some(value) = value {
+            *line = format!("{key}={value}");
+            replaced = true;
+            true
+        } else {
+            replaced = true;
+            false
+        }
+    });
+
+    if let Some(value) = value {
+        if !replaced {
+            lines.push(format!("{key}={value}"));
+        }
+    }
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+    }
+
+    let data = if lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", lines.join("\n"))
+    };
+    fs::write(&path, data).map_err(|error| format!("Could not write {}: {error}", path.display()))
 }
 
 fn open_privacy_url(title: &str, url: &str) -> Result<ActionResult, String> {

@@ -5,6 +5,9 @@
     Ban,
     Camera,
     CheckCircle2,
+    Cloud,
+    Cpu,
+    KeyRound,
     Info,
     Keyboard,
     Languages,
@@ -13,11 +16,13 @@
     ScrollText,
     Settings as SettingsIcon,
     ShieldCheck,
-    SlidersHorizontal
+    SlidersHorizontal,
+    Star
   } from "@lucide/svelte";
   import {
     cloneFallbackState,
     type ActionResult,
+    type OpenRouterModelOption,
     type SettingField,
     type Settings,
     type SettingsState,
@@ -25,7 +30,11 @@
     type TranslationProvider
   } from "./lib/settings";
 
-  type Section = "general" | "translation" | "shortcuts" | "excluded" | "advanced" | "info";
+  type Section = "general" | "models" | "shortcuts" | "excluded" | "advanced" | "info";
+  type OpenRouterAPIKeyState = {
+    configured: boolean;
+    path: string;
+  };
 
   let settingsState = $state<SettingsState | null>(null);
   let activeSection = $state<Section>("general");
@@ -33,10 +42,12 @@
   let isTauri = $state(false);
   let lastResult = $state("No translation yet.");
   let notices = $state<ActionResult[]>([]);
+  let openRouterAPIKeyState = $state<OpenRouterAPIKeyState>({ configured: false, path: "~/.config/copy-translator/.env" });
+  let openRouterAPIKeyInput = $state("");
 
   const sectionTitles: Record<Section, string> = {
     general: "General",
-    translation: "Translation",
+    models: "Models",
     shortcuts: "Shortcuts",
     excluded: "Excluded Apps",
     advanced: "Advanced",
@@ -46,6 +57,7 @@
   onMount(async () => {
     isTauri = "__TAURI_INTERNALS__" in window;
     await loadSettings();
+    await loadOpenRouterAPIKeyState();
   });
 
   async function loadSettings() {
@@ -97,7 +109,86 @@
   }
 
   async function updateModelField(field: "openRouterTextModel" | "openRouterVisionModel", value: string) {
-    await updateField(field, value.trim());
+    const trimmed = value.trim();
+    await updateField(field, trimmed === "default" ? settingsState?.defaults[field] ?? trimmed : trimmed);
+  }
+
+  async function selectTranslationModel(value: string) {
+    if (!settingsState) return;
+    const [provider, model] = value.split(/:(.*)/s).filter(Boolean);
+    if (provider !== "localHyMT2" && provider !== "openRouter") return;
+
+    const next: Settings = { ...settingsState.settings, provider };
+    if (provider === "localHyMT2") {
+      next.localModelID = model === "default" ? settingsState.defaults.localModelID : model;
+    } else {
+      next.openRouterTextModel = model === "default" ? settingsState.defaults.openRouterTextModel : model;
+    }
+    await saveSettings(next);
+  }
+
+  async function toggleFavorite(field: "favoriteLocalModelIDs" | "favoriteOpenRouterModels", modelID: string) {
+    if (!settingsState) return;
+    const current = settingsState.settings[field];
+    const nextValue = current.includes(modelID)
+      ? current.filter((value) => value !== modelID)
+      : [...current, modelID];
+    await updateField(field, nextValue);
+  }
+
+  async function useLocalModel(modelID: string) {
+    if (!settingsState) return;
+    await saveSettings({ ...settingsState.settings, provider: "localHyMT2", localModelID: modelID });
+  }
+
+  async function useOpenRouterTextModel(modelID: string) {
+    if (!settingsState) return;
+    await saveSettings({ ...settingsState.settings, provider: "openRouter", openRouterTextModel: modelID });
+  }
+
+  async function useOpenRouterVisionModel(modelID: string) {
+    if (!settingsState) return;
+    await saveSettings({ ...settingsState.settings, openRouterVisionModel: modelID });
+  }
+
+  async function loadOpenRouterAPIKeyState() {
+    if (!isTauri) {
+      openRouterAPIKeyState = { configured: false, path: "~/.config/copy-translator/.env" };
+      return;
+    }
+    try {
+      openRouterAPIKeyState = await invoke<OpenRouterAPIKeyState>("load_openrouter_api_key_state");
+    } catch (error) {
+      pushNotice({ title: "OpenRouter API Key", message: formatError(error), ok: false });
+    }
+  }
+
+  async function saveOpenRouterAPIKey() {
+    if (!openRouterAPIKeyInput.trim()) {
+      pushNotice({ title: "OpenRouter API Key", message: "Enter a key before saving.", ok: false });
+      return;
+    }
+    try {
+      openRouterAPIKeyState = isTauri
+        ? await invoke<OpenRouterAPIKeyState>("save_openrouter_api_key", { value: openRouterAPIKeyInput })
+        : { configured: true, path: "~/.config/copy-translator/.env" };
+      openRouterAPIKeyInput = "";
+      pushNotice({ title: "OpenRouter API Key", message: "Saved.", ok: true });
+    } catch (error) {
+      pushNotice({ title: "OpenRouter API Key", message: formatError(error), ok: false });
+    }
+  }
+
+  async function clearOpenRouterAPIKey() {
+    try {
+      openRouterAPIKeyState = isTauri
+        ? await invoke<OpenRouterAPIKeyState>("clear_openrouter_api_key")
+        : { configured: false, path: "~/.config/copy-translator/.env" };
+      openRouterAPIKeyInput = "";
+      pushNotice({ title: "OpenRouter API Key", message: "Cleared.", ok: true });
+    } catch (error) {
+      pushNotice({ title: "OpenRouter API Key", message: formatError(error), ok: false });
+    }
   }
 
   async function resetField(field: SettingField) {
@@ -158,10 +249,7 @@
 
   function withBrowserOverrides(current: SettingsState, settings: Settings): SettingsState {
     const overrides = Object.fromEntries(
-      (Object.keys(current.overrides) as SettingField[]).map((field) => [
-        field,
-        settings[field] !== current.defaults[field]
-      ])
+      (Object.keys(current.overrides) as SettingField[]).map((field) => [field, isOverride(settings, current.defaults, field)])
     ) as Record<SettingField, boolean>;
 
     return {
@@ -202,6 +290,44 @@
     if (value === "bottomLeft" || value === "topRight" || value === "topLeft") return value;
     return "bottomRight";
   }
+
+  function isOverride(settings: Settings, defaults: Settings, field: SettingField) {
+    const value = settings[field];
+    const defaultValue = defaults[field];
+    return Array.isArray(value) && Array.isArray(defaultValue)
+      ? JSON.stringify(value) !== JSON.stringify(defaultValue)
+      : value !== defaultValue;
+  }
+
+  function translationModelValue(settings: Settings, defaults: Settings) {
+    if (settings.provider === "localHyMT2") {
+      return settings.localModelID === defaults.localModelID ? "localHyMT2:default" : `localHyMT2:${settings.localModelID}`;
+    }
+    return settings.openRouterTextModel === defaults.openRouterTextModel
+      ? "openRouter:default"
+      : `openRouter:${settings.openRouterTextModel}`;
+  }
+
+  function localModelLabel(value: string) {
+    return settingsState?.options.localModels.find((option) => option.value === value)?.label ?? value;
+  }
+
+  function openRouterModelLabel(value: string) {
+    return settingsState?.options.openRouterModels.find((option) => option.value === value)?.label ?? value;
+  }
+
+  function formatPrice(model: OpenRouterModelOption) {
+    if (model.isFree) return "Free";
+    return `$${formatCompactPrice(model.promptPricePerMillion)} in / $${formatCompactPrice(model.completionPricePerMillion)} out per 1M`;
+  }
+
+  function formatCompactPrice(value: number) {
+    return value.toFixed(value < 1 ? 2 : 1).replace(/\.?0+$/, "");
+  }
+
+  function modalityText(model: OpenRouterModelOption) {
+    return model.modalities.includes("image") ? "Text + Image" : "Text";
+  }
 </script>
 
 {#if settingsState}
@@ -211,9 +337,9 @@
         <SettingsIcon size={15} />
         <span>General</span>
       </button>
-      <button class:active={activeSection === "translation"} onclick={() => (activeSection = "translation")}>
-        <Languages size={15} />
-        <span>Translation</span>
+      <button class:active={activeSection === "models"} onclick={() => (activeSection = "models")}>
+        <Cpu size={15} />
+        <span>Models</span>
       </button>
       <button class:active={activeSection === "shortcuts"} onclick={() => (activeSection = "shortcuts")}>
         <Keyboard size={15} />
@@ -250,22 +376,35 @@
           <div class="setting-group">
             <label class="setting-row">
               <span class="setting-copy">
-                <strong>Text Provider</strong>
+                <strong>Translation Model</strong>
               </span>
               <select
-                value={settingsState.settings.provider}
-                onchange={(event) => updateField("provider", providerValue(event.currentTarget.value))}
+                value={translationModelValue(settingsState.settings, settingsState.defaults)}
+                onchange={(event) => selectTranslationModel(event.currentTarget.value)}
               >
-                {#each settingsState.options.providers as option}
-                  <option value={option.value}>{option.label}</option>
-                {/each}
+                <optgroup label="Local Model">
+                  <option value="localHyMT2:default">Default ({localModelLabel(settingsState.defaults.localModelID)})</option>
+                  {#each settingsState.options.localModels as option}
+                    <option value={`localHyMT2:${option.value}`}>{option.label}</option>
+                  {/each}
+                </optgroup>
+                <optgroup label="OpenRouter LLM">
+                  <option value="openRouter:default">Default ({openRouterModelLabel(settingsState.defaults.openRouterTextModel)})</option>
+                  {#each settingsState.options.openRouterModels as option}
+                    <option value={`openRouter:${option.value}`}>{option.label}</option>
+                  {/each}
+                </optgroup>
               </select>
               <button
                 class="reset-row"
-                class:visible={settingsState.overrides.provider}
-                disabled={!settingsState.overrides.provider}
-                title="Reset Text Provider"
-                onclick={() => resetField("provider")}
+                class:visible={settingsState.overrides.provider || settingsState.overrides.localModelID || settingsState.overrides.openRouterTextModel}
+                disabled={!settingsState.overrides.provider && !settingsState.overrides.localModelID && !settingsState.overrides.openRouterTextModel}
+                title="Reset Translation Model"
+                onclick={async () => {
+                  await resetField("provider");
+                  await resetField("localModelID");
+                  await resetField("openRouterTextModel");
+                }}
               >
                 <RotateCcw size={13} />
               </button>
@@ -357,47 +496,110 @@
             </div>
           </div>
         </section>
-      {:else if activeSection === "translation"}
+      {:else if activeSection === "models"}
         <section class="pane">
-          <h2>Local Model</h2>
+          <h2>Active Translation Model</h2>
           <div class="setting-group">
             <label class="setting-row">
               <span class="setting-copy">
-                <strong>Local Model</strong>
+                <strong>Translation Model</strong>
               </span>
               <select
-                value={settingsState.settings.localModelID}
-                onchange={(event) => updateField("localModelID", event.currentTarget.value)}
+                value={translationModelValue(settingsState.settings, settingsState.defaults)}
+                onchange={(event) => selectTranslationModel(event.currentTarget.value)}
               >
-                {#each settingsState.options.localModels as option}
-                  <option value={option.value}>{option.label}</option>
-                {/each}
+                <optgroup label="Local Model">
+                  <option value="localHyMT2:default">Default ({localModelLabel(settingsState.defaults.localModelID)})</option>
+                  {#each settingsState.options.localModels as option}
+                    <option value={`localHyMT2:${option.value}`}>{option.label}</option>
+                  {/each}
+                </optgroup>
+                <optgroup label="OpenRouter LLM">
+                  <option value="openRouter:default">Default ({openRouterModelLabel(settingsState.defaults.openRouterTextModel)})</option>
+                  {#each settingsState.options.openRouterModels as option}
+                    <option value={`openRouter:${option.value}`}>{option.label}</option>
+                  {/each}
+                </optgroup>
               </select>
               <button
                 class="reset-row"
-                class:visible={settingsState.overrides.localModelID}
-                disabled={!settingsState.overrides.localModelID}
-                title="Reset Local Model"
-                onclick={() => resetField("localModelID")}
+                class:visible={settingsState.overrides.provider || settingsState.overrides.localModelID || settingsState.overrides.openRouterTextModel}
+                disabled={!settingsState.overrides.provider && !settingsState.overrides.localModelID && !settingsState.overrides.openRouterTextModel}
+                title="Reset Translation Model"
+                onclick={async () => {
+                  await resetField("provider");
+                  await resetField("localModelID");
+                  await resetField("openRouterTextModel");
+                }}
               >
                 <RotateCcw size={13} />
               </button>
             </label>
+          </div>
+
+          <h2>Local Model Favorites</h2>
+          <div class="setting-group">
+            {#each settingsState.options.localModels as option}
+              <div class="model-row">
+                <button
+                  class="favorite-button"
+                  class:active={settingsState.settings.favoriteLocalModelIDs.includes(option.value)}
+                  title="Toggle favorite"
+                  onclick={() => toggleFavorite("favoriteLocalModelIDs", option.value)}
+                >
+                  <Star size={14} />
+                </button>
+                <div class="model-copy">
+                  <strong>{option.label}</strong>
+                  <span>{option.note ?? (option.value === settingsState.defaults.localModelID ? "Default" : "Local runtime")}</span>
+                </div>
+                <button class="inline-action" onclick={() => useLocalModel(option.value)}><Cpu size={13} />Use</button>
+              </div>
+            {/each}
             <div class="action-grid single">
               <button onclick={() => runAction("showLocalModelSetup")}><ShieldCheck size={14} />Model Setup</button>
             </div>
           </div>
 
-          <h2>OpenRouter</h2>
+          <h2>OpenRouter API Key</h2>
+          <div class="setting-group">
+            <div class="setting-row text-row">
+              <span class="setting-copy">
+                <strong>Status</strong>
+                <span>{openRouterAPIKeyState.path}</span>
+              </span>
+              <span class:ready={openRouterAPIKeyState.configured} class="status-pill">
+                <KeyRound size={13} />{openRouterAPIKeyState.configured ? "Configured" : "Not configured"}
+              </span>
+              <span class="reset-row spacer"></span>
+            </div>
+            <div class="api-key-row">
+              <input
+                type="password"
+                placeholder={openRouterAPIKeyState.configured ? "Enter a new key to replace the saved key" : "OpenRouter API key"}
+                value={openRouterAPIKeyInput}
+                oninput={(event) => (openRouterAPIKeyInput = event.currentTarget.value)}
+              />
+              <button onclick={saveOpenRouterAPIKey}><KeyRound size={13} />Save</button>
+              <button onclick={clearOpenRouterAPIKey}>Clear</button>
+            </div>
+          </div>
+
+          <h2>OpenRouter Models</h2>
           <div class="setting-group">
             <label class="setting-row">
               <span class="setting-copy">
                 <strong>Text Model</strong>
               </span>
-              <input
-                value={settingsState.settings.openRouterTextModel}
-                onblur={(event) => updateModelField("openRouterTextModel", event.currentTarget.value)}
-              />
+              <select
+                value={settingsState.settings.openRouterTextModel === settingsState.defaults.openRouterTextModel ? "default" : settingsState.settings.openRouterTextModel}
+                onchange={(event) => updateModelField("openRouterTextModel", event.currentTarget.value)}
+              >
+                <option value="default">Default ({openRouterModelLabel(settingsState.defaults.openRouterTextModel)})</option>
+                {#each settingsState.options.openRouterModels as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
               <button
                 class="reset-row"
                 class:visible={settingsState.overrides.openRouterTextModel}
@@ -412,10 +614,15 @@
               <span class="setting-copy">
                 <strong>Vision Model</strong>
               </span>
-              <input
-                value={settingsState.settings.openRouterVisionModel}
-                onblur={(event) => updateModelField("openRouterVisionModel", event.currentTarget.value)}
-              />
+              <select
+                value={settingsState.settings.openRouterVisionModel === settingsState.defaults.openRouterVisionModel ? "default" : settingsState.settings.openRouterVisionModel}
+                onchange={(event) => updateModelField("openRouterVisionModel", event.currentTarget.value)}
+              >
+                <option value="default">Default ({openRouterModelLabel(settingsState.defaults.openRouterVisionModel)})</option>
+                {#each settingsState.options.openRouterModels.filter((option) => option.modalities.includes("image")) as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
               <button
                 class="reset-row"
                 class:visible={settingsState.overrides.openRouterVisionModel}
@@ -426,6 +633,32 @@
                 <RotateCcw size={13} />
               </button>
             </label>
+            {#each settingsState.options.openRouterModels as model}
+              <div class="model-row">
+                <button
+                  class="favorite-button"
+                  class:active={settingsState.settings.favoriteOpenRouterModels.includes(model.value)}
+                  title="Toggle favorite"
+                  onclick={() => toggleFavorite("favoriteOpenRouterModels", model.value)}
+                >
+                  <Star size={14} />
+                </button>
+                <div class="model-copy">
+                  <strong>{model.label}</strong>
+                  <span>
+                    {formatPrice(model)} · {modalityText(model)}
+                    {model.isFree ? " · Free" : ""}
+                    {model.isRecommended ? " · Recommended" : ""}
+                  </span>
+                </div>
+                <div class="model-actions">
+                  <button class="inline-action" onclick={() => useOpenRouterTextModel(model.value)}><Cloud size={13} />Text</button>
+                  {#if model.modalities.includes("image")}
+                    <button class="inline-action" onclick={() => useOpenRouterVisionModel(model.value)}>Vision</button>
+                  {/if}
+                </div>
+              </div>
+            {/each}
           </div>
         </section>
       {:else if activeSection === "shortcuts"}

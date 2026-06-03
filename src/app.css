@@ -278,6 +278,93 @@ input {
   font-weight: 520;
 }
 
+.model-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.model-row:last-child {
+  border-bottom: 0;
+}
+
+.favorite-button,
+.inline-action,
+.api-key-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-solid);
+  color: #343438;
+  font-size: 11px;
+  font-weight: 540;
+}
+
+.favorite-button {
+  width: 26px;
+  color: var(--tertiary);
+}
+
+.favorite-button.active {
+  border-color: rgba(255, 149, 0, 0.28);
+  color: #b36b00;
+  background: rgba(255, 149, 0, 0.08);
+}
+
+.model-copy {
+  min-width: 0;
+}
+
+.model-copy strong {
+  display: block;
+  overflow: hidden;
+  color: #202024;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-copy span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.inline-action {
+  padding: 0 9px;
+}
+
+.api-key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 10px 11px;
+  border-top: 1px solid var(--border);
+}
+
+.api-key-row button {
+  padding: 0 10px;
+}
+
 kbd {
   display: inline-flex;
   align-items: center;

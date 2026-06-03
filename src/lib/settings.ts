@@ -10,7 +10,9 @@ export type SettingField =
   | "localHyMT2BackendPath"
   | "customLocalModelsPath"
   | "openRouterTextModel"
-  | "openRouterVisionModel";
+  | "openRouterVisionModel"
+  | "favoriteLocalModelIDs"
+  | "favoriteOpenRouterModels";
 
 export type Settings = {
   provider: TranslationProvider;
@@ -19,6 +21,8 @@ export type Settings = {
   customLocalModelsPath: string | null;
   openRouterTextModel: string;
   openRouterVisionModel: string;
+  favoriteLocalModelIDs: string[];
+  favoriteOpenRouterModels: string[];
   includeScreenContextForLLM: boolean;
   sourceLanguage: string;
   targetLanguage: string;
@@ -33,6 +37,17 @@ export type SettingOption = {
   note?: string;
 };
 
+export type OpenRouterModelOption = {
+  label: string;
+  value: string;
+  note?: string | null;
+  promptPricePerMillion: number;
+  completionPricePerMillion: number;
+  modalities: string[];
+  isFree: boolean;
+  isRecommended: boolean;
+};
+
 export type PermissionStatus = {
   keyboard: boolean;
   accessibility: boolean;
@@ -42,6 +57,7 @@ export type PermissionStatus = {
 export type SettingsOptions = {
   providers: SettingOption[];
   localModels: SettingOption[];
+  openRouterModels: OpenRouterModelOption[];
   sourceLanguages: SettingOption[];
   targetLanguages: SettingOption[];
   toastPositions: SettingOption[];
@@ -70,6 +86,8 @@ export const fallbackState: SettingsState = {
     customLocalModelsPath: null,
     openRouterTextModel: "google/gemini-2.5-flash-lite",
     openRouterVisionModel: "google/gemini-2.5-flash-lite",
+    favoriteLocalModelIDs: ["hymt2-mlx-1.8b-4bit"],
+    favoriteOpenRouterModels: ["google/gemini-2.5-flash-lite"],
     includeScreenContextForLLM: false,
     sourceLanguage: "Auto",
     targetLanguage: "Korean",
@@ -84,6 +102,8 @@ export const fallbackState: SettingsState = {
     customLocalModelsPath: null,
     openRouterTextModel: "google/gemini-2.5-flash-lite",
     openRouterVisionModel: "google/gemini-2.5-flash-lite",
+    favoriteLocalModelIDs: ["hymt2-mlx-1.8b-4bit"],
+    favoriteOpenRouterModels: ["google/gemini-2.5-flash-lite"],
     includeScreenContextForLLM: false,
     sourceLanguage: "Auto",
     targetLanguage: "Korean",
@@ -100,7 +120,9 @@ export const fallbackState: SettingsState = {
     localHyMT2BackendPath: false,
     customLocalModelsPath: false,
     openRouterTextModel: false,
-    openRouterVisionModel: false
+    openRouterVisionModel: false,
+    favoriteLocalModelIDs: false,
+    favoriteOpenRouterModels: false
   },
   options: {
     providers: [
@@ -117,6 +139,84 @@ export const fallbackState: SettingsState = {
       { label: "QuickMT En-Ko", value: "quickmt-en-ko" },
       { label: "Kanana 1.5 2.1B AIHub Ko-En LoRA", value: "kanana-lora-koen" },
       { label: "MADLAD-400 Swift int4", value: "madlad-swift-int4" }
+    ],
+    openRouterModels: [
+      {
+        label: "Google Gemini 2.5 Flash Lite",
+        value: "google/gemini-2.5-flash-lite",
+        note: "Recommended",
+        promptPricePerMillion: 0.1,
+        completionPricePerMillion: 0.4,
+        modalities: ["text", "image", "file", "audio", "video"],
+        isFree: false,
+        isRecommended: true
+      },
+      {
+        label: "Google Gemini 2.5 Flash",
+        value: "google/gemini-2.5-flash",
+        promptPricePerMillion: 0.3,
+        completionPricePerMillion: 2.5,
+        modalities: ["text", "image", "file", "audio", "video"],
+        isFree: false,
+        isRecommended: false
+      },
+      {
+        label: "OpenAI GPT-4o mini",
+        value: "openai/gpt-4o-mini",
+        promptPricePerMillion: 0.15,
+        completionPricePerMillion: 0.6,
+        modalities: ["text", "image", "file"],
+        isFree: false,
+        isRecommended: false
+      },
+      {
+        label: "Anthropic Claude 3.5 Haiku",
+        value: "anthropic/claude-3.5-haiku",
+        promptPricePerMillion: 0.8,
+        completionPricePerMillion: 4,
+        modalities: ["text", "image"],
+        isFree: false,
+        isRecommended: false
+      },
+      {
+        label: "Qwen3 VL 8B Instruct",
+        value: "qwen/qwen3-vl-8b-instruct",
+        promptPricePerMillion: 0.08,
+        completionPricePerMillion: 0.5,
+        modalities: ["text", "image"],
+        isFree: false,
+        isRecommended: false
+      },
+      {
+        label: "OpenRouter Free Models Router",
+        value: "openrouter/free",
+        note: "Free",
+        promptPricePerMillion: 0,
+        completionPricePerMillion: 0,
+        modalities: ["text", "image"],
+        isFree: true,
+        isRecommended: false
+      },
+      {
+        label: "OpenAI gpt-oss-20b (free)",
+        value: "openai/gpt-oss-20b:free",
+        note: "Free",
+        promptPricePerMillion: 0,
+        completionPricePerMillion: 0,
+        modalities: ["text"],
+        isFree: true,
+        isRecommended: false
+      },
+      {
+        label: "Meta Llama 3.3 70B Instruct (free)",
+        value: "meta-llama/llama-3.3-70b-instruct:free",
+        note: "Free",
+        promptPricePerMillion: 0,
+        completionPricePerMillion: 0,
+        modalities: ["text"],
+        isFree: true,
+        isRecommended: false
+      }
     ],
     sourceLanguages: [
       "Auto",

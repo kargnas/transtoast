@@ -10,6 +10,8 @@ import Testing
     #expect(settings.localModelID == LocalModelRegistry.defaultModelID)
     #expect(settings.openRouterTextModel == "google/gemini-2.5-flash-lite")
     #expect(settings.openRouterVisionModel == "google/gemini-2.5-flash-lite")
+    #expect(settings.favoriteLocalModelIDs == [LocalModelRegistry.defaultModelID])
+    #expect(settings.favoriteOpenRouterModels == ["google/gemini-2.5-flash-lite"])
     #expect(settings.includeScreenContextForLLM == false)
     #expect(settings.sourceLanguage == TranslationLanguage.auto)
     #expect(settings.targetLanguage == "Korean")
