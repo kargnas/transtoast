@@ -13,6 +13,8 @@
   let settingsState = $state<SettingsState | null>(null);
   let permissionTarget = $state<PermissionAppTarget | null>(null);
   let result = $state<ActionResult | null>(null);
+  let dragStart = $state<{ x: number; y: number } | null>(null);
+  let isStartingNativeDrag = $state(false);
 
   onMount(load);
 
@@ -39,19 +41,39 @@
     await load();
   }
 
-  function startAppDrag(event: DragEvent) {
-    if (!permissionTarget || !event.dataTransfer) return;
+  function prepareAppDrag(event: PointerEvent) {
+    if (!permissionTarget || event.button !== 0) return;
+    dragStart = { x: event.clientX, y: event.clientY };
+  }
 
-    event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData("text/uri-list", `${permissionTarget.bundleFileURL}\n`);
-    event.dataTransfer.setData("public.file-url", permissionTarget.bundleFileURL);
-    event.dataTransfer.setData("URL", permissionTarget.bundleFileURL);
-    event.dataTransfer.setData("text/plain", permissionTarget.bundlePath);
-    result = {
-      title: permissionTarget.bundleName,
-      message: "Drop it into the open macOS Privacy list.",
-      ok: true
-    };
+  async function startAppDrag(event: PointerEvent) {
+    if (!permissionTarget || !dragStart || isStartingNativeDrag || (event.buttons & 1) !== 1) {
+      return;
+    }
+
+    const distance = Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y);
+    if (distance < 4) return;
+
+    event.preventDefault();
+    isStartingNativeDrag = true;
+
+    try {
+      result = await invoke<ActionResult>("start_permission_app_drag");
+    } catch (error) {
+      result = {
+        title: "Drag failed",
+        message: String(error),
+        ok: false
+      };
+    } finally {
+      dragStart = null;
+      isStartingNativeDrag = false;
+    }
+  }
+
+  function cancelAppDrag() {
+    dragStart = null;
+    isStartingNativeDrag = false;
   }
 </script>
 
@@ -69,8 +91,10 @@
       <article
         class="app-card"
         class:draggable={permissionTarget !== null}
-        draggable={permissionTarget !== null}
-        ondragstart={startAppDrag}
+        onpointerdown={prepareAppDrag}
+        onpointermove={startAppDrag}
+        onpointerup={cancelAppDrag}
+        onpointercancel={cancelAppDrag}
         title={permissionTarget ? `Drag ${permissionTarget.bundlePath} into the macOS Privacy list` : "Build and launch the app bundle before dragging"}
       >
         <ShieldCheck size={58} />

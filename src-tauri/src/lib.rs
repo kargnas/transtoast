@@ -12,6 +12,87 @@ use std::process::Command;
 use surfaces::{open_surface_window, AppSurface};
 use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
+#[cfg(target_os = "macos")]
+mod macos_drag {
+    use objc2::rc::Retained;
+    use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
+    use objc2::{define_class, msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
+    use objc2_app_kit::{
+        NSApplication, NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSource,
+        NSPasteboardWriting, NSWindow, NSWorkspace,
+    };
+    use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSString, NSURL};
+    use std::ffi::c_void;
+    use std::path::Path;
+
+    define_class!(
+        #[unsafe(super(NSObject))]
+        #[derive(Debug, PartialEq, Eq, Hash)]
+        #[name = "CopyTranslatorPermissionDragSource"]
+        #[thread_kind = MainThreadOnly]
+        struct PermissionDragSource;
+
+        unsafe impl NSObjectProtocol for PermissionDragSource {}
+
+        unsafe impl NSDraggingSource for PermissionDragSource {
+            #[unsafe(method(draggingSession:sourceOperationMaskForDraggingContext:))]
+            fn source_operation_mask(
+                &self,
+                _session: &objc2_app_kit::NSDraggingSession,
+                _context: NSDraggingContext,
+            ) -> NSDragOperation {
+                NSDragOperation::Copy
+            }
+        }
+    );
+
+    impl PermissionDragSource {
+        fn new(mtm: MainThreadMarker) -> Retained<Self> {
+            unsafe { msg_send![Self::alloc(mtm), init] }
+        }
+    }
+
+    pub fn start_app_drag(bundle_path: &Path, ns_window: *mut c_void) -> Result<(), String> {
+        let mtm = MainThreadMarker::new().ok_or("Native drag must start on the main thread.")?;
+        let bundle_path = bundle_path
+            .to_str()
+            .ok_or("The app bundle path is not valid UTF-8.")?;
+        let window = unsafe { (ns_window as *mut NSWindow).as_ref() }
+            .ok_or("Permission Helper window is not available.")?;
+        let event = NSApplication::sharedApplication(mtm)
+            .currentEvent()
+            .ok_or("Start dragging from the app card first.")?;
+
+        let path = NSString::from_str(bundle_path);
+        let file_url = NSURL::fileURLWithPath(&path);
+        let writer: &ProtocolObject<dyn NSPasteboardWriting> = ProtocolObject::from_ref(&*file_url);
+        let item = NSDraggingItem::initWithPasteboardWriter(NSDraggingItem::alloc(), writer);
+
+        let origin = event.locationInWindow();
+        let frame = NSRect::new(
+            NSPoint::new(origin.x - 24.0, origin.y - 24.0),
+            NSSize::new(48.0, 48.0),
+        );
+        let icon = NSWorkspace::sharedWorkspace().iconForFile(&path);
+        let icon_object: &objc2::runtime::AnyObject = icon.as_ref();
+        unsafe {
+            item.setDraggingFrame_contents(frame, Some(icon_object));
+        }
+
+        let items = NSArray::from_slice(&[&*item]);
+        let source = PermissionDragSource::new(mtm);
+        let source: &ProtocolObject<dyn NSDraggingSource> = ProtocolObject::from_ref(&*source);
+
+        if let Some(view) = window.contentView() {
+            view.beginDraggingSessionWithItems_event_source(&items, &event, source);
+        } else {
+            window.beginDraggingSessionWithItems_event_source(&items, &event, source);
+        }
+
+        Ok(())
+    }
+}
+
 const TRANSLATION_WINDOW_WIDTH: f64 = 356.0;
 const TRANSLATION_WINDOW_HEIGHT: f64 = 150.0;
 const TRANSLATION_TALL_WINDOW_HEIGHT: f64 = 176.0;
@@ -466,6 +547,33 @@ fn reveal_permission_app(app: AppHandle) -> Result<ActionResult, String> {
 }
 
 #[tauri::command]
+fn start_permission_app_drag(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<ActionResult, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let bundle_path = resolve_permission_app_bundle(&app)?;
+        let ns_window = window
+            .ns_window()
+            .map_err(|error| format!("Permission Helper window is not available: {error}"))?;
+        macos_drag::start_app_drag(&bundle_path, ns_window)?;
+        return Ok(ActionResult {
+            title: "Drag started".to_string(),
+            message: "Drop CopyTranslator.app into the open macOS Privacy list.".to_string(),
+            ok: true,
+        });
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        let _ = window;
+        Err("Native privacy drag is only supported on macOS.".to_string())
+    }
+}
+
+#[tauri::command]
 fn open_screen_recording_settings() -> Result<ActionResult, String> {
     open_privacy_url(
         "Screen Recording",
@@ -619,6 +727,7 @@ pub fn run() {
             perform_settings_action,
             permission_app_target,
             reveal_permission_app,
+            start_permission_app_drag,
             open_app_surface,
             complete_local_model_setup,
             prepare_custom_local_models,

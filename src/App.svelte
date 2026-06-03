@@ -728,11 +728,7 @@
               </span>
               <span class="reset-row spacer"></span>
             </div>
-            <div class="action-grid">
-              <button onclick={() => runAction("openInputMonitoring")}>Input Monitoring</button>
-              <button onclick={() => runAction("openAccessibility")}>Accessibility</button>
-              <button onclick={() => runAction("openScreenRecording")}>Screen Recording</button>
-              <button onclick={() => runAction("requestKeyboardPrompt")}>Keyboard Prompt</button>
+            <div class="action-grid single">
               <button onclick={() => runAction("openPermissionHelper")}><ShieldCheck size={14} />Permission Helper</button>
             </div>
           </div>
