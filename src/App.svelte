@@ -326,7 +326,24 @@
   }
 
   function modalityText(model: OpenRouterModelOption) {
-    return model.modalities.includes("image") ? "Text + Image" : "Text";
+    return model.modalities.map((value) => value.charAt(0).toUpperCase() + value.slice(1)).join(" + ");
+  }
+
+  function modelMetaText(model: OpenRouterModelOption) {
+    const parts = [
+      modalityText(model),
+      model.releaseDate,
+      `${formatContextWindow(model.contextWindow)} context`
+    ];
+    if (model.isReasoning) parts.push("Reasoning");
+    if (model.isRecommended) parts.push("Recommended");
+    return parts.join(" · ");
+  }
+
+  function formatContextWindow(value: number) {
+    if (value >= 1_000_000) return `${formatCompactPrice(value / 1_000_000)}M`;
+    if (value >= 1_000) return `${formatCompactPrice(value / 1_000)}K`;
+    return String(value);
   }
 </script>
 
@@ -646,9 +663,7 @@
                 <div class="model-copy">
                   <strong>{model.label}</strong>
                   <span>
-                    {formatPrice(model)} · {modalityText(model)}
-                    {model.isFree ? " · Free" : ""}
-                    {model.isRecommended ? " · Recommended" : ""}
+                    {formatPrice(model)} · {modelMetaText(model)}
                   </span>
                 </div>
                 <div class="model-actions">

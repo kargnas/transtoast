@@ -6,6 +6,9 @@ public struct OpenRouterModelSpec: Codable, Equatable, Sendable, Identifiable {
     public var promptPricePerMillion: Double
     public var completionPricePerMillion: Double
     public var inputModalities: [String]
+    public var releaseDate: String
+    public var contextWindow: Int
+    public var isReasoning: Bool
     public var isFree: Bool
     public var isRecommended: Bool
 
@@ -15,6 +18,9 @@ public struct OpenRouterModelSpec: Codable, Equatable, Sendable, Identifiable {
         promptPricePerMillion: Double,
         completionPricePerMillion: Double,
         inputModalities: [String],
+        releaseDate: String,
+        contextWindow: Int,
+        isReasoning: Bool,
         isFree: Bool = false,
         isRecommended: Bool = false
     ) {
@@ -23,6 +29,9 @@ public struct OpenRouterModelSpec: Codable, Equatable, Sendable, Identifiable {
         self.promptPricePerMillion = promptPricePerMillion
         self.completionPricePerMillion = completionPricePerMillion
         self.inputModalities = inputModalities
+        self.releaseDate = releaseDate
+        self.contextWindow = contextWindow
+        self.isReasoning = isReasoning
         self.isFree = isFree
         self.isRecommended = isRecommended
     }
@@ -60,63 +69,157 @@ public enum OpenRouterModelCatalog {
 
     public static let models: [OpenRouterModelSpec] = [
         OpenRouterModelSpec(
-            id: "google/gemini-2.5-flash-lite",
-            title: "Google Gemini 2.5 Flash Lite",
-            promptPricePerMillion: 0.10,
-            completionPricePerMillion: 0.40,
-            inputModalities: ["text", "image", "file", "audio", "video"],
+            id: "~google/gemini-flash-latest",
+            title: "Google Gemini Flash Latest",
+            promptPricePerMillion: 1.50,
+            completionPricePerMillion: 9.00,
+            inputModalities: ["text", "image", "video", "pdf", "audio"],
+            releaseDate: "2026-04-27",
+            contextWindow: 1_048_576,
+            isReasoning: true,
             isRecommended: true
         ),
         OpenRouterModelSpec(
-            id: "google/gemini-2.5-flash",
-            title: "Google Gemini 2.5 Flash",
+            id: "minimax/minimax-m3",
+            title: "MiniMax-M3",
             promptPricePerMillion: 0.30,
-            completionPricePerMillion: 2.50,
-            inputModalities: ["text", "image", "file", "audio", "video"]
+            completionPricePerMillion: 1.20,
+            inputModalities: ["text", "image", "video"],
+            releaseDate: "2026-06-01",
+            contextWindow: 524_288,
+            isReasoning: true
         ),
         OpenRouterModelSpec(
-            id: "openai/gpt-4o-mini",
-            title: "OpenAI GPT-4o mini",
-            promptPricePerMillion: 0.15,
-            completionPricePerMillion: 0.60,
-            inputModalities: ["text", "image", "file"]
+            id: "anthropic/claude-opus-4.8",
+            title: "Claude Opus 4.8",
+            promptPricePerMillion: 5.00,
+            completionPricePerMillion: 25.00,
+            inputModalities: ["text", "image", "pdf"],
+            releaseDate: "2026-05-28",
+            contextWindow: 1_000_000,
+            isReasoning: true
         ),
         OpenRouterModelSpec(
-            id: "anthropic/claude-3.5-haiku",
-            title: "Anthropic Claude 3.5 Haiku",
-            promptPricePerMillion: 0.80,
-            completionPricePerMillion: 4.00,
-            inputModalities: ["text", "image"]
+            id: "google/gemini-3.5-flash",
+            title: "Gemini 3.5 Flash",
+            promptPricePerMillion: 1.50,
+            completionPricePerMillion: 9.00,
+            inputModalities: ["text", "image", "video", "pdf", "audio"],
+            releaseDate: "2026-05-19",
+            contextWindow: 1_048_576,
+            isReasoning: true
         ),
         OpenRouterModelSpec(
-            id: "qwen/qwen3-vl-8b-instruct",
-            title: "Qwen3 VL 8B Instruct",
-            promptPricePerMillion: 0.08,
-            completionPricePerMillion: 0.50,
-            inputModalities: ["text", "image"]
+            id: "google/gemini-3.1-flash-lite",
+            title: "Gemini 3.1 Flash Lite",
+            promptPricePerMillion: 0.25,
+            completionPricePerMillion: 1.50,
+            inputModalities: ["text", "image", "video", "pdf", "audio"],
+            releaseDate: "2026-05-07",
+            contextWindow: 1_048_576,
+            isReasoning: true
         ),
         OpenRouterModelSpec(
-            id: "openrouter/free",
-            title: "OpenRouter Free Models Router",
+            id: "~anthropic/claude-sonnet-latest",
+            title: "Anthropic Claude Sonnet Latest",
+            promptPricePerMillion: 3.00,
+            completionPricePerMillion: 15.00,
+            inputModalities: ["text", "image", "pdf"],
+            releaseDate: "2026-04-27",
+            contextWindow: 1_000_000,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "openai/gpt-5.5",
+            title: "GPT-5.5",
+            promptPricePerMillion: 5.00,
+            completionPricePerMillion: 30.00,
+            inputModalities: ["pdf", "image", "text"],
+            releaseDate: "2026-04-23",
+            contextWindow: 1_050_000,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "~openai/gpt-mini-latest",
+            title: "OpenAI GPT Mini Latest",
+            promptPricePerMillion: 0.75,
+            completionPricePerMillion: 4.50,
+            inputModalities: ["pdf", "image", "text"],
+            releaseDate: "2026-04-27",
+            contextWindow: 400_000,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "qwen/qwen3.7-max",
+            title: "Qwen3.7 Max",
+            promptPricePerMillion: 1.25,
+            completionPricePerMillion: 3.75,
+            inputModalities: ["text"],
+            releaseDate: "2026-05-21",
+            contextWindow: 1_000_000,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "deepseek/deepseek-v4-pro",
+            title: "DeepSeek V4 Pro",
+            promptPricePerMillion: 0.435,
+            completionPricePerMillion: 0.87,
+            inputModalities: ["text"],
+            releaseDate: "2026-04-24",
+            contextWindow: 1_048_576,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "mistralai/mistral-medium-3-5",
+            title: "Mistral Medium 3.5",
+            promptPricePerMillion: 1.50,
+            completionPricePerMillion: 7.50,
+            inputModalities: ["text", "image", "pdf"],
+            releaseDate: "2026-04-30",
+            contextWindow: 262_144,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "moonshotai/kimi-k2.6",
+            title: "Kimi K2.6",
+            promptPricePerMillion: 0.684,
+            completionPricePerMillion: 3.42,
+            inputModalities: ["text", "image"],
+            releaseDate: "2026-04-21",
+            contextWindow: 262_144,
+            isReasoning: true
+        ),
+        OpenRouterModelSpec(
+            id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            title: "Nemotron 3 Nano Omni (free)",
+            promptPricePerMillion: 0,
+            completionPricePerMillion: 0,
+            inputModalities: ["text", "audio", "image", "video"],
+            releaseDate: "2026-04-28",
+            contextWindow: 256_000,
+            isReasoning: true,
+            isFree: true
+        ),
+        OpenRouterModelSpec(
+            id: "moonshotai/kimi-k2.6:free",
+            title: "Kimi K2.6 (free)",
             promptPricePerMillion: 0,
             completionPricePerMillion: 0,
             inputModalities: ["text", "image"],
+            releaseDate: "2026-04-21",
+            contextWindow: 262_144,
+            isReasoning: true,
             isFree: true
         ),
         OpenRouterModelSpec(
-            id: "openai/gpt-oss-20b:free",
-            title: "OpenAI gpt-oss-20b (free)",
+            id: "openrouter/owl-alpha",
+            title: "Owl Alpha",
             promptPricePerMillion: 0,
             completionPricePerMillion: 0,
             inputModalities: ["text"],
-            isFree: true
-        ),
-        OpenRouterModelSpec(
-            id: "meta-llama/llama-3.3-70b-instruct:free",
-            title: "Meta Llama 3.3 70B Instruct (free)",
-            promptPricePerMillion: 0,
-            completionPricePerMillion: 0,
-            inputModalities: ["text"],
+            releaseDate: "2026-04-28",
+            contextWindow: 1_048_756,
+            isReasoning: false,
             isFree: true
         ),
     ]

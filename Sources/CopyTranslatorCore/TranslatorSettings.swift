@@ -57,7 +57,7 @@ public enum ToastPosition: String, CaseIterable, Codable, Sendable {
 }
 
 public struct TranslatorSettings: Codable, Equatable, Sendable {
-    public static let defaultOpenRouterModel = "google/gemini-2.5-flash-lite"
+    public static let defaultOpenRouterModel = "~google/gemini-flash-latest"
 
     public var provider: TranslationProvider
     public var hyMT2Model: HyMT2Model

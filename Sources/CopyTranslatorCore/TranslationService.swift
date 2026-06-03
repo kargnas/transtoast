@@ -296,8 +296,8 @@ public final class TranslationService: @unchecked Sendable {
             body.removeValue(forKey: "model")
             body["models"] = [
                 model,
-                "qwen/qwen3-vl-8b-instruct",
-                "google/gemini-2.5-flash-lite",
+                "~google/gemini-flash-latest",
+                "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
             ].uniqued()
         }
 
