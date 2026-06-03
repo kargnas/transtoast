@@ -209,6 +209,14 @@ h2 {
   white-space: nowrap;
 }
 
+.setting-copy span.setting-note {
+  display: -webkit-box;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 select,
 input {
   width: 100%;
@@ -1347,8 +1355,26 @@ pre {
   text-align: center;
 }
 
+.app-card.draggable {
+  cursor: grab;
+}
+
+.app-card.draggable:active {
+  cursor: grabbing;
+}
+
 .app-card strong {
   font-size: 13px;
+}
+
+.app-path {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--secondary);
+  font-family: inherit;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .permission-column {

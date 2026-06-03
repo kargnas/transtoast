@@ -1,11 +1,20 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Accessibility, Keyboard, Monitor, MousePointer2, RefreshCw, ShieldCheck } from "@lucide/svelte";
+  import { Accessibility, FolderSearch, Keyboard, Monitor, MousePointer2, RefreshCw, ShieldCheck } from "@lucide/svelte";
   import { cloneFallbackState, type ActionResult, type SettingsState } from "./lib/settings";
 
+  type PermissionAppTarget = {
+    bundleName: string;
+    bundlePath: string;
+    bundleFileURL: string;
+  };
+
   let settingsState = $state<SettingsState | null>(null);
+  let permissionTarget = $state<PermissionAppTarget | null>(null);
   let result = $state<ActionResult | null>(null);
+  let dragStart = $state<{ x: number; y: number } | null>(null);
+  let isStartingNativeDrag = $state(false);
 
   onMount(load);
 
@@ -14,6 +23,12 @@
       settingsState = await invoke<SettingsState>("load_settings");
     } catch {
       settingsState = cloneFallbackState();
+    }
+
+    try {
+      permissionTarget = await invoke<PermissionAppTarget>("permission_app_target");
+    } catch {
+      permissionTarget = null;
     }
   }
 
@@ -24,6 +39,41 @@
       settings: settingsState.settings
     });
     await load();
+  }
+
+  function prepareAppDrag(event: PointerEvent) {
+    if (!permissionTarget || event.button !== 0) return;
+    dragStart = { x: event.clientX, y: event.clientY };
+  }
+
+  async function startAppDrag(event: PointerEvent) {
+    if (!permissionTarget || !dragStart || isStartingNativeDrag || (event.buttons & 1) !== 1) {
+      return;
+    }
+
+    const distance = Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y);
+    if (distance < 4) return;
+
+    event.preventDefault();
+    isStartingNativeDrag = true;
+
+    try {
+      result = await invoke<ActionResult>("start_permission_app_drag");
+    } catch (error) {
+      result = {
+        title: "Drag failed",
+        message: String(error),
+        ok: false
+      };
+    } finally {
+      dragStart = null;
+      isStartingNativeDrag = false;
+    }
+  }
+
+  function cancelAppDrag() {
+    dragStart = null;
+    isStartingNativeDrag = false;
   }
 </script>
 
@@ -38,10 +88,21 @@
     </header>
 
     <section class="permission-grid">
-      <article class="app-card">
+      <article
+        class="app-card"
+        class:draggable={permissionTarget !== null}
+        onpointerdown={prepareAppDrag}
+        onpointermove={startAppDrag}
+        onpointerup={cancelAppDrag}
+        onpointercancel={cancelAppDrag}
+        title={permissionTarget ? `Drag ${permissionTarget.bundlePath} into the macOS Privacy list` : "Build and launch the app bundle before dragging"}
+      >
         <ShieldCheck size={58} />
-        <strong>CopyTranslator.app</strong>
-        <span>Use the actions on the right to add the app in macOS privacy settings. Windows support will use the same status/action contract here.</span>
+        <strong>{permissionTarget?.bundleName ?? "CopyTranslator.app"}</strong>
+        <span>Drag this card into the open macOS Privacy list. If macOS rejects the drop, reveal the app in Finder and drag the selected app.</span>
+        {#if permissionTarget}
+          <code class="app-path">{permissionTarget.bundlePath}</code>
+        {/if}
       </article>
 
       <div class="permission-column">
@@ -77,6 +138,7 @@
           <button onclick={() => action("openAccessibility")}><Accessibility size={14} />Open Accessibility Settings</button>
           <button onclick={() => action("openScreenRecording")}><Monitor size={14} />Open Screen Recording Settings</button>
           <button onclick={() => action("requestKeyboardPrompt")}><MousePointer2 size={14} />Request Keyboard Prompt</button>
+          <button onclick={() => action("revealPermissionApp")}><FolderSearch size={14} />Reveal CopyTranslator.app</button>
         </section>
 
         {#if result}
