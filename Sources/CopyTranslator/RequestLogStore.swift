@@ -12,6 +12,7 @@ struct RequestLogEntry: Identifiable {
     let promptTokens: Int
     let completionTokens: Int
     let totalTokens: Int
+    let costCredits: Double?
     let usageSource: String
     let isDuplicateSuspect: Bool
     let imageInfo: String?
@@ -24,6 +25,7 @@ struct RequestLogSummary {
     let promptTokens: Int
     let completionTokens: Int
     let totalTokens: Int
+    let costCredits: Double
 }
 
 @MainActor
@@ -45,6 +47,7 @@ final class RequestLogStore {
         let promptTokens = result.usage?.promptTokens ?? estimatedTokenCount(input)
         let completionTokens = result.usage?.completionTokens ?? estimatedTokenCount(result.text)
         let totalTokens = result.usage?.totalTokens ?? promptTokens + completionTokens
+        let costCredits = result.usage?.costCredits
         let isDuplicate = entries.contains { entry in
             now.timeIntervalSince(entry.timestamp) <= duplicateWindow
                 && entry.source == source
@@ -62,6 +65,7 @@ final class RequestLogStore {
             promptTokens: promptTokens,
             completionTokens: completionTokens,
             totalTokens: totalTokens,
+            costCredits: costCredits,
             usageSource: result.usage == nil ? "estimated" : "actual",
             isDuplicateSuspect: isDuplicate,
             imageInfo: imageInfo,
@@ -86,7 +90,8 @@ final class RequestLogStore {
             duplicateSuspectCount: entries.filter(\.isDuplicateSuspect).count,
             promptTokens: entries.reduce(0) { $0 + $1.promptTokens },
             completionTokens: entries.reduce(0) { $0 + $1.completionTokens },
-            totalTokens: entries.reduce(0) { $0 + $1.totalTokens }
+            totalTokens: entries.reduce(0) { $0 + $1.totalTokens },
+            costCredits: entries.reduce(0) { $0 + ($1.costCredits ?? 0) }
         )
     }
 
@@ -139,6 +144,7 @@ private struct RequestLogDiskEntry: Encodable {
     let promptTokens: Int
     let completionTokens: Int
     let totalTokens: Int
+    let costCredits: Double?
     let usageSource: String
     let isDuplicateSuspect: Bool
     let imageInfo: String?
@@ -157,6 +163,7 @@ private struct RequestLogDiskEntry: Encodable {
         promptTokens = entry.promptTokens
         completionTokens = entry.completionTokens
         totalTokens = entry.totalTokens
+        costCredits = entry.costCredits
         usageSource = entry.usageSource
         isDuplicateSuspect = entry.isDuplicateSuspect
         imageInfo = entry.imageInfo

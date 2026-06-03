@@ -172,6 +172,8 @@ struct RequestLogEntryState {
     completion_tokens: i64,
     #[serde(rename = "totalTokens")]
     total_tokens: i64,
+    #[serde(rename = "costCredits")]
+    cost_credits: Option<f64>,
     #[serde(rename = "usageSource")]
     usage_source: String,
     #[serde(rename = "isDuplicateSuspect")]
@@ -193,6 +195,8 @@ struct RequestLogSummaryState {
     completion_tokens: i64,
     #[serde(rename = "totalTokens")]
     total_tokens: i64,
+    #[serde(rename = "costCredits")]
+    cost_credits: f64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -225,6 +229,8 @@ struct TranslationPreviewState {
     #[serde(rename = "providerTitle")]
     provider_title: String,
     model: String,
+    #[serde(rename = "costCredits")]
+    cost_credits: Option<f64>,
     #[serde(rename = "toastDuration", default = "default_toast_duration_value")]
     toast_duration: f64,
 }
@@ -796,6 +802,7 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
         error_text: None,
         provider_title: provider_title(&settings.provider).to_string(),
         model: model_title(&settings.local_model_id, &settings.provider).to_string(),
+        cost_credits: None,
         toast_duration: settings.toast_duration,
     }
 }
@@ -1312,6 +1319,10 @@ fn request_log_summary(entries: &[RequestLogEntryState]) -> RequestLogSummarySta
         prompt_tokens: entries.iter().map(|entry| entry.prompt_tokens).sum(),
         completion_tokens: entries.iter().map(|entry| entry.completion_tokens).sum(),
         total_tokens: entries.iter().map(|entry| entry.total_tokens).sum(),
+        cost_credits: entries
+            .iter()
+            .map(|entry| entry.cost_credits.unwrap_or_default())
+            .sum(),
     }
 }
 

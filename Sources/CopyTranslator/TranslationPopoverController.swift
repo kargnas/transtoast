@@ -684,7 +684,7 @@ private final class TranslationPopoverContentView: NSView {
 
     private func render() {
         languageLabel.stringValue = "⌘  \(payload.targetLanguage)"
-        modelLabel.stringValue = payload.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        modelLabel.stringValue = modelMetadataText()
 
         switch visibleMode {
         case "loading":
@@ -711,6 +711,36 @@ private final class TranslationPopoverContentView: NSView {
 
         needsLayout = true
         needsDisplay = true
+    }
+
+    private func modelMetadataText() -> String {
+        let model = payload.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let costText = formatCostCredits(payload.costCredits) else {
+            return model
+        }
+        if model.isEmpty {
+            return costText
+        }
+        return "\(model) · \(costText)"
+    }
+
+    private func formatCostCredits(_ value: Double?) -> String? {
+        guard let value else {
+            return nil
+        }
+        let formatted = trimTrailingZeros(String(format: value < 0.0001 ? "%.8f" : "%.6f", value))
+        return "Cost \(formatted.isEmpty ? "0" : formatted) credits"
+    }
+
+    private func trimTrailingZeros(_ value: String) -> String {
+        var result = value
+        while result.contains(".") && result.last == "0" {
+            result.removeLast()
+        }
+        if result.last == "." {
+            result.removeLast()
+        }
+        return result
     }
 
     private func layoutContent() {

@@ -171,6 +171,7 @@ export type RequestLogEntry = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  costCredits: number | null;
   usageSource: string;
   isDuplicateSuspect: boolean;
   imageInfo: string | null;
@@ -183,6 +184,7 @@ export type RequestLogSummary = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  costCredits: number;
 };
 
 export type RequestLogsState = {

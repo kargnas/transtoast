@@ -12,6 +12,7 @@ struct TranslationPreviewPayload: Encodable {
     var errorText: String?
     var providerTitle: String
     var model: String
+    var costCredits: Double?
 }
 
 struct TranslationModelOption: Equatable {
@@ -522,7 +523,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             translatedText: "",
             errorText: nil,
             providerTitle: settings.provider.title,
-            model: activeModelTitle(settings: settings)
+            model: activeModelTitle(settings: settings),
+            costCredits: nil
         ), sourceTitle: sourceTitle, settings: settings)
     }
 
@@ -541,7 +543,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             translatedText: result.text,
             errorText: nil,
             providerTitle: result.providerTitle,
-            model: result.model
+            model: result.model,
+            costCredits: result.usage?.costCredits
         ), sourceTitle: result.providerTitle, settings: settings)
     }
 
@@ -560,7 +563,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             translatedText: "",
             errorText: error.localizedDescription,
             providerTitle: settings.provider.title,
-            model: activeModelTitle(settings: settings)
+            model: activeModelTitle(settings: settings),
+            costCredits: nil
         ), sourceTitle: sourceTitle, settings: settings)
     }
 
@@ -584,7 +588,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     translatedText: "마우스 오버 테스트",
                     errorText: nil,
                     providerTitle: "Smoke",
-                    model: "Smoke"
+                    model: "Smoke",
+                    costCredits: nil
                 ),
                 settings: settingsStore.settings,
                 caretBounds: caretBounds

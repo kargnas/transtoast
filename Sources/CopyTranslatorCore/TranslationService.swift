@@ -37,11 +37,13 @@ public struct TranslationUsage: Equatable, Sendable {
     public let promptTokens: Int?
     public let completionTokens: Int?
     public let totalTokens: Int?
+    public let costCredits: Double?
 
-    public init(promptTokens: Int?, completionTokens: Int?, totalTokens: Int?) {
+    public init(promptTokens: Int?, completionTokens: Int?, totalTokens: Int?, costCredits: Double? = nil) {
         self.promptTokens = promptTokens
         self.completionTokens = completionTokens
         self.totalTokens = totalTokens
+        self.costCredits = costCredits
     }
 }
 
@@ -507,7 +509,8 @@ public final class TranslationService: @unchecked Sendable {
         return TranslationUsage(
             promptTokens: tokenCount(from: usage["prompt_tokens"]),
             completionTokens: tokenCount(from: usage["completion_tokens"]),
-            totalTokens: tokenCount(from: usage["total_tokens"])
+            totalTokens: tokenCount(from: usage["total_tokens"]),
+            costCredits: doubleValue(from: usage["cost"])
         )
     }
 
@@ -520,6 +523,19 @@ public final class TranslationService: @unchecked Sendable {
         }
         if let stringValue = value as? String {
             return Int(stringValue)
+        }
+        return nil
+    }
+
+    private func doubleValue(from value: Any?) -> Double? {
+        if let doubleValue = value as? Double {
+            return doubleValue
+        }
+        if let intValue = value as? Int {
+            return Double(intValue)
+        }
+        if let stringValue = value as? String {
+            return Double(stringValue)
         }
         return nil
     }

@@ -55,6 +55,7 @@ struct OpenRouterScreenContextTests {
         #expect(result.usage?.promptTokens == 11)
         #expect(result.usage?.completionTokens == 7)
         #expect(result.usage?.totalTokens == 18)
+        #expect(result.usage?.costCredits == 0.000123)
     }
 
     @Test func openRouterTextParsesContextDescriptionSeparately() async throws {
@@ -146,6 +147,7 @@ private func openRouterResponse(_ translation: String, description: String? = ni
             "prompt_tokens": 11,
             "completion_tokens": 7,
             "total_tokens": 18,
+            "cost": 0.000123,
         ],
     ]
     return try! JSONSerialization.data(withJSONObject: payload)

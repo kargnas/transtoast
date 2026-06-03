@@ -40,6 +40,8 @@
   };
   const targetLanguage = $derived(preview.targetLanguage);
   const modelName = $derived(preview.model.trim());
+  const costLabel = $derived(formatCostCredits(preview.costCredits));
+  const modelMetadata = $derived([modelName, costLabel].filter(Boolean).join(" · "));
   const bodyText = $derived(visibleMode === "original" ? preview.originalText : preview.translatedText);
   const loadingMessage = $derived(
     preview.originalText === "[screen screenshot]"
@@ -119,6 +121,13 @@
       return value;
     }
     return null;
+  }
+
+  function formatCostCredits(value: number | null | undefined) {
+    if (value === null || value === undefined) return "";
+    const fixed = value < 0.0001 ? value.toFixed(8) : value.toFixed(6);
+    const trimmed = fixed.replace(/\.?0+$/, "");
+    return `Cost ${trimmed || "0"} credits`;
   }
 
   async function copyText() {
@@ -269,7 +278,7 @@
         <footer class="bubble-footer">
           <div class="footer-meta">
             <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
-            {#if modelName}<span class="model-label">{modelName}</span>{/if}
+            {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
         </footer>
       {:else if visibleMode === "error"}
@@ -297,7 +306,7 @@
         <footer class="bubble-footer">
           <div class="footer-meta">
             <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
-            {#if modelName}<span class="model-label">{modelName}</span>{/if}
+            {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
         </footer>
       {:else}
@@ -327,7 +336,7 @@
         <footer class="bubble-footer">
           <div class="footer-meta">
             <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
-            {#if modelName}<span class="model-label">{modelName}</span>{/if}
+            {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
         </footer>
       {/if}

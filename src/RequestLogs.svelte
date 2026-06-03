@@ -21,6 +21,13 @@
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleTimeString();
   }
+
+  function formatCostCredits(value: number | null | undefined) {
+    if (value === null || value === undefined) return "none";
+    const fixed = value < 0.0001 ? value.toFixed(8) : value.toFixed(6);
+    const trimmed = fixed.replace(/\.?0+$/, "");
+    return `${trimmed || "0"} credits`;
+  }
 </script>
 
 {#if state}
@@ -42,6 +49,7 @@
       <span>Input tokens <strong>{state.summary.promptTokens}</strong></span>
       <span>Output tokens <strong>{state.summary.completionTokens}</strong></span>
       <span>Total tokens <strong>{state.summary.totalTokens}</strong></span>
+      <span>Cost <strong>{formatCostCredits(state.summary.costCredits)}</strong></span>
     </section>
 
     <section class="log-list">
@@ -54,6 +62,7 @@
               <strong>{formatTimestamp(entry.timestamp)} | {entry.source} | {entry.providerTitle} | {entry.model}</strong>
               <span>
                 tokens {entry.promptTokens}/{entry.completionTokens}/{entry.totalTokens} ({entry.usageSource})
+                | cost: {formatCostCredits(entry.costCredits)}
                 | duplicate suspect: {entry.isDuplicateSuspect ? "yes" : "no"}
                 | image: {entry.imageInfo ?? "none"}
               </span>
