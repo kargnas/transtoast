@@ -10,8 +10,14 @@
   const debugMode = params.get("debug") === "1";
   const requestedMode = modeFromQuery(params.get("mode"));
   const arrowAbove = params.get("placement") === "above";
+  const anchorBottom = params.get("anchor") === "bottom";
+
+  // Must match `.translation-stage` vertical padding in app.css so the resized window
+  // leaves exactly enough room for the bubble plus its caret arrow on either side.
+  const stagePadding = 18;
 
   let isTauri = $state(false);
+  let bubbleEl = $state<HTMLDivElement | undefined>();
   let preview = $state<TranslationPreviewState>(fallbackTranslationState);
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
@@ -110,6 +116,23 @@
       flushMovedPosition();
     };
   });
+
+  $effect(() => {
+    void bodyText;
+    void visibleMode;
+    void modelMetadata;
+    if (!isTauri || !bubbleEl) return;
+    const frame = requestAnimationFrame(syncWindowHeight);
+    return () => cancelAnimationFrame(frame);
+  });
+
+  function syncWindowHeight() {
+    if (!isTauri || !bubbleEl) return;
+    const height = bubbleEl.offsetHeight + stagePadding * 2;
+    void invoke("resize_translation_preview", { height, anchorBottom }).catch(() => {
+      // Window resize is best-effort; a stale fixed size still shows the translation.
+    });
+  }
 
   async function loadPreview() {
     try {
@@ -384,6 +407,7 @@
 
 <main class="translation-stage" class:debug={debugMode} class:tall={tallMode} aria-label="Translation popup">
   <div
+    bind:this={bubbleEl}
     class="translation-bubble"
     class:above={arrowAbove}
     class:compact={compactMode}
@@ -399,9 +423,6 @@
   >
     <div class="translation-bubble-inner">
       {#if visibleMode === "loading"}
-        <div class="top-controls">
-          <button class="icon-button" aria-label={uiStrings.cancel} onclick={cancelLoading}><X size={16} /></button>
-        </div>
         <div class="loading-title">
           <span class="status-dot"></span>
           <span>{uiStrings.translating}</span>
@@ -413,54 +434,17 @@
             <span class="language"><Languages size={14} /><span class="language-text">{targetLanguage}</span></span>
             {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
           </div>
+          <div class="action-row">
+            <button class="icon-button" aria-label={uiStrings.cancel} onclick={cancelLoading}><X size={16} /></button>
+          </div>
         </footer>
       {:else if visibleMode === "error"}
-        <div class="popover-header">
-          <label class="language-select-shell" aria-label="Target language">
-            <Languages size={14} />
-            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
-              {#each targetLanguageOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </select>
-          </label>
-        </div>
         <div class="loading-title error-title">
           <span class="status-dot"></span>
           <span>{uiStrings.error}</span>
         </div>
         <p class="copying">{preview.errorText ?? uiStrings.translationFailed}</p>
-        <div class="top-controls">
-          {#if modelOptions.length > 1}
-            <label class="model-select-shell" aria-label="Model">
-              <Cpu size={16} />
-              <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
-                {#each modelOptions as option}
-                  <option value={option.value}>{option.label}</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
-          <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
-        </div>
         <footer class="bubble-footer error-footer">
-          <div class="footer-meta">
-            {#if modelMetadata}<span class="model-label">{modelMetadata}</span>{/if}
-          </div>
-          {#if screenRecordingPermissionError}
-            <button class="small-button permission-request-button" onclick={requestScreenRecordingPermission}>
-              <ShieldCheck size={14} />{uiStrings.requestPermission}
-            </button>
-          {/if}
-        </footer>
-        {#if showCountdown}
-          <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
-            <span class="dismiss-countdown-fill"></span>
-            <span class="dismiss-countdown-label">{countdownLabel}</span>
-          </div>
-        {/if}
-      {:else}
-        <div class="popover-header">
           <label class="language-select-shell" aria-label="Target language">
             <Languages size={14} />
             <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
@@ -469,33 +453,61 @@
               {/each}
             </select>
           </label>
-        </div>
-        <div class="top-controls">
-          {#if modelOptions.length > 1}
-            <label class="model-select-shell" aria-label="Model">
-              <Cpu size={16} />
-              <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
-                {#each modelOptions as option}
-                  <option value={option.value}>{option.label}</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
-          <button class="icon-button" aria-label={visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal} onclick={toggleOriginal}>
-            {#if visibleMode === "original"}<Languages size={16} />{:else}<Eye size={16} />{/if}
-          </button>
-          <button class="icon-button" aria-label={copied ? uiStrings.copied : uiStrings.copyCurrent} onclick={copyText}>
-            {#if copied}<Check size={16} />{:else}<Copy size={16} />{/if}
-          </button>
-          <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
-        </div>
-        <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
-        {#if showCountdown}
-          <div class="dismiss-countdown" aria-label={`Auto hide in ${countdownLabel}`}>
-            <span class="dismiss-countdown-fill"></span>
-            <span class="dismiss-countdown-label">{countdownLabel}</span>
+          <div class="action-row">
+            {#if screenRecordingPermissionError}
+              <button class="small-button permission-request-button" onclick={requestScreenRecordingPermission}>
+                <ShieldCheck size={14} />{uiStrings.requestPermission}
+              </button>
+            {/if}
+            {#if modelOptions.length > 1}
+              <label class="model-select-shell" aria-label="Model">
+                <Cpu size={16} />
+                <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+                  {#each modelOptions as option}
+                    <option value={option.value}>{option.label}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
+            <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
           </div>
-        {/if}
+        </footer>
+      {:else}
+        <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
+        <footer class="bubble-footer">
+          <label class="language-select-shell" aria-label="Target language">
+            <Languages size={14} />
+            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
+              {#each targetLanguageOptions as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </label>
+          <div class="action-row">
+            {#if modelOptions.length > 1}
+              <label class="model-select-shell" aria-label="Model">
+                <Cpu size={16} />
+                <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+                  {#each modelOptions as option}
+                    <option value={option.value}>{option.label}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
+            <button class="icon-button" aria-label={visibleMode === "original" ? uiStrings.showTranslation : uiStrings.showOriginal} onclick={toggleOriginal}>
+              {#if visibleMode === "original"}<Languages size={16} />{:else}<Eye size={16} />{/if}
+            </button>
+            <button class="icon-button" aria-label={copied ? uiStrings.copied : uiStrings.copyCurrent} onclick={copyText}>
+              {#if copied}<Check size={16} />{:else}<Copy size={16} />{/if}
+            </button>
+            <button class="icon-button" aria-label={uiStrings.close} onclick={closePopover}><X size={16} /></button>
+          </div>
+        </footer>
+      {/if}
+      {#if showCountdown}
+        <div class="countdown-bar" aria-label={`Auto hide in ${countdownLabel}`}>
+          <span class="countdown-bar-fill"></span>
+        </div>
       {/if}
     </div>
   </div>

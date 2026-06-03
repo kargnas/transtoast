@@ -739,10 +739,10 @@ kbd {
   display: grid;
   width: 100%;
   height: 100%;
-  min-width: 356px;
-  min-height: 132px;
+  min-width: 396px;
+  min-height: 124px;
   place-items: start center;
-  padding: 20px 18px 12px;
+  padding: 18px;
   background: transparent;
 }
 
@@ -756,11 +756,12 @@ kbd {
 
 .translation-bubble {
   position: relative;
-  width: 308px;
-  min-height: 112px;
-  border: 0.5px solid rgba(0, 0, 0, 0.34);
-  border-radius: 15px;
+  width: 348px;
+  min-height: 88px;
+  border: 0.5px solid rgba(0, 0, 0, 0.18);
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   opacity: var(--dismiss-opacity, 1);
@@ -773,7 +774,7 @@ kbd {
 }
 
 .translation-bubble.compact {
-  min-height: 112px;
+  min-height: 88px;
 }
 
 .translation-bubble.hover-paused {
@@ -818,59 +819,37 @@ kbd {
 .translation-bubble-inner {
   position: relative;
   z-index: 1;
-  padding: 14px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 13px 16px;
 }
 
-.translation-bubble.compact .translation-bubble-inner {
-  padding: 10px 20px 10px;
-}
-
-.dismiss-countdown {
-  position: relative;
-  width: 38px;
-  height: 20px;
-  margin: 7px 2px 0 auto;
+.countdown-bar {
+  height: 3px;
+  margin-top: 2px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(235, 236, 240, 0.76);
-  color: #5c5c62;
-  font-variant-numeric: tabular-nums;
-  line-height: 20px;
-  transition:
-    background 140ms ease,
-    transform 160ms ease;
+  background: rgba(120, 120, 128, 0.16);
 }
 
-.dismiss-countdown-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
+.countdown-bar-fill {
+  display: block;
   width: var(--countdown-progress);
+  height: 100%;
   border-radius: inherit;
-  background: rgba(0, 122, 255, 0.2);
+  background: rgba(0, 122, 255, 0.55);
   transition: width 100ms linear;
 }
 
-.dismiss-countdown-label {
-  position: relative;
-  display: grid;
-  height: 100%;
-  place-items: center;
-  padding: 0 7px;
-  font-size: 10px;
-  font-weight: 560;
-  line-height: 20px;
-}
-
-.translation-bubble.hover-paused .dismiss-countdown {
-  background: rgba(0, 122, 255, 0.12);
-  transform: scale(1.08);
+.translation-bubble.hover-paused .countdown-bar-fill {
+  background: rgba(0, 122, 255, 0.85);
 }
 
 .loading-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-right: 96px;
   color: var(--blue);
   font-size: 14px;
   font-weight: 650;
@@ -913,9 +892,8 @@ kbd {
 .bubble-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  margin-top: 8px;
-  padding-right: 0;
+  justify-content: space-between;
+  gap: 10px;
   color: #515154;
   font-size: 12px;
 }
@@ -923,19 +901,12 @@ kbd {
 .footer-meta {
   display: grid;
   min-width: 0;
-  width: 100%;
   gap: 2px;
-}
-
-.error-footer .footer-meta {
-  flex: 1 1 auto;
-  width: auto;
 }
 
 .permission-request-button {
   flex: 0 0 auto;
   gap: 6px;
-  min-width: 138px;
 }
 
 .language {
@@ -952,13 +923,6 @@ kbd {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.popover-header {
-  display: flex;
-  min-height: 28px;
-  align-items: center;
-  padding-right: 172px;
 }
 
 .language-select-shell {
@@ -1009,8 +973,8 @@ kbd {
 .translation-text {
   margin: 0;
   max-width: none;
-  min-height: 28px;
-  padding: 9px 0 0;
+  min-height: 24px;
+  padding: 0;
   color: var(--text);
   font-size: 16px;
   font-weight: 580;
@@ -1021,16 +985,6 @@ kbd {
   font-size: 14px;
   font-weight: 450;
   line-height: 1.35;
-}
-
-.top-controls {
-  position: absolute;
-  top: 10px;
-  right: 20px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .model-select-shell {
@@ -1065,7 +1019,7 @@ kbd {
 .action-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 

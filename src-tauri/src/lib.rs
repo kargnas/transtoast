@@ -10,7 +10,9 @@ use std::os::raw::{c_char, c_void};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use surfaces::{open_surface_window, AppSurface};
-use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, LogicalSize, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
+};
 
 #[cfg(target_os = "macos")]
 mod macos_drag {
@@ -93,7 +95,7 @@ mod macos_drag {
     }
 }
 
-const TRANSLATION_WINDOW_WIDTH: f64 = 356.0;
+const TRANSLATION_WINDOW_WIDTH: f64 = 396.0;
 const TRANSLATION_WINDOW_HEIGHT: f64 = 150.0;
 const TRANSLATION_TALL_WINDOW_HEIGHT: f64 = 176.0;
 const TRANSLATION_DEBUG_WINDOW_HEIGHT: f64 = 230.0;
@@ -686,6 +688,33 @@ fn close_translation_preview(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn resize_translation_preview(
+    app: AppHandle,
+    height: f64,
+    anchor_bottom: bool,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window("translation")
+        .ok_or("Translation window is not available.")?;
+    let clamped = height.clamp(TRANSLATION_WINDOW_HEIGHT, 720.0);
+    let scale = window.scale_factor().map_err(|error| error.to_string())?;
+    let previous = window.outer_size().map_err(|error| error.to_string())?;
+    window
+        .set_size(LogicalSize::new(TRANSLATION_WINDOW_WIDTH, clamped))
+        .map_err(|error| error.to_string())?;
+    if anchor_bottom {
+        // Keep the bottom edge (which points at the caret) fixed by moving the top up
+        // by however much the window grew.
+        let position = window.outer_position().map_err(|error| error.to_string())?;
+        let grown = (clamped * scale).round() as i32 - previous.height as i32;
+        window
+            .set_position(PhysicalPosition::new(position.x, position.y - grown))
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn save_translation_preview_position(
     app: AppHandle,
     position: PhysicalToastPosition,
@@ -785,11 +814,22 @@ pub fn run() {
                     height,
                     request.caret_override,
                 );
+                // Svelte resizes the window to fit wrapped text; it must keep the edge that
+                // points at the caret fixed, so tell it which edge is anchored.
+                let anchor_bottom = match placement.arrow {
+                    TranslationArrowPlacement::AboveCaret => true,
+                    TranslationArrowPlacement::BelowCaret => false,
+                    TranslationArrowPlacement::Fallback => matches!(
+                        settings.toast_position,
+                        ToastPosition::BottomRight | ToastPosition::BottomLeft
+                    ),
+                };
                 let url = format!(
-                    "index.html?surface=translation&mode={}&debug={}&placement={}",
+                    "index.html?surface=translation&mode={}&debug={}&placement={}&anchor={}",
                     request.mode,
                     if request.debug { "1" } else { "0" },
-                    placement.arrow.as_query_value()
+                    placement.arrow.as_query_value(),
+                    if anchor_bottom { "bottom" } else { "top" }
                 );
                 WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
                     .title("CopyTranslator Translation")
@@ -837,7 +877,8 @@ pub fn run() {
             translate_preview_to_language,
             save_translation_preview_position,
             open_screen_recording_settings,
-            close_translation_preview
+            close_translation_preview,
+            resize_translation_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running CopyTranslator Tauri app");
