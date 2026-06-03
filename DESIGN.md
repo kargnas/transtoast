@@ -14,7 +14,7 @@
 
 ## Brand
 - Personality: quiet, native, fast, utility-first, trustworthy.
-- Trust signals: macOS-native window chrome, system font, explicit permission status, visible provider/model state, reset controls only when an override exists.
+- Trust signals: macOS-native window chrome, system font, explicit permission status, visible translation model state, reset controls only when an override exists.
 - Avoid: marketing pages, decorative gradients/orbs, custom fake platform shadows, oversized hero layouts, hardcoded non-system UI language defaults.
 
 ## Product goals
@@ -24,13 +24,13 @@
 
 ## Personas and jobs
 - Primary personas: macOS power users, developers, bilingual readers, users comparing local and OpenRouter translation.
-- User jobs: choose translation provider/model, set source/target languages, confirm permissions, run diagnostics, inspect last result/logs, recover defaults.
+- User jobs: choose a translation model that also selects the provider, manage favorite/default models, set source/target languages, confirm permissions, run diagnostics, inspect last result/logs, recover defaults.
 - Key contexts of use: menu-bar utility workflow, short text fragments, screenshots, development/debug sessions.
 
 ## Information architecture
 - Primary navigation: macOS settings sidebar.
-- Core routes/screens: General, Translation, Shortcuts, Excluded Apps, Advanced, Info.
-- Content hierarchy: high-frequency provider/language settings first; model configuration second; shortcut/permission status third; advanced paths and storage details last.
+- Core routes/screens: General, Models, Shortcuts, Excluded Apps, Advanced, Info.
+- Content hierarchy: high-frequency translation model/language settings first; model favorites, OpenRouter pricing/modality/API key configuration second; shortcut/permission status third; advanced paths and storage details last.
 
 ## Design principles
 - Principle 1: Native first. Use OS titlebar, traffic-light controls, window shadow, keyboard permissions, and system settings links instead of drawing fake platform features.
@@ -46,8 +46,8 @@
 - Imagery/iconography: use symbol-style icons for settings sidebar and action buttons; do not use stock imagery in app surfaces.
 
 ## Components
-- Existing components to reuse: `TranslatorSettings`, `SettingsStore` semantics, `TranslationLanguage`, `LocalModelRegistry`, current permission checks, diagnostics actions, and translation result behavior including loading/success/error states. Toast position is fallback only when the keyboard caret/selection bounds are unavailable.
-- New/changed components: Tauri 2 settings shell, Svelte settings sidebar, grouped setting rows, reset buttons, Rust settings command layer, Tauri/Svelte translation popover surface.
+- Existing components to reuse: `TranslatorSettings`, `SettingsStore` semantics, `TranslationLanguage`, `LocalModelRegistry`, `OpenRouterModelCatalog`, current permission checks, diagnostics actions, and translation result behavior including loading/success/error states. Toast position is fallback only when the keyboard caret/selection bounds are unavailable.
+- New/changed components: Tauri 2 settings shell, Svelte settings sidebar, grouped setting rows, model-first Translation Model selectors, favorite model rows, reset buttons, Rust settings command layer, Tauri/Svelte translation popover surface.
 - Variants and states: default vs overridden setting rows, ready/not-granted permission states, saved/saving, success/error action notices, disabled reset buttons, translation loading/done/original/error states. Translation state switchers are debug-only and must not appear in the default popup.
 - Token/component ownership: `design/guide.html` remains visual token reference; `src/app.css` owns Tauri web implementation tokens; Rust owns setting defaults and persistence normalization.
 
@@ -73,14 +73,14 @@
 
 ## Content voice
 - Tone: concise, operational, English by default.
-- Terminology: "Text Provider", "Local Model", "OpenRouter", "Source Language", "Target Language", "Toast Position", "Reset Defaults".
+- Terminology: "Translation Model", "Local Model", "OpenRouter LLM", "Models", "Favorite Models", "Default", "Source Language", "Target Language", "Toast Position", "Reset Defaults".
 - Microcopy rules: use direct status labels like "Ready", "Not granted", "Saved"; avoid instructional paragraphs inside compact settings panes.
 
 ## Implementation constraints
 - Framework/styling system: Tauri 2 + Rust backend + Svelte 5 frontend.
 - Design-token constraints: follow `design/` colors, radii, grouped rows, sidebar navigation, and compact typography; do not use CSS `box-shadow` for platform-native window features.
-- Performance constraints: load settings synchronously from small override JSON; avoid unnecessary provider/model network calls in settings render.
-- Compatibility constraints: macOS 15+, bundle identifier `as.kargn.copy-translator`, default target language Korean, default text provider local Hy-MT2, OpenRouter for non-local and screenshot translation, Tauri `macos-private-api` enabled for transparent translation popover windows.
+- Performance constraints: load settings synchronously from small override JSON; avoid unnecessary model-catalog network calls in settings render. OpenRouter model pricing/modality metadata may use a static fallback catalog unless a live refresh is explicitly implemented.
+- Compatibility constraints: macOS 15+, bundle identifier `as.kargn.copy-translator`, default target language Korean, default translation model local Hy-MT2, OpenRouter for non-local and screenshot translation, Tauri `macos-private-api` enabled for transparent translation popover windows.
 - Test/screenshot expectations: run build/check/tests; run UI, capture screenshot, crop settings and translation surfaces, compare against `design/image.png` references and generated mockup/reference.
 
 ## Open questions

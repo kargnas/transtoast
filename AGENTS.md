@@ -36,11 +36,19 @@ npm run tauri dev
 cd src-tauri && cargo test
 ```
 
+VS Code's `🚀 Run Dev App Bundle` launch configuration runs:
+
+```sh
+./scripts/run-dev.zsh
+```
+
+After completed development or documentation work is verified and committed, run this launch path before reporting completion so the user's currently running `dist/CopyTranslator.app` is replaced with the latest build.
+
 ## Defaults And Behavior
 
 - Default UI language: English.
 - Default translation target: Korean.
-- Default text provider: local Hugging Face Hy-MT2.
+- Default translation model: app-recommended local Hugging Face Hy-MT2.
 - OpenRouter handles non-local LLM translation and screenshot translation.
 - Preserve `Cmd+C` double press and `Shift+Cmd+2` shortcuts.
 - Every persisted setting is code-default plus user override:
@@ -53,18 +61,21 @@ cd src-tauri && cargo test
 
 The settings UI must cover current AppKit behavior before adding new behavior:
 
-- Text Provider: `Local Model`, `OpenRouter LLM`.
+- Translation Model: one model-first selector that groups `Local Model` and `OpenRouter LLM` choices. Selecting any model must also select the matching provider.
+- Every model selector must include a `Default` option that resolves to the app-recommended model for that provider.
 - Source Language: `Auto` plus supported language list.
 - Target Language: supported language list without `Auto`.
 - Toast Position: bottom/top and left/right variants.
+- Models tab: manage favorite local and OpenRouter models.
 - Local Model: all built-in models plus custom models when supported.
 - Local Backend Path: blank means automatic backend selection.
 - Custom Models JSON: blank means default config lookup.
-- OpenRouter Text Model and Vision Model.
+- OpenRouter Text Model and Vision Model: show popular models, pricing, free status, and modality support.
+- OpenRouter API Key: settings may save or clear `OPENROUTER_API_KEY` in `~/.config/copy-translator/.env`; never expose the stored key value back to the UI.
 - Permission status for keyboard and screen recording.
 - Diagnostics/actions: model setup, permission panes, text test, screenshot translation, request logs, stacked toast preview.
 
-Do not edit credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/copy-translator/.env`.
+Do not edit other credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/copy-translator/.env`.
 
 ## Platform And Surface Rules
 
@@ -107,6 +118,7 @@ Before claiming UI work complete:
 - Run `npm run check`, `npm run build`, and `cd src-tauri && cargo test` for Tauri/Svelte/Rust changes.
 - Run the UI, capture a screenshot, crop the implemented settings surface, and compare it against `design/image.png` plus the generated mockup/reference.
 - Check generated CSS for forbidden custom platform shadows (`box-shadow`) in the settings shell.
+- After committing completed work, run the VS Code `🚀 Run Dev App Bundle` equivalent (`./scripts/run-dev.zsh`) before the final report unless the user explicitly says not to relaunch.
 - Report any verification gap clearly.
 
 ## Git Hygiene

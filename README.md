@@ -7,10 +7,10 @@ Copy Translator is a macOS menu-bar app that translates copied text after pressi
 - `Cmd+C` twice: reads the clipboard text and translates it.
 - `Shift+Cmd+2`: captures the current screen and translates visible text in the image.
 - Toast results appear in the configured screen corner and stack when multiple translations finish close together.
-- Text translation providers:
-  - `tencent/Hy-MT2-30B-A3B` local inference by default.
-  - `tencent/Hy-MT2-1.8B` local inference.
-  - Any OpenRouter chat model ID.
+- Translation Model selection is model-first:
+  - **Local Model** choices run local Hy-MT2 inference. The default is the app-recommended local model.
+  - **OpenRouter LLM** choices use OpenRouter chat models. Selecting a model also selects the OpenRouter provider.
+  - Every model selector includes **Default** to return to the app recommendation.
 - Screenshot translation uses an OpenRouter multimodal model. The default is `google/gemini-2.5-flash-lite`.
 - OpenRouter text translation automatically attaches the current screen as 1x visual context through the configured vision model when Screen Recording is already trusted.
 - OpenRouter text translation keeps the copied selection as the only translation target and may show a small contextual description for ambiguous short selections.
@@ -71,7 +71,7 @@ Development builds are signed with a stable local Apple Development identity whe
 ./scripts/run-dev.zsh
 ```
 
-Use the menu-bar icon to open options, request logs, provider/model selectors, permission helpers, and Quit. For local UI verification, you can launch the settings window directly:
+Use the menu-bar icon to open options, request logs, the **Translation Model** selector, permission helpers, and Quit. For local UI verification, you can launch the settings window directly:
 
 ```sh
 ./scripts/run-dev.zsh --show-settings
@@ -87,7 +87,9 @@ To build and install the app on this Mac:
 
 For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
 
-When **Text Provider** is **OpenRouter LLM**, Copy Translator automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
+When the selected **Translation Model** is an **OpenRouter LLM**, Copy Translator automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
+
+In Settings, **General** shows the active **Translation Model** directly. **Models** manages favorite local/OpenRouter models, default model selections, OpenRouter text/vision models, model pricing, free model status, modality support, and the local OpenRouter API key entry stored in `~/.config/copy-translator/.env`.
 
 Open **Request Logs...** from the menu-bar icon to inspect recent translation requests. The log keeps the last 200 requests and shows whether token usage came from the provider response or an app-side estimate. OpenRouter requests report provider token usage when the response includes it; local model requests use an estimate.
 
