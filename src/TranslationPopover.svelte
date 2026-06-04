@@ -10,6 +10,7 @@
   const debugMode = params.get("debug") === "1";
   const requestedMode = modeFromQuery(params.get("mode"));
   const arrowAbove = params.get("placement") === "above";
+  const arrowHidden = params.get("placement") === "none";
   const anchorBottom = params.get("anchor") === "bottom";
 
   // Must match `.translation-stage` vertical padding in app.css so the resized window
@@ -447,6 +448,7 @@
     bind:this={bubbleEl}
     class="translation-bubble"
     class:above={arrowAbove}
+    class:no-arrow={arrowHidden}
     class:compact={compactMode}
     class:error={visibleMode === "error"}
     role="dialog"

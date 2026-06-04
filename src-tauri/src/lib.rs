@@ -13,6 +13,8 @@ use surfaces::{open_surface_window, AppSurface};
 use tauri::{
     AppHandle, LogicalSize, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
 };
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 
 #[cfg(target_os = "macos")]
 mod macos_drag {
@@ -420,7 +422,10 @@ enum TranslationArrowPlacement {
 impl TranslationArrowPlacement {
     fn as_query_value(self) -> &'static str {
         match self {
-            Self::BelowCaret | Self::Fallback => "below",
+            // Fallback means the toast floats in a screen corner with no caret to point at, so the
+            // Svelte bubble must hide its arrow instead of pointing at empty space.
+            Self::Fallback => "none",
+            Self::BelowCaret => "below",
             Self::AboveCaret => "above",
         }
     }
@@ -795,6 +800,10 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             if let Some(request) = translation_preview_request() {
+                // The toast is a transient popover, so force this helper process to run as an
+                // accessory: no Dock icon and no focus stealing from the app the user copied from.
+                #[cfg(target_os = "macos")]
+                let _ = app.set_activation_policy(ActivationPolicy::Accessory);
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
                 }

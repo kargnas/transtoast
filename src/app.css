@@ -816,6 +816,10 @@ kbd {
   border-bottom-right-radius: 6px;
 }
 
+.translation-bubble.no-arrow::before {
+  display: none;
+}
+
 .translation-bubble-inner {
   position: relative;
   z-index: 1;
