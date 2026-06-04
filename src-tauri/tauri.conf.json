@@ -21,7 +21,12 @@
         "minHeight": 540,
         "resizable": true,
         "decorations": true,
-        "center": true
+        "center": true,
+        "transparent": true,
+        "windowEffects": {
+          "effects": ["sidebar"],
+          "state": "active"
+        }
       }
     ],
     "security": {

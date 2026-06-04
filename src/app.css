@@ -133,6 +133,14 @@ body,
   background: transparent;
 }
 
+/* Settings window uses the native macOS vibrancy material (Tauri windowEffects). The root must be
+   transparent so that material shows; the translucent sidebar/content surfaces then layer over it. */
+:root[data-surface="settings"],
+:root[data-surface="settings"] body,
+:root[data-surface="settings"] #app {
+  background: transparent;
+}
+
 button,
 input,
 select {
