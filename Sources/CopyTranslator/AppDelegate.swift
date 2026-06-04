@@ -14,6 +14,11 @@ struct TranslationPreviewPayload: Encodable {
     var model: String
     var costCredits: Double?
     var permissionAction: String? = nil
+    var requestSequence: Int = 0
+    var caretX: Double? = nil
+    var caretY: Double? = nil
+    var caretW: Double? = nil
+    var caretH: Double? = nil
 }
 
 @MainActor
@@ -30,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keepAliveWindow: NSWindow?
     private var lastClipboardTriggerAt: Date?
     private var lastTranslationCaretBounds: CGRect?
+    private var translationRequestSequence = 0
     private var currentTextTranslationTask: Task<Void, Never>?
     private var currentScreenshotTranslationTask: Task<Void, Never>?
     private var currentTextTranslationUsesLocalBackend = false
@@ -66,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startKeyboardMonitor()
         startScreenshotHotKey()
         startPasteboardMonitor()
+        startPersistentToastProcess()
         print("CopyTranslator ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
         let runsPopoverSmoke = CommandLine.arguments.contains("--show-popover-smoke")
@@ -90,6 +97,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         isUserQuitting ? .terminateNow : .terminateCancel
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // The persistent toast process has no Dock icon and survives window hide, so it would
+        // linger as a zombie unless the menu-bar app kills it explicitly on quit.
+        if let appURL = resolveTauriHelperAppURL() {
+            terminateTauriHelper(appURL: appURL, matching: "--translation-preview")
+        }
     }
 
     private func configureStatusItem() {
@@ -665,17 +680,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if payload.mode == "loading" {
             caretBounds = KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
             lastTranslationCaretBounds = caretBounds
+            // A new loading frame is a new user request; bumping the sequence tells the persistent
+            // toast window to reposition and show, instead of only updating its text in place.
+            translationRequestSequence += 1
         } else {
             caretBounds = lastTranslationCaretBounds
                 ?? KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
         }
 
-        writeTranslationPreviewState(payload)
-        // Only the loading frame launches the helper window; the result/error frame just rewrites
-        // the file and the helper, which polls while loading, swaps to it in place.
-        if payload.mode == "loading" {
-            launchTranslationToast(caretBounds: caretBounds)
+        var payload = payload
+        payload.requestSequence = translationRequestSequence
+        if let caret = toastCaretRect(for: caretBounds) {
+            payload.caretX = caret.0
+            payload.caretY = caret.1
+            payload.caretW = caret.2
+            payload.caretH = caret.3
         }
+        writeTranslationPreviewState(payload)
     }
 
     private func writeTranslationPreviewState(_ payload: TranslationPreviewPayload) {
@@ -690,51 +711,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func launchTranslationToast(caretBounds: CGRect?) {
-        var arguments = ["--translation-preview", "--translation-preview-state=loading"]
-        if let caret = translationCaretArgument(for: caretBounds) {
-            arguments.append("--translation-preview-caret=\(caret)")
-        }
-        // A live toast helper polls the state file, so a retry during cold start is absorbed by it.
-        // Relaunching here would pkill that still-visible toast and flash-kill it, so reuse instead.
-        if isTranslationHelperRunning() {
-            return
-        }
+    private func startPersistentToastProcess() {
+        // One hidden Tauri process is launched up front and reused for every translation, so the
+        // WebView (and its CJK font cache) stays warm instead of cold-starting on each Cmd+C.
         _ = launchTauriHelper(
-            arguments: arguments,
+            arguments: ["--translation-preview", "--persistent"],
             activate: false,
             replaceExistingMatching: "--translation-preview"
         )
     }
 
-    private func isTranslationHelperRunning() -> Bool {
-        guard let appURL = resolveTauriHelperAppURL() else {
-            return false
-        }
-        let executablePath = appURL
-            .appendingPathComponent("Contents/MacOS/copy-translator-tauri")
-            .path
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-f", "\(executablePath).*--translation-preview"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        try? process.run()
-        process.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return !data.isEmpty
-    }
-
     // KeyboardCaretLocator returns AppKit screen coordinates (bottom-left origin). The Rust
     // placement logic works in global Quartz coordinates (top-left origin), so flip Y against the
-    // primary display height before handing the caret rect to the Tauri helper.
-    private func translationCaretArgument(for caretBounds: CGRect?) -> String? {
+    // primary display height before writing the caret rect into the shared toast state.
+    private func toastCaretRect(for caretBounds: CGRect?) -> (Double, Double, Double, Double)? {
         guard let caret = caretBounds,
               let primaryHeight = (NSScreen.screens.first ?? NSScreen.main)?.frame.height else {
             return nil
         }
         let topLeftY = primaryHeight - caret.maxY
-        return "\(caret.minX),\(topLeftY),\(caret.width),\(caret.height)"
+        return (Double(caret.minX), Double(topLeftY), Double(caret.width), Double(caret.height))
     }
 
 
