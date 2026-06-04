@@ -152,29 +152,31 @@
       syncSelectedModel();
     }
     scheduleAutoDismiss();
-    if (isTauri && !debugMode && visibleMode === "loading") {
+    if (isTauri && !debugMode) {
       startResultPolling();
     }
   }
 
+  // The state file is the single source of truth. Polling never stops while the toast lives, so a
+  // fresh Cmd+C that rewrites the file (a retry during cold start) is absorbed by this same window
+  // instead of spawning a second helper whose launch would pkill and flash-kill the first toast.
   function startResultPolling() {
     stopResultPolling();
-    const startedAt = performance.now();
     resultPollTimer = window.setInterval(async () => {
-      if (performance.now() - startedAt > 60000) {
-        stopResultPolling();
-        return;
-      }
       let next: TranslationPreviewState;
       try {
         next = await invoke<TranslationPreviewState>("load_translation_preview");
       } catch {
         return;
       }
-      if (next.mode === "loading") return;
-      stopResultPolling();
+      const changed =
+        next.mode !== preview.mode ||
+        next.translatedText !== preview.translatedText ||
+        next.errorText !== preview.errorText ||
+        next.originalText !== preview.originalText;
+      if (!changed) return;
       preview = next;
-      visibleMode = next.mode === "error" ? "error" : next.mode === "original" ? "original" : "translated";
+      visibleMode = next.mode === "error" ? "error" : next.mode === "original" ? "original" : next.mode === "loading" ? "loading" : "translated";
       syncSelectedModel();
       syncSelectedTargetLanguage();
       scheduleAutoDismiss();

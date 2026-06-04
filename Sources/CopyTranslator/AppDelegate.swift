@@ -690,11 +690,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let caret = translationCaretArgument(for: caretBounds) {
             arguments.append("--translation-preview-caret=\(caret)")
         }
+        // A live toast helper polls the state file, so a retry during cold start is absorbed by it.
+        // Relaunching here would pkill that still-visible toast and flash-kill it, so reuse instead.
+        if isTranslationHelperRunning() {
+            return
+        }
         _ = launchTauriHelper(
             arguments: arguments,
             activate: false,
             replaceExistingMatching: "--translation-preview"
         )
+    }
+
+    private func isTranslationHelperRunning() -> Bool {
+        guard let appURL = resolveTauriHelperAppURL() else {
+            return false
+        }
+        let executablePath = appURL
+            .appendingPathComponent("Contents/MacOS/copy-translator-tauri")
+            .path
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-f", "\(executablePath).*--translation-preview"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        try? process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return !data.isEmpty
     }
 
     // KeyboardCaretLocator returns AppKit screen coordinates (bottom-left origin). The Rust
