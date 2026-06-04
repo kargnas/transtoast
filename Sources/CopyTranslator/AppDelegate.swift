@@ -56,6 +56,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         configureMainMenu()
         createKeepAliveWindow()
+        // The Tauri toast writes the global target language to the shared override
+        // file; rebuild the menu when that happens so both surfaces stay in sync.
+        settingsStore.onExternalChange = { [weak self] in
+            self?.rebuildMenu()
+        }
         configureStatusItem()
         localModelWarmupNotifier.requestAuthorization()
         startKeyboardMonitor()

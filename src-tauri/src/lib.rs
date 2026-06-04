@@ -667,8 +667,15 @@ fn translate_preview_to_language(
         &["--translate-text-once", state.original_text.as_str()],
     );
     let binary = legacy_binary_path(&app)?;
-    let output = Command::new(&binary)
-        .args(&args)
+    let mut command = Command::new(&binary);
+    command.args(&args);
+    // NSWorkspace launches this Tauri helper with cwd `/`, but the spawned Swift CLI
+    // resolves `scripts/runtimes/<backend>.py` relative to its cwd. Pin the workspace
+    // root so local-model retranslation does not fail with localModelUnavailable.
+    if let Some(dir) = legacy_working_dir(&app) {
+        command.current_dir(dir);
+    }
+    let output = command
         .output()
         .map_err(|error| format!("Could not run {}: {error}", binary.display()))?;
 
@@ -1965,6 +1972,12 @@ fn legacy_binary_path(app: &AppHandle) -> Result<PathBuf, String> {
         }
     }
     Err("CopyTranslator CLI binary not found. Build the Swift app first.".to_string())
+}
+
+fn legacy_working_dir(app: &AppHandle) -> Option<PathBuf> {
+    candidate_roots(app)
+        .into_iter()
+        .find(|root| root.join("scripts/runtimes").is_dir())
 }
 
 fn resolve_permission_app_bundle(app: &AppHandle) -> Result<PathBuf, String> {
