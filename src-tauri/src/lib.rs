@@ -98,6 +98,50 @@ mod macos_drag {
     }
 }
 
+#[cfg(target_os = "macos")]
+mod macos_toast {
+    use block2::RcBlock;
+    use objc2_app_kit::{NSEvent, NSEventMask, NSWindow};
+    use std::ffi::c_void;
+    use std::ptr::NonNull;
+    use tauri::{AppHandle, Manager};
+
+    // A focusable(false) panel never becomes key, and macOS withholds mouseMoved from non-key
+    // windows by default, so the WebView never sees DOM mouseenter/mouseleave and the toast's
+    // hover-to-pause countdown stays dead. Opt this window into mouse-moved delivery to revive it.
+    pub fn enable_mouse_moved(ns_window: *mut c_void) {
+        if let Some(window) = unsafe { (ns_window as *mut NSWindow).as_ref() } {
+            window.setAcceptsMouseMovedEvents(true);
+        }
+    }
+
+    // The toast lives in its own helper process, so a *global* monitor (which only reports events
+    // delivered to OTHER processes) fires precisely when the user clicks anywhere except the toast.
+    // That is exactly "clicked outside" -> dismiss, without making the panel focusable.
+    pub fn install_outside_click_dismiss(app: AppHandle, persistent: bool) {
+        let mask = NSEventMask::LeftMouseDown
+            | NSEventMask::RightMouseDown
+            | NSEventMask::OtherMouseDown;
+        let handler = RcBlock::new(move |_event: NonNull<NSEvent>| {
+            let Some(window) = app.get_webview_window("translation") else {
+                return;
+            };
+            if !window.is_visible().unwrap_or(false) {
+                return;
+            }
+            if persistent {
+                let _ = window.hide();
+            } else {
+                app.exit(0);
+            }
+        });
+        let token = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &handler);
+        // The toast helper outlives every individual popup, so keep the monitor for the whole
+        // process lifetime; dropping the token would unregister it via its Drop glue.
+        std::mem::forget(token);
+    }
+}
+
 const TRANSLATION_WINDOW_WIDTH: f64 = 396.0;
 const TRANSLATION_WINDOW_HEIGHT: f64 = 150.0;
 const TRANSLATION_TALL_WINDOW_HEIGHT: f64 = 176.0;
@@ -947,6 +991,10 @@ pub fn run() {
                             .visible(false)
                             .build()?;
                     apply_toast_theme(&window);
+                    if let Ok(ns_window) = window.ns_window() {
+                        macos_toast::enable_mouse_moved(ns_window);
+                    }
+                    macos_toast::install_outside_click_dismiss(app.handle().clone(), true);
                 } else {
                     let placement = translation_window_placement(
                         app.handle(),
@@ -987,6 +1035,13 @@ pub fn run() {
                         .map(|window| {
                             let _ = window.set_position(placement.position);
                             apply_toast_theme(&window);
+                            if let Ok(ns_window) = window.ns_window() {
+                                macos_toast::enable_mouse_moved(ns_window);
+                            }
+                            macos_toast::install_outside_click_dismiss(
+                                app.handle().clone(),
+                                false,
+                            );
                         })?;
                 }
             } else if let Some(surface) = startup_surface() {

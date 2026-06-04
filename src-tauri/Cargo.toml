@@ -12,6 +12,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+block2 = "0.6"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = [
   "NSApplication",
@@ -23,7 +24,8 @@ objc2-app-kit = { version = "0.3", features = [
   "NSPasteboard",
   "NSView",
   "NSWindow",
-  "NSWorkspace"
+  "NSWorkspace",
+  "block2"
 ] }
 objc2-foundation = { version = "0.3", features = [
   "NSArray",
