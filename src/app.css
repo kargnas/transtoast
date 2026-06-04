@@ -40,7 +40,7 @@
   --favorite-ink: #b36b00;
 
   /* Translation toast bubble surfaces, tokenized so the glass inverts in dark mode. */
-  --bubble-bg: rgba(255, 255, 255, 0.86);
+  --bubble-bg: rgba(255, 255, 255, 0.92);
   --bubble-border: rgba(0, 0, 0, 0.18);
   --bubble-border-hover: rgba(0, 0, 0, 0.42);
   --bubble-arrow: rgba(0, 0, 0, 0.34);
@@ -83,7 +83,7 @@
     --track: #3a3a3e;
     --favorite-ink: #f0a23a;
 
-    --bubble-bg: rgba(40, 40, 44, 0.82);
+    --bubble-bg: rgba(40, 40, 44, 0.90);
     --bubble-border: rgba(255, 255, 255, 0.16);
     --bubble-border-hover: rgba(255, 255, 255, 0.38);
     --bubble-arrow: rgba(255, 255, 255, 0.28);
@@ -960,6 +960,10 @@ kbd {
   .countdown-bar-fill {
     transition: none;
   }
+
+  .progress-fill {
+    animation: none;
+  }
 }
 
 .loading-title {
@@ -984,7 +988,7 @@ kbd {
 }
 
 .copying {
-  margin: 16px 0 20px;
+  margin: 0;
   color: var(--secondary);
   font-size: 14px;
 }
@@ -1000,9 +1004,21 @@ kbd {
 .progress-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 42%;
+  width: 40%;
   border-radius: inherit;
   background: var(--blue);
+  /* Indeterminate translation has no measurable progress, so slide a segment instead of
+     parking a static 42% bar that reads as a frozen/stalled determinate progress bar. */
+  animation: progress-indeterminate 1.15s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(275%);
+  }
 }
 
 .bubble-footer {
