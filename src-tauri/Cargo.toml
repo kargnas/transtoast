@@ -25,7 +25,12 @@ objc2-app-kit = { version = "0.3", features = [
   "NSWindow",
   "NSWorkspace"
 ] }
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSURL"] }
+objc2-foundation = { version = "0.3", features = [
+  "NSArray",
+  "NSString",
+  "NSURL",
+  "NSUserDefaults",
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["macos-private-api"] }

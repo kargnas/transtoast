@@ -790,6 +790,7 @@ fn show_translation_toast(app: AppHandle) -> Result<ShowToastResult, String> {
         .set_size(LogicalSize::new(TRANSLATION_WINDOW_WIDTH, height))
         .map_err(|error| error.to_string())?;
     let _ = window.set_position(placement.position);
+    apply_toast_theme(&window);
     window.show().map_err(|error| error.to_string())?;
     Ok(ShowToastResult {
         arrow: placement.arrow.as_query_value().to_string(),
@@ -874,6 +875,35 @@ fn clear_request_logs(app: AppHandle) -> Result<RequestLogsState, String> {
     request_logs_state(&app)
 }
 
+#[cfg(target_os = "macos")]
+fn system_prefers_dark() -> bool {
+    // Read the global AppleInterfaceStyle default directly: once set_theme pins a transparent
+    // WebView, window.theme() reports that pinned value, so it cannot detect later system changes.
+    use objc2_foundation::{NSString, NSUserDefaults};
+    let defaults = NSUserDefaults::standardUserDefaults();
+    let key = NSString::from_str("AppleInterfaceStyle");
+    defaults
+        .stringForKey(&key)
+        .map(|value| value.to_string().eq_ignore_ascii_case("dark"))
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn system_prefers_dark() -> bool {
+    false
+}
+
+fn apply_toast_theme(window: &tauri::WebviewWindow) {
+    // The transparent toast WebView does not follow the system color scheme on its own (unlike the
+    // vibrancy-backed settings window), so force the current system theme every time it is shown.
+    let theme = if system_prefers_dark() {
+        tauri::Theme::Dark
+    } else {
+        tauri::Theme::Light
+    };
+    let _ = window.set_theme(Some(theme));
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -902,19 +932,21 @@ pub fn run() {
                         request.mode,
                         if request.debug { "1" } else { "0" }
                     );
-                    WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
-                        .title("CopyTranslator Translation")
-                        .inner_size(TRANSLATION_WINDOW_WIDTH, height)
-                        .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
-                        .resizable(false)
-                        .decorations(false)
-                        .transparent(true)
-                        .always_on_top(true)
-                        .skip_taskbar(true)
-                        .focusable(false)
-                        .focused(false)
-                        .visible(false)
-                        .build()?;
+                    let window =
+                        WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
+                            .title("CopyTranslator Translation")
+                            .inner_size(TRANSLATION_WINDOW_WIDTH, height)
+                            .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
+                            .resizable(false)
+                            .decorations(false)
+                            .transparent(true)
+                            .always_on_top(true)
+                            .skip_taskbar(true)
+                            .focusable(false)
+                            .focused(false)
+                            .visible(false)
+                            .build()?;
+                    apply_toast_theme(&window);
                 } else {
                     let placement = translation_window_placement(
                         app.handle(),
@@ -954,6 +986,7 @@ pub fn run() {
                         .build()
                         .map(|window| {
                             let _ = window.set_position(placement.position);
+                            apply_toast_theme(&window);
                         })?;
                 }
             } else if let Some(surface) = startup_surface() {
