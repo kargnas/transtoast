@@ -380,6 +380,18 @@ struct TranslationPreviewState {
     permission_action: Option<String>,
     #[serde(rename = "toastDuration", default = "default_toast_duration_value")]
     toast_duration: f64,
+    #[serde(rename = "requestSequence", default)]
+    request_sequence: u64,
+    #[serde(rename = "caretX", default)]
+    caret_x: Option<f64>,
+    #[serde(rename = "caretY", default)]
+    caret_y: Option<f64>,
+    #[serde(rename = "caretW", default)]
+    caret_w: Option<f64>,
+    #[serde(rename = "caretH", default)]
+    caret_h: Option<f64>,
+    #[serde(rename = "anchorBottom", default)]
+    anchor_bottom: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -695,6 +707,14 @@ fn translate_preview_to_language(
 
 #[tauri::command]
 fn close_translation_preview(app: AppHandle) -> Result<(), String> {
+    // Persistent toast hides so the warmed WebView (and its font cache) survives for reuse;
+    // the legacy throwaway process still exits so its behavior is byte-for-byte unchanged.
+    if is_persistent_toast() {
+        if let Some(window) = app.get_webview_window("translation") {
+            window.hide().map_err(|error| error.to_string())?;
+        }
+        return Ok(());
+    }
     app.exit(0);
     Ok(())
 }
@@ -724,6 +744,56 @@ fn resize_translation_preview(
             .map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+#[derive(Serialize)]
+struct ShowToastResult {
+    arrow: String,
+    #[serde(rename = "anchorBottom")]
+    anchor_bottom: bool,
+}
+
+#[tauri::command]
+fn show_translation_toast(app: AppHandle) -> Result<ShowToastResult, String> {
+    let window = app
+        .get_webview_window("translation")
+        .ok_or("Translation window is not available.")?;
+    let settings = load_effective_settings(&app).unwrap_or_else(|_| default_settings());
+    let state = read_translation_preview_state(&app)?;
+    let (mode, caret) = match &state {
+        Some(s) => {
+            let caret = match (s.caret_x, s.caret_y, s.caret_w, s.caret_h) {
+                (Some(x), Some(y), Some(w), Some(h)) => ScreenRect::new(x, y, w, h),
+                _ => None,
+            };
+            (s.mode.clone(), caret)
+        }
+        None => ("translated".to_string(), None),
+    };
+    let height = if mode == "loading" || mode == "error" {
+        TRANSLATION_TALL_WINDOW_HEIGHT
+    } else {
+        TRANSLATION_WINDOW_HEIGHT
+    };
+    let placement =
+        translation_window_placement(&app, &settings, TRANSLATION_WINDOW_WIDTH, height, caret);
+    let anchor_bottom = match placement.arrow {
+        TranslationArrowPlacement::AboveCaret => true,
+        TranslationArrowPlacement::BelowCaret => false,
+        TranslationArrowPlacement::Fallback => matches!(
+            settings.toast_position,
+            ToastPosition::BottomRight | ToastPosition::BottomLeft
+        ),
+    };
+    window
+        .set_size(LogicalSize::new(TRANSLATION_WINDOW_WIDTH, height))
+        .map_err(|error| error.to_string())?;
+    let _ = window.set_position(placement.position);
+    window.show().map_err(|error| error.to_string())?;
+    Ok(ShowToastResult {
+        arrow: placement.arrow.as_query_value().to_string(),
+        anchor_bottom,
+    })
 }
 
 #[tauri::command]
@@ -823,45 +893,68 @@ pub fn run() {
                 } else {
                     TRANSLATION_WINDOW_HEIGHT
                 };
-                let placement = translation_window_placement(
-                    app.handle(),
-                    &settings,
-                    TRANSLATION_WINDOW_WIDTH,
-                    height,
-                    request.caret_override,
-                );
-                // Svelte resizes the window to fit wrapped text; it must keep the edge that
-                // points at the caret fixed, so tell it which edge is anchored.
-                let anchor_bottom = match placement.arrow {
-                    TranslationArrowPlacement::AboveCaret => true,
-                    TranslationArrowPlacement::BelowCaret => false,
-                    TranslationArrowPlacement::Fallback => matches!(
-                        settings.toast_position,
-                        ToastPosition::BottomRight | ToastPosition::BottomLeft
-                    ),
-                };
-                let url = format!(
-                    "index.html?surface=translation&mode={}&debug={}&placement={}&anchor={}",
-                    request.mode,
-                    if request.debug { "1" } else { "0" },
-                    placement.arrow.as_query_value(),
-                    if anchor_bottom { "bottom" } else { "top" }
-                );
-                WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
-                    .title("CopyTranslator Translation")
-                    .inner_size(TRANSLATION_WINDOW_WIDTH, height)
-                    .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
-                    .resizable(false)
-                    .decorations(false)
-                    .transparent(true)
-                    .always_on_top(true)
-                    .skip_taskbar(true)
-                    .focusable(false)
-                    .focused(false)
-                    .build()
-                    .map(|window| {
-                        let _ = window.set_position(placement.position);
-                    })?;
+                if is_persistent_toast() {
+                    // Built hidden and positioned per-translation by show_translation_toast, so one
+                    // warm WebView is reused instead of cold-starting a process on every Cmd+C.
+                    let url = format!(
+                        "index.html?surface=translation&mode={}&debug={}",
+                        request.mode,
+                        if request.debug { "1" } else { "0" }
+                    );
+                    WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
+                        .title("CopyTranslator Translation")
+                        .inner_size(TRANSLATION_WINDOW_WIDTH, height)
+                        .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
+                        .resizable(false)
+                        .decorations(false)
+                        .transparent(true)
+                        .always_on_top(true)
+                        .skip_taskbar(true)
+                        .focusable(false)
+                        .focused(false)
+                        .visible(false)
+                        .build()?;
+                } else {
+                    let placement = translation_window_placement(
+                        app.handle(),
+                        &settings,
+                        TRANSLATION_WINDOW_WIDTH,
+                        height,
+                        request.caret_override,
+                    );
+                    // Svelte resizes the window to fit wrapped text; it must keep the edge that
+                    // points at the caret fixed, so tell it which edge is anchored.
+                    let anchor_bottom = match placement.arrow {
+                        TranslationArrowPlacement::AboveCaret => true,
+                        TranslationArrowPlacement::BelowCaret => false,
+                        TranslationArrowPlacement::Fallback => matches!(
+                            settings.toast_position,
+                            ToastPosition::BottomRight | ToastPosition::BottomLeft
+                        ),
+                    };
+                    let url = format!(
+                        "index.html?surface=translation&mode={}&debug={}&placement={}&anchor={}",
+                        request.mode,
+                        if request.debug { "1" } else { "0" },
+                        placement.arrow.as_query_value(),
+                        if anchor_bottom { "bottom" } else { "top" }
+                    );
+                    WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
+                        .title("CopyTranslator Translation")
+                        .inner_size(TRANSLATION_WINDOW_WIDTH, height)
+                        .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
+                        .resizable(false)
+                        .decorations(false)
+                        .transparent(true)
+                        .always_on_top(true)
+                        .skip_taskbar(true)
+                        .focusable(false)
+                        .focused(false)
+                        .build()
+                        .map(|window| {
+                            let _ = window.set_position(placement.position);
+                        })?;
+                }
             } else if let Some(surface) = startup_surface() {
                 if surface != AppSurface::Settings {
                     if let Some(window) = app.get_webview_window("main") {
@@ -894,10 +987,20 @@ pub fn run() {
             save_translation_preview_position,
             open_screen_recording_settings,
             close_translation_preview,
-            resize_translation_preview
+            resize_translation_preview,
+            show_translation_toast
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running CopyTranslator Tauri app");
+        .build(tauri::generate_context!())
+        .expect("error while building CopyTranslator Tauri app")
+        .run(|_app, event| {
+            // The persistent toast must survive dismissing its only window so the next translation
+            // reuses the warm WebView; legacy throwaway processes are unaffected and exit normally.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if is_persistent_toast() {
+                    api.prevent_exit();
+                }
+            }
+        });
 }
 
 fn startup_surface() -> Option<AppSurface> {
@@ -939,6 +1042,10 @@ fn translation_preview_request() -> Option<TranslationPreviewRequest> {
         debug,
         caret_override,
     })
+}
+
+fn is_persistent_toast() -> bool {
+    std::env::args().skip(1).any(|arg| arg == "--persistent")
 }
 
 fn normalized_translation_mode(value: &str) -> &'static str {
@@ -1268,6 +1375,12 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
         cost_credits: None,
         permission_action: None,
         toast_duration: settings.toast_duration,
+        request_sequence: 0,
+        caret_x: None,
+        caret_y: None,
+        caret_w: None,
+        caret_h: None,
+        anchor_bottom: false,
     }
 }
 
@@ -2533,6 +2646,37 @@ mod tests {
         let defaults = default_settings();
         let stored = StoredSettings::from_effective(&defaults, &defaults);
         assert!(stored.is_empty());
+    }
+
+    #[test]
+    fn translation_preview_state_defaults_when_new_fields_absent() {
+        let legacy = r#"{
+            "mode":"translated","sourceLanguage":"English","targetLanguage":"Korean",
+            "originalText":"hi","translatedText":"안녕","errorText":null,
+            "providerTitle":"Local Model","model":"m","costCredits":null,"permissionAction":null
+        }"#;
+        let state: TranslationPreviewState = serde_json::from_str(legacy).unwrap();
+        assert_eq!(state.request_sequence, 0);
+        assert!(state.caret_x.is_none());
+        assert!(state.caret_y.is_none());
+        assert!(!state.anchor_bottom);
+    }
+
+    #[test]
+    fn translation_preview_state_roundtrips_new_fields() {
+        let json = r#"{
+            "mode":"translated","sourceLanguage":"English","targetLanguage":"Korean",
+            "originalText":"hi","translatedText":"안녕","errorText":null,
+            "providerTitle":"Local Model","model":"m","costCredits":null,"permissionAction":null,
+            "requestSequence":7,"caretX":10.0,"caretY":20.0,"caretW":2.0,"caretH":18.0,"anchorBottom":true
+        }"#;
+        let state: TranslationPreviewState = serde_json::from_str(json).unwrap();
+        assert_eq!(state.request_sequence, 7);
+        assert_eq!(state.caret_x, Some(10.0));
+        assert!(state.anchor_bottom);
+        let encoded = serde_json::to_string(&state).unwrap();
+        assert!(encoded.contains("\"requestSequence\":7"));
+        assert!(encoded.contains("\"anchorBottom\":true"));
     }
 
     #[test]
