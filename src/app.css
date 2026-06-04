@@ -1,21 +1,103 @@
 :root {
   --blue: #007aff;
   --green: #34c759;
+  --green-text: #247a3d;
   --red: #ff3b30;
+  /* Tints derive from fixed Apple blue (not var(--blue)) so color-mix always resolves even when the
+     solid accent below upgrades to the system AccentColor keyword, which is invalid inside color-mix. */
+  --accent-soft: color-mix(in srgb, #007aff 7%, transparent);
+  --accent-tint: color-mix(in srgb, #007aff 10%, transparent);
+  --accent-line: color-mix(in srgb, #007aff 16%, transparent);
+  --accent-bar: color-mix(in srgb, #007aff 55%, transparent);
+  --accent-bar-strong: color-mix(in srgb, #007aff 85%, transparent);
+
   --text: #1d1d1f;
+  /* Headings and strong labels were hardcoded #202024/#252529; unified so dark mode can lift them together. */
+  --text-strong: #202024;
+  /* Control/button text was hardcoded across #2f2f35/#303036/#343438/#3b3b41/#3f3f46/#45454a; one token flips cleanly in dark. */
+  --control-ink: #2f2f35;
   --secondary: #6e6e73;
   --tertiary: #a1a1a6;
+
   --border: #e5e5ea;
   --border-strong: #d2d2d7;
-  --sidebar: rgba(246, 247, 250, 0.72);
+  /* Glass-edge hairline on the translation bubble controls (was rgba(178,178,184,~.5)). */
+  --glass-border: rgba(178, 178, 184, 0.46);
+
+  --bg: #f5f6f8;
   --surface: rgba(255, 255, 255, 0.86);
   --surface-solid: #ffffff;
-  --bg: #f5f6f8;
+  --surface-card: rgba(255, 255, 255, 0.78);
+  --surface-pop: rgba(255, 255, 255, 0.98);
+  --sidebar: rgba(246, 247, 250, 0.72);
+  --sidebar-panel: rgba(246, 247, 250, 0.86);
+  --hover: rgba(0, 0, 0, 0.04);
+  /* Text on the accent fill stays white in both schemes, matching macOS accent buttons. */
+  --on-accent: #ffffff;
+
+  --kbd-bg: #f7f7f8;
+  --track: #e7e8ec;
+  --favorite-ink: #b36b00;
+
+  /* Translation toast bubble surfaces, tokenized so the glass inverts in dark mode. */
+  --bubble-bg: rgba(255, 255, 255, 0.86);
+  --bubble-border: rgba(0, 0, 0, 0.18);
+  --bubble-border-hover: rgba(0, 0, 0, 0.42);
+  --bubble-arrow: rgba(0, 0, 0, 0.34);
+  --bubble-edge: rgba(255, 255, 255, 0.88);
+  --toast-bg: rgba(255, 255, 255, 0.94);
+
   color: var(--text);
   background: var(--bg);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-synthesis: none;
   line-height: 1.4;
+}
+
+/* Dark mode follows the system appearance (native-feel ship-readiness D.32). Only token values flip;
+   every selector below resolves through these variables so light-mode pixels stay byte-identical. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --green-text: #41c463;
+
+    --text: #f5f5f7;
+    --text-strong: #ffffff;
+    --control-ink: #e3e3e6;
+    --secondary: #9b9ba1;
+    --tertiary: #6f6f76;
+
+    --border: #38383c;
+    --border-strong: #48484d;
+    --glass-border: rgba(255, 255, 255, 0.18);
+
+    --bg: #1e1e20;
+    --surface: rgba(40, 40, 44, 0.86);
+    --surface-solid: #2c2c2e;
+    --surface-card: rgba(255, 255, 255, 0.05);
+    --surface-pop: rgba(44, 44, 48, 0.98);
+    --sidebar: rgba(30, 30, 33, 0.72);
+    --sidebar-panel: rgba(36, 36, 40, 0.86);
+    --hover: rgba(255, 255, 255, 0.07);
+
+    --kbd-bg: #2a2a2d;
+    --track: #3a3a3e;
+    --favorite-ink: #f0a23a;
+
+    --bubble-bg: rgba(40, 40, 44, 0.82);
+    --bubble-border: rgba(255, 255, 255, 0.16);
+    --bubble-border-hover: rgba(255, 255, 255, 0.38);
+    --bubble-arrow: rgba(255, 255, 255, 0.28);
+    --bubble-edge: rgba(255, 255, 255, 0.10);
+    --toast-bg: rgba(40, 40, 44, 0.94);
+  }
+}
+
+/* Follow the live macOS system accent for solid accent fills (native-feel D.33). Guarded by @supports so
+   engines that lack AccentColor keep the Apple-blue fallback instead of rendering a transparent fill. */
+@supports (background: AccentColor) {
+  :root {
+    --blue: AccentColor;
+  }
 }
 
 * {
@@ -91,19 +173,19 @@ button {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #343438;
+  color: var(--control-ink);
   font-size: 12px;
   font-weight: 540;
   text-align: left;
 }
 
 .sidebar button:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--hover);
 }
 
 .sidebar button.active {
   background: var(--blue);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .sidebar-separator {
@@ -148,7 +230,7 @@ h1 {
 
 h2 {
   margin: 0 0 8px;
-  color: #202024;
+  color: var(--text-strong);
   font-size: 12px;
 }
 
@@ -172,7 +254,7 @@ h2 {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface-card);
 }
 
 .menu-setting-group {
@@ -209,7 +291,7 @@ h2 {
 
 .setting-copy strong {
   display: block;
-  color: #202024;
+  color: var(--text-strong);
   font-size: 12px;
   font-weight: 650;
 }
@@ -333,7 +415,7 @@ input {
   gap: 5px;
   padding: 2px 6px;
   border-radius: 5px;
-  background: rgba(0, 122, 255, 0.1);
+  background: var(--accent-tint);
   color: var(--blue);
   font-size: 10px;
   font-weight: 650;
@@ -341,11 +423,11 @@ input {
 
 .trigger-provider.open-router {
   background: rgba(52, 199, 89, 0.12);
-  color: #247a3d;
+  color: var(--green-text);
 }
 
 .trigger-model {
-  color: #252529;
+  color: var(--text-strong);
 }
 
 .nested-model-menu {
@@ -360,7 +442,7 @@ input {
   overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--surface-pop);
 }
 
 .nested-model-providers {
@@ -369,7 +451,7 @@ input {
   gap: 2px;
   padding: 6px;
   border-right: 1px solid var(--border);
-  background: rgba(246, 247, 250, 0.86);
+  background: var(--sidebar-panel);
 }
 
 .nested-model-providers button,
@@ -381,7 +463,7 @@ input {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #303036;
+  color: var(--control-ink);
   text-align: left;
 }
 
@@ -408,7 +490,7 @@ input {
 .nested-model-providers button:hover,
 .nested-model-providers button.active {
   background: var(--blue);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .nested-model-providers button:hover svg:last-child,
@@ -432,7 +514,7 @@ input {
 }
 
 .nested-model-options button:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--hover);
 }
 
 .nested-model-options button.selected {
@@ -480,7 +562,7 @@ input {
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: var(--surface-solid);
-  color: #2f2f35;
+  color: var(--control-ink);
   font-size: 11px;
   font-weight: 520;
 }
@@ -511,7 +593,7 @@ input {
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: var(--surface-solid);
-  color: #343438;
+  color: var(--control-ink);
   font-size: 11px;
   font-weight: 540;
 }
@@ -523,7 +605,7 @@ input {
 
 .favorite-button.active {
   border-color: rgba(255, 149, 0, 0.28);
-  color: #b36b00;
+  color: var(--favorite-ink);
   background: rgba(255, 149, 0, 0.08);
 }
 
@@ -534,7 +616,7 @@ input {
 .model-copy strong {
   display: block;
   overflow: hidden;
-  color: #202024;
+  color: var(--text-strong);
   font-size: 11px;
   font-weight: 650;
   text-overflow: ellipsis;
@@ -574,7 +656,7 @@ input {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: rgba(248, 248, 250, 0.98);
+  background: var(--surface-pop);
 }
 
 .openrouter-table th button {
@@ -600,12 +682,12 @@ input {
 }
 
 .openrouter-table td {
-  color: #3b3b41;
+  color: var(--control-ink);
   vertical-align: middle;
 }
 
 .openrouter-table tr.selected-model td {
-  background: rgba(0, 122, 255, 0.07);
+  background: var(--accent-soft);
 }
 
 .favorite-column {
@@ -627,7 +709,7 @@ input {
 }
 
 .model-name-cell strong {
-  color: #202024;
+  color: var(--text-strong);
   font-size: 11px;
   font-weight: 650;
 }
@@ -648,10 +730,10 @@ input {
 
 .model-badges em {
   padding: 1px 5px;
-  border: 1px solid rgba(0, 122, 255, 0.16);
+  border: 1px solid var(--accent-line);
   border-radius: 999px;
-  background: rgba(0, 122, 255, 0.07);
-  color: #1d67b5;
+  background: var(--accent-soft);
+  color: var(--blue);
   font-size: 9px;
   font-style: normal;
   font-weight: 560;
@@ -682,8 +764,8 @@ kbd {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #f7f7f8;
-  color: #3f3f46;
+  background: var(--kbd-bg);
+  color: var(--control-ink);
   font-family: inherit;
   font-size: 11px;
 }
@@ -701,7 +783,7 @@ kbd {
 
 .status-pill.ready,
 .api-status {
-  color: #247a3d;
+  color: var(--green-text);
 }
 
 .toast-stack {
@@ -720,7 +802,7 @@ kbd {
   padding: 10px 12px;
   border: 1px solid rgba(255, 59, 48, 0.28);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--toast-bg);
   color: var(--secondary);
   font-size: 11px;
 }
@@ -773,9 +855,9 @@ kbd {
   position: relative;
   width: 348px;
   min-height: 88px;
-  border: 0.5px solid rgba(0, 0, 0, 0.18);
+  border: 0.5px solid var(--bubble-border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--bubble-bg);
   box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
@@ -793,7 +875,7 @@ kbd {
 }
 
 .translation-bubble.hover-paused {
-  border-color: rgba(0, 0, 0, 0.42);
+  border-color: var(--bubble-border-hover);
   transform: scale(1.012);
 }
 
@@ -803,8 +885,8 @@ kbd {
   left: calc(50% - 13px);
   width: 28px;
   height: 28px;
-  border-top: 0.5px solid rgba(0, 0, 0, 0.34);
-  border-left: 0.5px solid rgba(0, 0, 0, 0.34);
+  border-top: 0.5px solid var(--bubble-arrow);
+  border-left: 0.5px solid var(--bubble-arrow);
   border-top-left-radius: 6px;
   background: inherit;
   content: "";
@@ -814,7 +896,7 @@ kbd {
 .translation-bubble::after {
   position: absolute;
   inset: 1px;
-  border: 1px solid rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--bubble-edge);
   border-radius: 14px;
   content: "";
   pointer-events: none;
@@ -825,8 +907,8 @@ kbd {
   bottom: -16px;
   border-top: 0;
   border-left: 0;
-  border-right: 0.5px solid rgba(0, 0, 0, 0.34);
-  border-bottom: 0.5px solid rgba(0, 0, 0, 0.34);
+  border-right: 0.5px solid var(--bubble-arrow);
+  border-bottom: 0.5px solid var(--bubble-arrow);
   border-top-left-radius: 0;
   border-bottom-right-radius: 6px;
 }
@@ -857,12 +939,12 @@ kbd {
   width: var(--countdown-progress);
   height: 100%;
   border-radius: inherit;
-  background: rgba(0, 122, 255, 0.55);
+  background: var(--accent-bar);
   transition: width 100ms linear;
 }
 
 .translation-bubble.hover-paused .countdown-bar-fill {
-  background: rgba(0, 122, 255, 0.85);
+  background: var(--accent-bar-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -895,7 +977,7 @@ kbd {
 
 .copying {
   margin: 16px 0 20px;
-  color: #67676d;
+  color: var(--secondary);
   font-size: 14px;
 }
 
@@ -904,7 +986,7 @@ kbd {
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e7e8ec;
+  background: var(--track);
 }
 
 .progress-fill {
@@ -920,7 +1002,7 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: #515154;
+  color: var(--secondary);
   font-size: 12px;
 }
 
@@ -941,7 +1023,7 @@ kbd {
   gap: 7px;
   min-width: 0;
   overflow: hidden;
-  color: #45454a;
+  color: var(--control-ink);
   white-space: nowrap;
 }
 
@@ -958,10 +1040,10 @@ kbd {
   max-width: 134px;
   height: 28px;
   gap: 6px;
-  border: 1px solid rgba(178, 178, 184, 0.52);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: #fff;
-  color: #45454a;
+  background: var(--surface-solid);
+  color: var(--control-ink);
 }
 
 .language-select-shell svg {
@@ -975,8 +1057,8 @@ kbd {
   height: 26px;
   padding: 0 10px 0 0;
   border: 0;
-  background: #fff;
-  color: #45454a;
+  background: var(--surface-solid);
+  color: var(--control-ink);
   appearance: none;
   -webkit-appearance: none;
   font-size: 12px;
@@ -987,7 +1069,7 @@ kbd {
 .model-label {
   min-width: 0;
   overflow: hidden;
-  color: #77777d;
+  color: var(--secondary);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   font-weight: 560;
@@ -1020,7 +1102,7 @@ kbd {
   height: 28px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(178, 178, 184, 0.46);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   background: transparent;
   color: var(--text);
@@ -1054,7 +1136,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(178, 178, 184, 0.46);
+  border: 1px solid var(--glass-border);
   background: transparent;
   color: var(--text);
 }
@@ -1083,7 +1165,7 @@ kbd {
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--surface-card);
 }
 
 .preview-switcher button {
@@ -1098,7 +1180,7 @@ kbd {
 
 .preview-switcher button.active {
   background: var(--blue);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 @media (max-width: 560px) {
@@ -1187,7 +1269,7 @@ kbd {
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: var(--surface-solid);
-  color: #2f2f35;
+  color: var(--control-ink);
   font-size: 11px;
   font-weight: 540;
 }
@@ -1200,7 +1282,7 @@ kbd {
 .surface-footer .primary {
   border-color: var(--blue);
   background: var(--blue);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .model-grid {
@@ -1219,7 +1301,7 @@ kbd {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface-card);
 }
 
 .table-panel {
@@ -1246,7 +1328,7 @@ th {
 }
 
 tr.active td {
-  background: rgba(0, 122, 255, 0.09);
+  background: var(--accent-tint);
 }
 
 .detail-panel {
@@ -1306,7 +1388,7 @@ tr.active td {
 
 .segmented button.active {
   background: var(--blue);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 pre {
@@ -1314,7 +1396,7 @@ pre {
   min-height: 0;
   overflow: auto;
   margin: 10px 0 0;
-  color: #2f2f35;
+  color: var(--control-ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   white-space: pre-wrap;
@@ -1333,7 +1415,7 @@ pre {
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface-card);
 }
 
 .summary-strip strong {
@@ -1437,7 +1519,7 @@ pre {
 }
 
 .action-result.ok {
-  color: #247a3d;
+  color: var(--green-text);
 }
 
 .toast-preview-frame {
@@ -1460,7 +1542,7 @@ pre {
   border: 1px solid rgba(217, 217, 222, 0.72);
   border-radius: 8px;
   background: rgba(34, 34, 38, 0.82);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .preview-toast header {
