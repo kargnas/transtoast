@@ -3,15 +3,15 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import { Check, Copy, Cpu, Eye, Languages, ShieldCheck, X } from "@lucide/svelte";
-  import { fallbackTranslationState, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
+  import { fallbackTranslationState, type ShowToastResult, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
   import { fallbackState, type SettingsState } from "./lib/settings";
 
   const params = new URLSearchParams(window.location.search);
   const debugMode = params.get("debug") === "1";
   const requestedMode = modeFromQuery(params.get("mode"));
-  const arrowAbove = params.get("placement") === "above";
-  const arrowHidden = params.get("placement") === "none";
-  const anchorBottom = params.get("anchor") === "bottom";
+  let arrowAbove = $state(params.get("placement") === "above");
+  let arrowHidden = $state(params.get("placement") === "none");
+  let anchorBottom = $state(params.get("anchor") === "bottom");
 
   // Must match `.translation-stage` vertical padding in app.css so the resized window
   // leaves exactly enough room for the bubble plus its caret arrow on either side.
@@ -32,6 +32,7 @@
   let countdownInterval: number | undefined;
   let resultPollTimer: number | undefined;
   let moveSaveTimer: number | undefined;
+  let lastShownSequence = 0;
   let windowMoveUnlisten: (() => void) | undefined;
   let pendingMovedPosition: WindowPosition | null = null;
   let countdownStartedAt = $state(0);
@@ -137,6 +138,22 @@
     });
   }
 
+  async function maybeShowForSequence() {
+    const seq = preview.requestSequence ?? 0;
+    // Sequence 0 means the legacy throwaway window (already visible); only a persistent reused
+    // window needs an explicit per-translation show, signalled by Swift bumping the sequence.
+    if (!isTauri || seq === 0 || seq === lastShownSequence) return;
+    lastShownSequence = seq;
+    try {
+      const result = await invoke<ShowToastResult>("show_translation_toast");
+      arrowAbove = result.arrow === "above";
+      arrowHidden = result.arrow === "none";
+      anchorBottom = result.anchorBottom;
+    } catch {
+      // Show is best-effort; a stale position still surfaces the translation.
+    }
+  }
+
   async function loadPreview() {
     try {
       preview = await invoke<TranslationPreviewState>("load_translation_preview");
@@ -146,6 +163,7 @@
       preview = fallbackTranslationState;
       visibleMode = requestedMode ?? "translated";
     }
+    void maybeShowForSequence();
     if (isTauri) {
       await loadModelOptions();
     } else {
@@ -173,9 +191,11 @@
         next.mode !== preview.mode ||
         next.translatedText !== preview.translatedText ||
         next.errorText !== preview.errorText ||
-        next.originalText !== preview.originalText;
+        next.originalText !== preview.originalText ||
+        (next.requestSequence ?? 0) !== (preview.requestSequence ?? 0);
       if (!changed) return;
       preview = next;
+      void maybeShowForSequence();
       visibleMode = next.mode === "error" ? "error" : next.mode === "original" ? "original" : next.mode === "loading" ? "loading" : "translated";
       syncSelectedModel();
       syncSelectedTargetLanguage();

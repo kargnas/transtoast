@@ -12,6 +12,12 @@ export type TranslationPreviewState = {
   costCredits: number | null;
   permissionAction?: "screenRecording" | null;
   toastDuration: number;
+  requestSequence?: number;
+};
+
+export type ShowToastResult = {
+  arrow: "above" | "below" | "none";
+  anchorBottom: boolean;
 };
 
 export const fallbackTranslationState: TranslationPreviewState = {
