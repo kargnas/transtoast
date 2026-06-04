@@ -22,6 +22,21 @@
   box-sizing: border-box;
 }
 
+/* Native widgets never let you select their chrome/label text; only real content opts back in. */
+:root {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.translation-text,
+pre,
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 html,
 body,
 #app {
@@ -848,6 +863,13 @@ kbd {
 
 .translation-bubble.hover-paused .countdown-bar-fill {
   background: rgba(0, 122, 255, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .translation-bubble,
+  .countdown-bar-fill {
+    transition: none;
+  }
 }
 
 .loading-title {

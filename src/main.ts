@@ -25,4 +25,17 @@ const app = mount(Component, {
   target: document.getElementById("app")!
 });
 
+function prewarmFontFallbacks() {
+  const span = document.createElement("span");
+  span.setAttribute("aria-hidden", "true");
+  span.style.cssText = "position:absolute;left:-9999px;top:0;opacity:0;pointer-events:none";
+  span.textContent = "😀🎉✨ 中文 日本語 한국어 ∑∫√ ✓✗";
+  document.body.appendChild(span);
+  void span.getBoundingClientRect();
+  // Double rAF: lets layout AND paint register the fallback fonts in Core Text's cache before removal.
+  requestAnimationFrame(() => requestAnimationFrame(() => span.remove()));
+}
+
+prewarmFontFallbacks();
+
 export default app;
