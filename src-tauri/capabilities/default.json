@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default permissions for CopyTranslator settings and translation windows",
   "windows": ["main", "translation"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
 }
