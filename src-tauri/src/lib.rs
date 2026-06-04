@@ -101,38 +101,65 @@ mod macos_drag {
 #[cfg(target_os = "macos")]
 mod macos_toast {
     use block2::RcBlock;
-    use objc2_app_kit::{NSEvent, NSEventMask, NSWindow};
-    use std::ffi::c_void;
+    use objc2_app_kit::{NSEvent, NSEventMask, NSEventType, NSWindow};
+    use std::cell::Cell;
     use std::ptr::NonNull;
-    use tauri::{AppHandle, Manager};
+    use std::rc::Rc;
+    use tauri::{AppHandle, Emitter, Manager};
 
-    // A focusable(false) panel never becomes key, and macOS withholds mouseMoved from non-key
-    // windows by default, so the WebView never sees DOM mouseenter/mouseleave and the toast's
-    // hover-to-pause countdown stays dead. Opt this window into mouse-moved delivery to revive it.
-    pub fn enable_mouse_moved(ns_window: *mut c_void) {
-        if let Some(window) = unsafe { (ns_window as *mut NSWindow).as_ref() } {
-            window.setAcceptsMouseMovedEvents(true);
+    // Screen-coordinate bounds of the visible toast, or None when it is hidden. Both NSWindow.frame
+    // and NSEvent::mouseLocation use the same bottom-left screen origin, so they hit-test directly.
+    fn visible_toast_bounds(app: &AppHandle) -> Option<(f64, f64, f64, f64)> {
+        let window = app.get_webview_window("translation")?;
+        if !window.is_visible().unwrap_or(false) {
+            return None;
         }
+        let ns_window = window.ns_window().ok()?;
+        let frame = unsafe { (ns_window as *mut NSWindow).as_ref() }?.frame();
+        Some((
+            frame.origin.x,
+            frame.origin.y,
+            frame.origin.x + frame.size.width,
+            frame.origin.y + frame.size.height,
+        ))
     }
 
-    // The toast lives in its own helper process, so a *global* monitor (which only reports events
-    // delivered to OTHER processes) fires precisely when the user clicks anywhere except the toast.
-    // That is exactly "clicked outside" -> dismiss, without making the panel focusable.
-    pub fn install_outside_click_dismiss(app: AppHandle, persistent: bool) {
-        let mask = NSEventMask::LeftMouseDown
+    // The toast is a non-activating panel in a background (accessory) helper process, so plain hover
+    // never reaches its WebView: macOS posts those mouseMoved events to the active app underneath
+    // instead, which is why hover only registered after a click woke the panel. A *global* monitor
+    // gets a copy of exactly those events, so we hit-test the cursor against the toast frame here and
+    // drive both hover-pause and outside-click-dismiss without the panel ever taking key focus.
+    // (Mouse-event monitors need no accessibility permission, unlike keyboard ones.)
+    pub fn install_pointer_monitor(app: AppHandle, persistent: bool) {
+        let mask = NSEventMask::MouseMoved
+            | NSEventMask::LeftMouseDown
             | NSEventMask::RightMouseDown
             | NSEventMask::OtherMouseDown;
-        let handler = RcBlock::new(move |_event: NonNull<NSEvent>| {
-            let Some(window) = app.get_webview_window("translation") else {
+        let inside = Rc::new(Cell::new(false));
+        let handler = RcBlock::new(move |event: NonNull<NSEvent>| {
+            let event_type = unsafe { event.as_ref() }.r#type();
+            let Some((min_x, min_y, max_x, max_y)) = visible_toast_bounds(&app) else {
+                inside.set(false);
                 return;
             };
-            if !window.is_visible().unwrap_or(false) {
-                return;
-            }
-            if persistent {
-                let _ = window.hide();
-            } else {
-                app.exit(0);
+            let location = NSEvent::mouseLocation();
+            let hit = location.x >= min_x
+                && location.x <= max_x
+                && location.y >= min_y
+                && location.y <= max_y;
+            if event_type == NSEventType::MouseMoved {
+                if hit != inside.get() {
+                    inside.set(hit);
+                    let _ = app.emit_to("translation", "toast-hover", hit);
+                }
+            } else if !hit {
+                if let Some(window) = app.get_webview_window("translation") {
+                    if persistent {
+                        let _ = window.hide();
+                    } else {
+                        app.exit(0);
+                    }
+                }
             }
         });
         let token = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &handler);
@@ -991,10 +1018,7 @@ pub fn run() {
                             .visible(false)
                             .build()?;
                     apply_toast_theme(&window);
-                    if let Ok(ns_window) = window.ns_window() {
-                        macos_toast::enable_mouse_moved(ns_window);
-                    }
-                    macos_toast::install_outside_click_dismiss(app.handle().clone(), true);
+                    macos_toast::install_pointer_monitor(app.handle().clone(), true);
                 } else {
                     let placement = translation_window_placement(
                         app.handle(),
@@ -1035,13 +1059,7 @@ pub fn run() {
                         .map(|window| {
                             let _ = window.set_position(placement.position);
                             apply_toast_theme(&window);
-                            if let Ok(ns_window) = window.ns_window() {
-                                macos_toast::enable_mouse_moved(ns_window);
-                            }
-                            macos_toast::install_outside_click_dismiss(
-                                app.handle().clone(),
-                                false,
-                            );
+                            macos_toast::install_pointer_monitor(app.handle().clone(), false);
                         })?;
                 }
             } else if let Some(surface) = startup_surface() {

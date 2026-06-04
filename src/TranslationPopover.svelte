@@ -34,6 +34,7 @@
   let moveSaveTimer: number | undefined;
   let lastShownSequence = 0;
   let windowMoveUnlisten: (() => void) | undefined;
+  let hoverUnlisten: (() => void) | undefined;
   let pendingMovedPosition: WindowPosition | null = null;
   let countdownStartedAt = $state(0);
   let countdownDuration = $state(fallbackTranslationState.toastDuration);
@@ -109,6 +110,23 @@
         .catch(() => {
           // Move persistence is best-effort when window events are unavailable.
         });
+      // A background non-activating panel never gets DOM hover events, so Rust hit-tests the
+      // global cursor and tells us when it crosses the toast frame to pause/resume the countdown.
+      void getCurrentWindow()
+        .listen<boolean>("toast-hover", ({ payload }) => {
+          if (payload) pauseAutoDismiss();
+          else scheduleAutoDismiss();
+        })
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+          } else {
+            hoverUnlisten = unlisten;
+          }
+        })
+        .catch(() => {
+          // Hover pause is best-effort when window events are unavailable.
+        });
     }
     return () => {
       disposed = true;
@@ -117,6 +135,7 @@
       clearCopyReset();
       stopResultPolling();
       windowMoveUnlisten?.();
+      hoverUnlisten?.();
       flushMovedPosition();
     };
   });
@@ -479,8 +498,6 @@
     onmousedown={startDragging}
     class:hover-paused={countdownPaused}
     style={`--countdown-progress: ${countdownProgress}; --dismiss-opacity: ${dismissOpacity}`}
-    onmouseenter={pauseAutoDismiss}
-    onmouseleave={scheduleAutoDismiss}
   >
     <div class="translation-bubble-inner">
       {#if visibleMode === "loading"}
