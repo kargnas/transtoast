@@ -38,10 +38,13 @@
 - Tradeoffs: complete settings coverage may require wider content than the `design/` board mock; keep the same sidebar/group-row language rather than forcing every control into one small panel.
 
 ## Visual language
-- Color: `design/` tokens: Apple blue `#007aff`, green `#34c759`, red `#ff3b30`, text `#1d1d1f`, secondary `#6e6e73`, borders `#e5e5ea` / `#d2d2d7`.
+- Color: `design/` light tokens: Apple blue `#007aff`, green `#34c759`, red `#ff3b30`, text `#1d1d1f`, secondary `#6e6e73`, borders `#e5e5ea` / `#d2d2d7`.
+- Color scheme: all surfaces are tokenized in `src/app.css` and follow the system appearance via `prefers-color-scheme`. Light token values stay byte-identical to the `design/` board; a dark token set mirrors them for macOS dark mode. The transparent toast WebView cannot read `prefers-color-scheme` on its own, so Rust applies the system theme to it per popup.
+- Accent: the solid accent follows the live macOS system accent (`AccentColor`) where the engine supports it, falling back to Apple blue `#007aff`. Accent tints derive from fixed `#007aff` via `color-mix` so they always resolve.
 - Typography: SF Pro system stack through `-apple-system`, compact settings text, no negative letter spacing.
 - Spacing/layout rhythm: 8px grid; 4 / 8 / 12 / 16 / 20 / 24 scale.
 - Shape/radius/elevation: 6px sidebar rows and controls, 8px setting groups. Do not implement custom CSS window shadows; native Tauri/macOS window shadow owns settings windows. Translation popover shadow is component-level elevation from `design/`, while transparent borderless window support comes from macOS/Tauri.
+- Material: the settings window uses native macOS vibrancy (Tauri `windowEffects` `sidebar` on the `main` window plus a transparent web root); content surfaces stay ~0.86 opaque so the material reads as a subtle backdrop without hurting legibility. The separate `translation` toast window stays fully transparent with no window effect.
 - Motion: short state transitions only where needed; no decorative motion.
 - Imagery/iconography: use symbol-style icons for settings sidebar and action buttons; do not use stock imagery in app surfaces.
 
@@ -53,8 +56,8 @@
 
 ## Accessibility
 - Target standard: keyboard navigable settings UI with native form controls and visible focus behavior.
-- Keyboard/focus behavior: sidebar buttons, selects, inputs, reset buttons, and actions must be reachable by Tab and activate with Enter/Space.
-- Contrast/readability: text and border colors follow macOS light-mode contrast from `design/`; status color is never the only signal.
+- Keyboard/focus behavior: sidebar buttons, selects, inputs, reset buttons, and actions must be reachable by Tab and activate with Enter/Space. Esc and Cmd+W close the settings window (Esc first dismisses an open model menu); the window restores its last frame on reopen.
+- Contrast/readability: text and border colors meet macOS contrast in both light and dark appearances; light values match `design/`, dark values mirror them. Status color is never the only signal.
 - Screen-reader semantics: use real `button`, `select`, `input`, `label`, `aside`, `main`, and `aria-live` for notices.
 - Reduced motion and sensory considerations: no required animation for comprehension.
 
