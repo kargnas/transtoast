@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use surfaces::{open_surface_window, AppSurface};
 use tauri::{
-    AppHandle, LogicalSize, Manager, Monitor, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, LogicalSize, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewUrl,
+    WebviewWindowBuilder,
 };
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
@@ -963,6 +964,27 @@ pub fn run() {
                 }
                 open_surface_window(app.handle(), surface)?;
             }
+
+            // Settings process: restore the last window frame and persist it on focus-loss/close so
+            // the settings window reopens where the user left it (native-feel ship-readiness B.15).
+            if translation_preview_request().is_none()
+                && matches!(startup_surface(), None | Some(AppSurface::Settings))
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    restore_main_window_geometry(app.handle(), &window);
+                    let handle = app.handle().clone();
+                    let geometry_window = window.clone();
+                    window.on_window_event(move |event| {
+                        if matches!(
+                            event,
+                            tauri::WindowEvent::Focused(false)
+                                | tauri::WindowEvent::CloseRequested { .. }
+                        ) {
+                            let _ = save_main_window_geometry(&handle, &geometry_window);
+                        }
+                    });
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -988,7 +1010,8 @@ pub fn run() {
             open_screen_recording_settings,
             close_translation_preview,
             resize_translation_preview,
-            show_translation_toast
+            show_translation_toast,
+            close_settings_window
         ])
         .build(tauri::generate_context!())
         .expect("error while building CopyTranslator Tauri app")
@@ -1585,6 +1608,69 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
         .app_data_dir()
         .map(|dir| dir.join("settings-overrides.json"))
         .map_err(|error| format!("Could not resolve app data directory: {error}"))
+}
+
+#[derive(Serialize, Deserialize)]
+struct WindowGeometry {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+}
+
+fn window_state_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("window-state.json"))
+        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+}
+
+fn save_main_window_geometry(app: &AppHandle, window: &tauri::WebviewWindow) -> Result<(), String> {
+    let position = window.outer_position().map_err(|error| error.to_string())?;
+    let size = window.inner_size().map_err(|error| error.to_string())?;
+    // A minimized/zero-size frame would otherwise be persisted and reopen the window invisible.
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
+    let geometry = WindowGeometry {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+    };
+    let path = window_state_path(app)?;
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let json = serde_json::to_string(&geometry).map_err(|error| error.to_string())?;
+    fs::write(&path, json).map_err(|error| error.to_string())
+}
+
+fn restore_main_window_geometry(app: &AppHandle, window: &tauri::WebviewWindow) {
+    let Ok(path) = window_state_path(app) else {
+        return;
+    };
+    let Ok(bytes) = fs::read(&path) else {
+        return;
+    };
+    let Ok(geometry) = serde_json::from_slice::<WindowGeometry>(&bytes) else {
+        return;
+    };
+    if geometry.width == 0 || geometry.height == 0 {
+        return;
+    }
+    // Size first, then position, so the restored origin is not re-centered by the size change.
+    let _ = window.set_size(PhysicalSize::new(geometry.width, geometry.height));
+    let _ = window.set_position(PhysicalPosition::new(geometry.x, geometry.y));
+}
+
+#[tauri::command]
+fn close_settings_window(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = save_main_window_geometry(&app, &window);
+        window.close().map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn default_settings() -> Settings {

@@ -158,6 +158,19 @@
     openTranslationModelMenu = null;
   }
 
+  function handleSettingsKeydown(event: KeyboardEvent) {
+    const isClose = event.key === "Escape" || (event.metaKey && event.key.toLowerCase() === "w");
+    if (!isClose) return;
+    // Esc first dismisses an open model menu; only an already-closed menu lets Esc close the window.
+    if (event.key === "Escape" && openTranslationModelMenu) {
+      closeTranslationModelMenu();
+      return;
+    }
+    if (!isTauri) return;
+    event.preventDefault();
+    void invoke("close_settings_window");
+  }
+
   async function toggleFavorite(field: "favoriteLocalModelIDs" | "favoriteOpenRouterModels", modelID: string) {
     if (!settingsState) return;
     const current = settingsState.settings[field];
@@ -541,6 +554,8 @@
     {/if}
   </div>
 {/snippet}
+
+<svelte:window onkeydown={handleSettingsKeydown} />
 
 {#if settingsState}
   <div class="app-frame">
