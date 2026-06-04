@@ -967,6 +967,16 @@ fn translation_window_placement(
     let fallback_monitor = app.primary_monitor().ok().flatten();
     let caret = caret_override.or_else(focused_text_caret_bounds);
 
+    // The popover follows the text caret whenever one is detected, so a saved corner or dragged
+    // custom position only acts as the fallback for apps (terminals, Electron) that expose no caret.
+    if let Some(caret) = caret {
+        if let Some(work_area) = work_area_for_caret(&monitors, &caret)
+            .or_else(|| fallback_monitor.as_ref().map(work_area_from_monitor))
+        {
+            return placement_near_caret(caret, work_area, logical_width, logical_height);
+        }
+    }
+
     if matches!(settings.toast_position, ToastPosition::Custom) {
         let work_area = work_area_for_custom_position(&monitors, settings.toast_custom_position)
             .or_else(|| fallback_monitor.as_ref().map(work_area_from_monitor))
@@ -979,14 +989,6 @@ fn translation_window_placement(
                 scale: 1.0,
             });
         return fallback_placement(settings, work_area, logical_width, logical_height);
-    }
-
-    if let Some(caret) = caret {
-        if let Some(work_area) = work_area_for_caret(&monitors, &caret)
-            .or_else(|| fallback_monitor.as_ref().map(work_area_from_monitor))
-        {
-            return placement_near_caret(caret, work_area, logical_width, logical_height);
-        }
     }
 
     let work_area = fallback_monitor
