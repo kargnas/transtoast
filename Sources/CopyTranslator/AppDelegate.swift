@@ -72,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startKeyboardMonitor()
         startScreenshotHotKey()
         startPasteboardMonitor()
+        resetPersistedToastSequence()
         startPersistentToastProcess()
         print("CopyTranslator ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
@@ -709,6 +710,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             print("Could not write translation preview state: \(error.localizedDescription)")
         }
+    }
+
+    // The persisted preview survives restarts, but the in-memory sequence restarts at 0. A stale
+    // nonzero sequence would either show last session's translation on launch or collide with this
+    // session's fresh numbers and suppress a real one. Reset it to 0 to match the in-memory baseline.
+    private func resetPersistedToastSequence() {
+        let url = SharedAppStorage.fileURL("translation-preview.json")
+        guard let data = try? Data(contentsOf: url),
+              var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return
+        }
+        object["requestSequence"] = 0
+        guard let updated = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else {
+            return
+        }
+        try? updated.write(to: url, options: .atomic)
     }
 
     private func startPersistentToastProcess() {
