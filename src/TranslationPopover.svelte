@@ -35,6 +35,11 @@
   let lastShownSequence = 0;
   let windowMoveUnlisten: (() => void) | undefined;
   let hoverUnlisten: (() => void) | undefined;
+  let dismissRequestUnlisten: (() => void) | undefined;
+  // Outside-click closes the toast, but only after the result has been readable this long, so the
+  // user's normal click right after copying does not dismiss it before they can see the translation.
+  const outsideCloseGraceMs = 1200;
+  let resultShownAt = 0;
   let pendingMovedPosition: WindowPosition | null = null;
   // onMoved fires for programmatic set_position (every show/resize) too, not just user drags.
   // Persist only after a real drag so the app's own repositioning never overwrites toast_position.
@@ -130,6 +135,24 @@
         .catch(() => {
           // Hover pause is best-effort when window events are unavailable.
         });
+      // Rust reports a click outside the toast; we decide whether to dismiss so a stray click
+      // during loading or in the first moment of a result never closes it before it is read.
+      void getCurrentWindow()
+        .listen("toast-dismiss-request", () => {
+          if (visibleMode === "loading") return;
+          if (performance.now() - resultShownAt < outsideCloseGraceMs) return;
+          void closePopover();
+        })
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+          } else {
+            dismissRequestUnlisten = unlisten;
+          }
+        })
+        .catch(() => {
+          // Outside-click dismissal is best-effort when window events are unavailable.
+        });
     }
     return () => {
       disposed = true;
@@ -139,6 +162,7 @@
       stopResultPolling();
       windowMoveUnlisten?.();
       hoverUnlisten?.();
+      dismissRequestUnlisten?.();
       flushMovedPosition();
     };
   });
@@ -442,6 +466,7 @@
     clearCountdown();
     if (debugMode || visibleMode === "loading") return;
 
+    resultShownAt = performance.now();
     countdownDuration = dismissDurationForText(bodyText);
     countdownRemaining = countdownDuration;
     countdownPaused = false;

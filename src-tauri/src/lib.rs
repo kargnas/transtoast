@@ -130,7 +130,7 @@ mod macos_toast {
     // gets a copy of exactly those events, so we hit-test the cursor against the toast frame here and
     // drive both hover-pause and outside-click-dismiss without the panel ever taking key focus.
     // (Mouse-event monitors need no accessibility permission, unlike keyboard ones.)
-    pub fn install_pointer_monitor(app: AppHandle, persistent: bool) {
+    pub fn install_pointer_monitor(app: AppHandle) {
         let mask = NSEventMask::MouseMoved
             | NSEventMask::LeftMouseDown
             | NSEventMask::RightMouseDown
@@ -153,13 +153,11 @@ mod macos_toast {
                     let _ = app.emit_to("translation", "toast-hover", hit);
                 }
             } else if !hit {
-                if let Some(window) = app.get_webview_window("translation") {
-                    if persistent {
-                        let _ = window.hide();
-                    } else {
-                        app.exit(0);
-                    }
-                }
+                // The toast is non-focusable, so we cannot rely on window blur for click-outside
+                // dismissal. Hand the decision to the WebView (which knows mode + how long the
+                // result has been readable) instead of hiding here, so a stray click during loading
+                // or right after the result appears does not yank the toast away before it is seen.
+                let _ = app.emit_to("translation", "toast-dismiss-request", ());
             }
         });
         let token = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &handler);
@@ -1018,7 +1016,7 @@ pub fn run() {
                             .visible(false)
                             .build()?;
                     apply_toast_theme(&window);
-                    macos_toast::install_pointer_monitor(app.handle().clone(), true);
+                    macos_toast::install_pointer_monitor(app.handle().clone());
                 } else {
                     let placement = translation_window_placement(
                         app.handle(),
@@ -1059,7 +1057,7 @@ pub fn run() {
                         .map(|window| {
                             let _ = window.set_position(placement.position);
                             apply_toast_theme(&window);
-                            macos_toast::install_pointer_monitor(app.handle().clone(), false);
+                            macos_toast::install_pointer_monitor(app.handle().clone());
                         })?;
                 }
             } else if let Some(surface) = startup_surface() {
