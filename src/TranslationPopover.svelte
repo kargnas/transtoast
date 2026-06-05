@@ -211,7 +211,14 @@
       preview = fallbackTranslationState;
       visibleMode = requestedMode ?? "translated";
     }
-    void maybeShowForSequence();
+    if (debugMode) {
+      void maybeShowForSequence();
+    } else {
+      // The persistent toast launches hidden at app start, but the state file still holds the
+      // previous session's translation. Mark that startup sequence as already shown so the old
+      // result does not pop up on launch; only a fresh Cmd+C bump (caught by polling) reveals it.
+      lastShownSequence = preview.requestSequence ?? 0;
+    }
     if (isTauri) {
       await loadModelOptions();
     } else {
