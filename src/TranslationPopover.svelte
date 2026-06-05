@@ -36,6 +36,9 @@
   let windowMoveUnlisten: (() => void) | undefined;
   let hoverUnlisten: (() => void) | undefined;
   let pendingMovedPosition: WindowPosition | null = null;
+  // onMoved fires for programmatic set_position (every show/resize) too, not just user drags.
+  // Persist only after a real drag so the app's own repositioning never overwrites toast_position.
+  let userInitiatedMove = false;
   let countdownStartedAt = $state(0);
   let countdownDuration = $state(fallbackTranslationState.toastDuration);
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
@@ -163,6 +166,8 @@
     // window needs an explicit per-translation show, signalled by Swift bumping the sequence.
     if (!isTauri || seq === 0 || seq === lastShownSequence) return;
     lastShownSequence = seq;
+    // The upcoming show repositions the window programmatically; do not let that look like a drag.
+    userInitiatedMove = false;
     try {
       const result = await invoke<ShowToastResult>("show_translation_toast");
       arrowAbove = result.arrow === "above";
@@ -365,6 +370,7 @@
     const target = event.target instanceof Element ? event.target : null;
     if (!isTauri || event.button !== 0 || target?.closest("button, select")) return;
     try {
+      userInitiatedMove = true;
       await getCurrentWindow().startDragging();
     } catch {
       // Dragging is best-effort in browser preview and unsupported shells.
@@ -372,6 +378,7 @@
   }
 
   function queueMovedPosition(position: WindowPosition) {
+    if (!userInitiatedMove) return;
     if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
     pendingMovedPosition = position;
     if (moveSaveTimer !== undefined) {
