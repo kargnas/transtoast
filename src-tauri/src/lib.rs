@@ -816,7 +816,7 @@ fn resize_translation_preview(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct ShowToastResult {
     arrow: String,
     #[serde(rename = "anchorBottom")]
@@ -825,11 +825,17 @@ struct ShowToastResult {
 
 #[tauri::command]
 fn show_translation_toast(app: AppHandle) -> Result<ShowToastResult, String> {
+    show_translation_toast_inner(&app)
+}
+
+// Shared by the JS command and the native watcher thread. Takes &AppHandle so the watcher can call
+// it from inside run_on_main_thread without moving ownership; window ops must run on the main thread.
+fn show_translation_toast_inner(app: &AppHandle) -> Result<ShowToastResult, String> {
     let window = app
         .get_webview_window("translation")
         .ok_or("Translation window is not available.")?;
-    let settings = load_effective_settings(&app).unwrap_or_else(|_| default_settings());
-    let state = read_translation_preview_state(&app)?;
+    let settings = load_effective_settings(app).unwrap_or_else(|_| default_settings());
+    let state = read_translation_preview_state(app)?;
     let (mode, caret) = match &state {
         Some(s) => {
             let caret = match (s.caret_x, s.caret_y, s.caret_w, s.caret_h) {
@@ -846,7 +852,7 @@ fn show_translation_toast(app: AppHandle) -> Result<ShowToastResult, String> {
         TRANSLATION_WINDOW_HEIGHT
     };
     let placement =
-        translation_window_placement(&app, &settings, TRANSLATION_WINDOW_WIDTH, height, caret);
+        translation_window_placement(app, &settings, TRANSLATION_WINDOW_WIDTH, height, caret);
     let anchor_bottom = match placement.arrow {
         TranslationArrowPlacement::AboveCaret => true,
         TranslationArrowPlacement::BelowCaret => false,
@@ -865,6 +871,68 @@ fn show_translation_toast(app: AppHandle) -> Result<ShowToastResult, String> {
         arrow: placement.arrow.as_query_value().to_string(),
         anchor_bottom,
     })
+}
+
+#[derive(Clone, Serialize)]
+struct ToastRefreshPayload {
+    #[serde(rename = "requestSequence")]
+    request_sequence: u64,
+    shown: Option<ShowToastResult>,
+}
+
+// macOS throttles then fully suspends a hidden WebView's JS timers (measured 200ms -> 1Hz -> 0), so
+// the persistent toast's in-page setInterval cannot reliably detect a new translation while hidden.
+// This native OS thread is immune to that WebKit page-visibility throttling: it watches the shared
+// state file and, on a new requestSequence, shows the window on the main thread; the show un-suspends
+// the WebView, then the emit makes it re-render. Emit fires only on content change to avoid IPC spam.
+fn start_translation_toast_watcher(app: AppHandle) {
+    let _ = std::thread::Builder::new()
+        .name("translation-toast-watcher".into())
+        .spawn(move || {
+            use tauri::Emitter;
+            let mut last_sequence: u64 = 0;
+            let mut last_fingerprint: Option<(u64, String, String, String, String)> = None;
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(180));
+                let state = match read_translation_preview_state(&app) {
+                    Ok(Some(state)) => state,
+                    // Skip transient parse failures from the writer's non-atomic mid-write window.
+                    _ => continue,
+                };
+                let seq = state.request_sequence;
+                let fingerprint = (
+                    seq,
+                    state.mode.clone(),
+                    state.original_text.clone(),
+                    state.translated_text.clone(),
+                    state.error_text.clone().unwrap_or_default(),
+                );
+                if last_fingerprint.as_ref() == Some(&fingerprint) {
+                    continue;
+                }
+                last_fingerprint = Some(fingerprint);
+                let should_show = seq != 0 && seq != last_sequence;
+                if should_show {
+                    last_sequence = seq;
+                }
+                let main_app = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    let shown = if should_show {
+                        show_translation_toast_inner(&main_app).ok()
+                    } else {
+                        None
+                    };
+                    let _ = main_app.emit_to(
+                        "translation",
+                        "toast-refresh",
+                        ToastRefreshPayload {
+                            request_sequence: seq,
+                            shown,
+                        },
+                    );
+                });
+            }
+        });
 }
 
 #[tauri::command]
@@ -1017,6 +1085,7 @@ pub fn run() {
                             .build()?;
                     apply_toast_theme(&window);
                     macos_toast::install_pointer_monitor(app.handle().clone());
+                    start_translation_toast_watcher(app.handle().clone());
                 } else {
                     let placement = translation_window_placement(
                         app.handle(),

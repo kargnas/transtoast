@@ -9,6 +9,7 @@
   const params = new URLSearchParams(window.location.search);
   const debugMode = params.get("debug") === "1";
   const requestedMode = modeFromQuery(params.get("mode"));
+  type ToastRefreshPayload = { requestSequence: number; shown?: ShowToastResult | null };
   let arrowAbove = $state(params.get("placement") === "above");
   let arrowHidden = $state(params.get("placement") === "none");
   let anchorBottom = $state(params.get("anchor") === "bottom");
@@ -36,6 +37,7 @@
   let windowMoveUnlisten: (() => void) | undefined;
   let hoverUnlisten: (() => void) | undefined;
   let dismissRequestUnlisten: (() => void) | undefined;
+  let refreshUnlisten: (() => void) | undefined;
   // Outside-click closes the toast, but only after the result has been readable this long, so the
   // user's normal click right after copying does not dismiss it before they can see the translation.
   const outsideCloseGraceMs = 1200;
@@ -153,6 +155,32 @@
         .catch(() => {
           // Outside-click dismissal is best-effort when window events are unavailable.
         });
+      // The native watcher (Rust) detects a new/updated translation while this hidden WebView's JS
+      // timers are suspended, shows the window, then fires this so the now-visible page re-renders.
+      // allowShow:false because the watcher already showed it; we only sync state + placement here.
+      void getCurrentWindow()
+        .listen<ToastRefreshPayload>("toast-refresh", ({ payload }) => {
+          if (payload.shown) {
+            lastShownSequence = payload.requestSequence;
+            arrowAbove = payload.shown.arrow === "above";
+            arrowHidden = payload.shown.arrow === "none";
+            anchorBottom = payload.shown.anchorBottom;
+          }
+          void loadPreview({ allowShow: false });
+        })
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+          } else {
+            refreshUnlisten = unlisten;
+          }
+        })
+        .catch(() => {
+          // Watcher-driven refresh is best-effort when window events are unavailable.
+        });
+      // Backup for a dropped toast-refresh event: when the window becomes visible the WebView
+      // un-suspends, so re-read the authoritative state once to recover any missed update.
+      document.addEventListener("visibilitychange", onVisibilityChange);
     }
     return () => {
       disposed = true;
@@ -160,9 +188,11 @@
       clearCountdown();
       clearCopyReset();
       stopResultPolling();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       windowMoveUnlisten?.();
       hoverUnlisten?.();
       dismissRequestUnlisten?.();
+      refreshUnlisten?.();
       flushMovedPosition();
     };
   });
@@ -202,7 +232,14 @@
     }
   }
 
-  async function loadPreview() {
+  function onVisibilityChange() {
+    if (!document.hidden) void loadPreview({ allowShow: false });
+  }
+
+  async function loadPreview(options: { allowShow?: boolean } = {}) {
+    // The native watcher (Rust) owns showing the window, so refreshes it triggers pass allowShow:false
+    // to avoid a redundant JS show that would recompute placement and reset the dismiss countdown.
+    const allowShow = options.allowShow ?? true;
     try {
       preview = await invoke<TranslationPreviewState>("load_translation_preview");
       // The state file is authoritative: if the result already landed before mount, skip loading.
@@ -211,7 +248,7 @@
       preview = fallbackTranslationState;
       visibleMode = requestedMode ?? "translated";
     }
-    void maybeShowForSequence();
+    if (allowShow) void maybeShowForSequence();
     if (isTauri) {
       await loadModelOptions();
     } else {
