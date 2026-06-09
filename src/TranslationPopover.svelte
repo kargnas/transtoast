@@ -50,6 +50,7 @@
   let countdownDuration = $state(fallbackTranslationState.toastDuration);
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
   let countdownPaused = $state(false);
+  let paintNudge = $state(0);
 
   const uiStrings = {
     translating: "Translating...",
@@ -82,6 +83,7 @@
   const countdownProgressValue = $derived(Math.max(0, Math.min(1, countdownRemaining / countdownDuration)));
   const countdownProgress = $derived(`${countdownProgressValue * 100}%`);
   const dismissOpacity = $derived((0.62 + countdownProgressValue * 0.38).toFixed(3));
+  const paintOffset = $derived(`${paintNudge % 2 === 0 ? 0 : 0.001}px`);
   const screenRecordingPermissionError = $derived(
     preview.permissionAction === "screenRecording" ||
       (preview.errorText ?? "").toLowerCase().includes("screen recording permission")
@@ -202,7 +204,12 @@
     void visibleMode;
     void modelMetadata;
     if (!isTauri || !bubbleEl) return;
-    const frame = requestAnimationFrame(syncWindowHeight);
+    const frame = requestAnimationFrame(() => {
+      // Transparent, hidden-until-shown WebKit views can miss the first text paint.
+      // A sub-pixel transform change forces the same repaint hover used to trigger.
+      paintNudge += 1;
+      syncWindowHeight();
+    });
     return () => cancelAnimationFrame(frame);
   });
 
@@ -566,7 +573,7 @@
     tabindex="-1"
     onmousedown={startDragging}
     class:hover-paused={countdownPaused}
-    style={`--countdown-progress: ${countdownProgress}; --dismiss-opacity: ${dismissOpacity}`}
+    style={`--countdown-progress: ${countdownProgress}; --dismiss-opacity: ${dismissOpacity}; --paint-y: ${paintOffset}`}
   >
     <div class="translation-bubble-inner">
       {#if visibleMode === "loading"}
