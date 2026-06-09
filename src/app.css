@@ -40,7 +40,7 @@
   --favorite-ink: #b36b00;
 
   /* Translation toast bubble surfaces, tokenized so the glass inverts in dark mode. */
-  --bubble-bg: rgba(255, 255, 255, 0.84);
+  --bubble-bg: rgba(255, 255, 255, 0.62);
   --bubble-border: rgba(0, 0, 0, 0.18);
   --bubble-border-hover: rgba(0, 0, 0, 0.42);
   --bubble-arrow: rgba(0, 0, 0, 0.34);
@@ -83,7 +83,7 @@
     --track: #3a3a3e;
     --favorite-ink: #f0a23a;
 
-    --bubble-bg: rgba(40, 40, 44, 0.78);
+    --bubble-bg: rgba(40, 40, 44, 0.62);
     --bubble-border: rgba(255, 255, 255, 0.16);
     --bubble-border-hover: rgba(255, 255, 255, 0.38);
     --bubble-arrow: rgba(255, 255, 255, 0.28);
@@ -131,6 +131,7 @@ body,
 :root[data-surface="translation"] body,
 :root[data-surface="translation"] #app {
   background: transparent;
+  overflow: hidden;
 }
 
 /* Settings window uses the native macOS vibrancy material (Tauri windowEffects). The root must be
@@ -846,6 +847,7 @@ kbd {
   height: 100%;
   min-width: 396px;
   min-height: 124px;
+  overflow: hidden;
   place-items: start center;
   padding: 18px;
   background: transparent;
@@ -866,14 +868,16 @@ kbd {
   border: 0.5px solid var(--bubble-border);
   border-radius: 14px;
   background: var(--bubble-bg);
-  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: none;
+  backdrop-filter: blur(var(--bubble-blur, 28px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--bubble-blur, 28px)) saturate(160%);
   opacity: var(--dismiss-opacity, 1);
+  transform: translateZ(0);
   transition:
     border-color 140ms ease,
     opacity 100ms linear,
     transform 160ms ease;
+  will-change: transform, backdrop-filter;
   --countdown-progress: 100%;
   --dismiss-opacity: 1;
 }
@@ -884,7 +888,7 @@ kbd {
 
 .translation-bubble.hover-paused {
   border-color: var(--bubble-border-hover);
-  transform: scale(1.012);
+  transform: translateZ(0) scale(1.012);
 }
 
 .translation-bubble::before {

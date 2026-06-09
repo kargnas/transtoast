@@ -38,6 +38,7 @@
   let hoverUnlisten: (() => void) | undefined;
   let dismissRequestUnlisten: (() => void) | undefined;
   let refreshUnlisten: (() => void) | undefined;
+  let backdropNudgeTimers: number[] = [];
   // Outside-click closes the toast, but only after the result has been readable this long, so the
   // user's normal click right after copying does not dismiss it before they can see the translation.
   const outsideCloseGraceMs = 1200;
@@ -50,6 +51,7 @@
   let countdownDuration = $state(fallbackTranslationState.toastDuration);
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
   let countdownPaused = $state(false);
+  let backdropNudge = $state(0);
 
   const uiStrings = {
     translating: "Translating...",
@@ -82,6 +84,7 @@
   const countdownProgressValue = $derived(Math.max(0, Math.min(1, countdownRemaining / countdownDuration)));
   const countdownProgress = $derived(`${countdownProgressValue * 100}%`);
   const dismissOpacity = $derived((0.62 + countdownProgressValue * 0.38).toFixed(3));
+  const bubbleBlur = $derived(backdropNudge % 2 === 0 ? "28px" : "28.01px");
   const screenRecordingPermissionError = $derived(
     preview.permissionAction === "screenRecording" ||
       (preview.errorText ?? "").toLowerCase().includes("screen recording permission")
@@ -187,6 +190,7 @@
       clearAutoDismiss();
       clearCountdown();
       clearCopyReset();
+      clearBackdropNudges();
       stopResultPolling();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       windowMoveUnlisten?.();
@@ -201,10 +205,33 @@
     void bodyText;
     void visibleMode;
     void modelMetadata;
+    void preview.requestSequence;
     if (!isTauri || !bubbleEl) return;
-    const frame = requestAnimationFrame(syncWindowHeight);
+    const frame = requestAnimationFrame(() => {
+      rearmBackdropFilter();
+      syncWindowHeight();
+    });
     return () => cancelAnimationFrame(frame);
   });
+
+  function rearmBackdropFilter() {
+    if (!isTauri || !bubbleEl) return;
+    clearBackdropNudges();
+    for (const delay of [0, 50, 120, 250]) {
+      const timer = window.setTimeout(() => {
+        backdropNudge += 1;
+        backdropNudgeTimers = backdropNudgeTimers.filter((value) => value !== timer);
+      }, delay);
+      backdropNudgeTimers = [...backdropNudgeTimers, timer];
+    }
+  }
+
+  function clearBackdropNudges() {
+    for (const timer of backdropNudgeTimers) {
+      window.clearTimeout(timer);
+    }
+    backdropNudgeTimers = [];
+  }
 
   function syncWindowHeight() {
     if (!isTauri || !bubbleEl) return;
@@ -227,13 +254,17 @@
       arrowAbove = result.arrow === "above";
       arrowHidden = result.arrow === "none";
       anchorBottom = result.anchorBottom;
+      rearmBackdropFilter();
     } catch {
       // Show is best-effort; a stale position still surfaces the translation.
     }
   }
 
   function onVisibilityChange() {
-    if (!document.hidden) void loadPreview({ allowShow: false });
+    if (!document.hidden) {
+      rearmBackdropFilter();
+      void loadPreview({ allowShow: false });
+    }
   }
 
   async function loadPreview(options: { allowShow?: boolean } = {}) {
@@ -258,6 +289,7 @@
     if (isTauri && !debugMode) {
       startResultPolling();
     }
+    rearmBackdropFilter();
   }
 
   // The state file is the single source of truth. Polling never stops while the toast lives, so a
@@ -566,7 +598,7 @@
     tabindex="-1"
     onmousedown={startDragging}
     class:hover-paused={countdownPaused}
-    style={`--countdown-progress: ${countdownProgress}; --dismiss-opacity: ${dismissOpacity}`}
+    style={`--countdown-progress: ${countdownProgress}; --dismiss-opacity: ${dismissOpacity}; --bubble-blur: ${bubbleBlur}`}
   >
     <div class="translation-bubble-inner">
       {#if visibleMode === "loading"}

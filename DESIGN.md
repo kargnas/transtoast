@@ -44,7 +44,7 @@
 - Typography: SF Pro system stack through `-apple-system`, compact settings text, no negative letter spacing.
 - Spacing/layout rhythm: 8px grid; 4 / 8 / 12 / 16 / 20 / 24 scale.
 - Shape/radius/elevation: 6px sidebar rows and controls, 8px setting groups. Do not implement custom CSS window shadows; native Tauri/macOS window shadow owns settings windows. Translation popover shadow is component-level elevation from `design/`, while transparent borderless window support comes from macOS/Tauri.
-- Material: the settings window uses native macOS vibrancy (Tauri `windowEffects` `sidebar` on the `main` window plus a transparent web root); content surfaces stay ~0.86 opaque so the material reads as a subtle backdrop without hurting legibility. The separate `translation` toast window uses native Tauri `windowEffects` `popover` material behind the transparent WebView, with the bubble fill kept translucent enough for the blur to read while preserving text contrast.
+- Material: the settings window uses native macOS vibrancy (Tauri `windowEffects` `sidebar` on the `main` window plus a transparent web root); content surfaces stay ~0.86 opaque so the material reads as a subtle backdrop without hurting legibility. The separate `translation` toast window stays fully transparent with no window-level or native material layer; only the rounded bubble applies CSS backdrop blur. The blur is re-armed on show/refresh because transparent WebKit surfaces can skip backdrop sampling on first paint.
 - Motion: short state transitions only where needed; no decorative motion.
 - Imagery/iconography: use symbol-style icons for settings sidebar and action buttons; do not use stock imagery in app surfaces.
 

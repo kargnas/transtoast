@@ -13,7 +13,6 @@ use surfaces::{open_surface_window, AppSurface};
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
 use tauri::{
-    window::{Effect, EffectState, EffectsBuilder},
     AppHandle, LogicalSize, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewUrl,
     WebviewWindowBuilder,
 };
@@ -1074,7 +1073,6 @@ pub fn run() {
                             .resizable(false)
                             .decorations(false)
                             .transparent(true)
-                            .effects(translation_toast_effects())
                             .always_on_top(true)
                             .skip_taskbar(true)
                             .focusable(false)
@@ -1116,7 +1114,6 @@ pub fn run() {
                         .resizable(false)
                         .decorations(false)
                         .transparent(true)
-                        .effects(translation_toast_effects())
                         .always_on_top(true)
                         .skip_taskbar(true)
                         .focusable(false)
@@ -1250,13 +1247,6 @@ fn persistent_translation_url(debug: bool) -> String {
         "index.html?surface=translation&debug={}",
         if debug { "1" } else { "0" }
     )
-}
-
-fn translation_toast_effects() -> tauri::utils::config::WindowEffectsConfig {
-    EffectsBuilder::new()
-        .effect(Effect::Popover)
-        .state(EffectState::Active)
-        .build()
 }
 
 fn normalized_translation_mode(value: &str) -> &'static str {
@@ -2957,13 +2947,6 @@ mod tests {
         let url = persistent_translation_url(false);
         assert_eq!(url, "index.html?surface=translation&debug=0");
         assert!(!url.contains("mode="));
-    }
-
-    #[test]
-    fn translation_toast_uses_native_popover_material() {
-        let effects = translation_toast_effects();
-        assert_eq!(effects.effects, vec![Effect::Popover]);
-        assert_eq!(effects.state, Some(EffectState::Active));
     }
 
     #[test]
