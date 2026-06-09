@@ -26,6 +26,7 @@
   let modelOptions = $state<PreviewModelOption[]>([]);
   let targetLanguageOptions = $state<PreviewLanguageOption[]>([]);
   let selectedModelValue = $state("");
+  let persistedModelValue = $state("");
   let selectedTargetLanguage = $state("");
   let isChangingModel = $state(false);
   let isChangingLanguage = $state(false);
@@ -366,12 +367,22 @@
       }))
     ];
     targetLanguageOptions = state.options.targetLanguages;
+    persistedModelValue = modelValueForSettings(state);
     syncSelectedModel();
     syncSelectedTargetLanguage();
   }
 
+  function modelValueForSettings(state: SettingsState) {
+    const modelId =
+      state.settings.provider === "openRouter"
+        ? state.settings.openRouterTextModel
+        : state.settings.localModelID;
+    return `${state.settings.provider}:${modelId}`;
+  }
+
   function syncSelectedModel() {
     selectedModelValue =
+      modelOptions.find((option) => option.value === persistedModelValue)?.value ??
       modelOptions.find((option) => option.label === preview.model || option.modelId === preview.model)?.value ??
       modelOptions[0]?.value ??
       "";

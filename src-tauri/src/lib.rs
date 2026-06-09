@@ -3084,6 +3084,24 @@ mod tests {
     }
 
     #[test]
+    fn preview_openrouter_model_selection_survives_settings_roundtrip() {
+        let defaults = default_settings();
+        let settings = apply_preview_model_selection(
+            defaults.clone(),
+            TranslationProvider::OpenRouter,
+            "anthropic/claude-opus-4.8",
+        )
+        .unwrap();
+        let stored = StoredSettings::from_effective(&settings, &defaults);
+
+        let reloaded = apply_stored_settings(stored);
+
+        assert_eq!(reloaded.provider, TranslationProvider::OpenRouter);
+        assert_eq!(reloaded.open_router_text_model, "anthropic/claude-opus-4.8");
+        assert_eq!(reloaded.local_model_id, defaults.local_model_id);
+    }
+
+    #[test]
     fn preview_model_selection_updates_local_model() {
         let settings = apply_preview_model_selection(
             default_settings(),
@@ -3094,6 +3112,23 @@ mod tests {
 
         assert_eq!(settings.provider, TranslationProvider::LocalHyMT2);
         assert_eq!(settings.local_model_id, "hymt2-transformers-1.8b");
+    }
+
+    #[test]
+    fn preview_local_model_selection_survives_settings_roundtrip() {
+        let defaults = default_settings();
+        let settings = apply_preview_model_selection(
+            defaults.clone(),
+            TranslationProvider::LocalHyMT2,
+            "hymt2-transformers-1.8b",
+        )
+        .unwrap();
+        let stored = StoredSettings::from_effective(&settings, &defaults);
+
+        let reloaded = apply_stored_settings(stored);
+
+        assert_eq!(reloaded.provider, TranslationProvider::LocalHyMT2);
+        assert_eq!(reloaded.local_model_id, "hymt2-transformers-1.8b");
     }
 
     #[test]
