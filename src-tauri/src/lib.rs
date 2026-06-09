@@ -706,55 +706,57 @@ fn translate_preview_to_language(
     app: AppHandle,
     target_language: String,
 ) -> Result<TranslationPreviewState, String> {
-    let requested_target = target_language.trim();
-    let target_is_supported = language_options(false)
-        .iter()
-        .any(|option| option.value == requested_target);
-    if requested_target.is_empty() || !target_is_supported {
-        return Err(format!("Unsupported target language: {target_language}"));
-    }
-
-    let mut settings = load_effective_settings(&app)?;
-    settings.target_language = requested_target.to_string();
-    write_settings(&app, normalize_settings(settings.clone()))?;
+    let settings = apply_preview_target_language(load_effective_settings(&app)?, &target_language)?;
+    write_settings(&app, settings)?;
     let settings = load_effective_settings(&app)?;
+    let target_language = settings.target_language.clone();
+    retranslate_preview(&app, settings, Some(target_language))
+}
 
-    let mut state = read_translation_preview_state(&app)?
+#[tauri::command]
+fn translate_preview_to_model(
+    app: AppHandle,
+    provider: TranslationProvider,
+    model_id: String,
+) -> Result<TranslationPreviewState, String> {
+    let settings =
+        apply_preview_model_selection(load_effective_settings(&app)?, provider, &model_id)?;
+    write_settings(&app, settings)?;
+    let settings = load_effective_settings(&app)?;
+    retranslate_preview(&app, settings, None)
+}
+
+fn retranslate_preview(
+    app: &AppHandle,
+    settings: Settings,
+    target_language: Option<String>,
+) -> Result<TranslationPreviewState, String> {
+    let mut state = read_translation_preview_state(app)?
         .unwrap_or_else(|| sample_translation_preview(&settings));
-    state.target_language = requested_target.to_string();
-    state.toast_duration = settings.toast_duration;
-    state.provider_title = provider_title(&settings.provider).to_string();
-    state.model = match settings.provider {
-        TranslationProvider::LocalHyMT2 => {
-            model_title(&settings.local_model_id, &settings.provider)
-        }
-        TranslationProvider::OpenRouter => {
-            model_title(&settings.open_router_text_model, &settings.provider)
-        }
-    };
-
+    prepare_translation_preview_for_retranslate(&mut state, &settings, target_language);
     if state.original_text.trim().is_empty() || state.original_text == "[screen screenshot]" {
         state.mode = "error".to_string();
         state.error_text = Some("Cannot retranslate this preview without source text.".to_string());
-        write_translation_preview_state(&app, &state)?;
+        write_translation_preview_state(app, &state)?;
         return Ok(state);
     }
 
     let mut translation_settings = settings;
     translation_settings.source_language = state.source_language.clone();
-    translation_settings.target_language = requested_target.to_string();
+    translation_settings.target_language = state.target_language.clone();
 
+    let original_text = state.original_text.clone();
     let args = legacy_cli_args(
         &translation_settings,
-        &["--translate-text-once", state.original_text.as_str()],
+        &["--translate-text-once", original_text.as_str()],
     );
-    let binary = legacy_binary_path(&app)?;
+    let binary = legacy_binary_path(app)?;
     let mut command = Command::new(&binary);
     command.args(&args);
     // NSWorkspace launches this Tauri helper with cwd `/`, but the spawned Swift CLI
     // resolves `scripts/runtimes/<backend>.py` relative to its cwd. Pin the workspace
     // root so local-model retranslation does not fail with localModelUnavailable.
-    if let Some(dir) = legacy_working_dir(&app) {
+    if let Some(dir) = legacy_working_dir(app) {
         command.current_dir(dir);
     }
     let output = command
@@ -771,7 +773,7 @@ fn translate_preview_to_language(
         state.mode = "error".to_string();
         state.error_text = Some(first_non_empty(&stderr, &stdout));
     }
-    write_translation_preview_state(&app, &state)?;
+    write_translation_preview_state(app, &state)?;
     Ok(state)
 }
 
@@ -891,7 +893,15 @@ fn start_translation_toast_watcher(app: AppHandle) {
         .spawn(move || {
             use tauri::Emitter;
             let mut last_sequence: u64 = 0;
-            let mut last_fingerprint: Option<(u64, String, String, String, String)> = None;
+            let mut last_fingerprint: Option<(
+                u64,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+            )> = None;
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(180));
                 let state = match read_translation_preview_state(&app) {
@@ -903,9 +913,11 @@ fn start_translation_toast_watcher(app: AppHandle) {
                 let fingerprint = (
                     seq,
                     state.mode.clone(),
+                    state.target_language.clone(),
                     state.original_text.clone(),
                     state.translated_text.clone(),
                     state.error_text.clone().unwrap_or_default(),
+                    state.model.clone(),
                 );
                 if last_fingerprint.as_ref() == Some(&fingerprint) {
                     continue;
@@ -1175,6 +1187,7 @@ pub fn run() {
             clear_request_logs,
             load_translation_preview,
             translate_preview_to_language,
+            translate_preview_to_model,
             save_translation_preview_position,
             open_screen_recording_settings,
             close_translation_preview,
@@ -1564,14 +1577,7 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
         translated_text: "미래는 자신의 꿈의 아름다움을 믿는 사람들의 것이다.".to_string(),
         error_text: None,
         provider_title: provider_title(&settings.provider).to_string(),
-        model: match settings.provider {
-            TranslationProvider::LocalHyMT2 => {
-                model_title(&settings.local_model_id, &settings.provider)
-            }
-            TranslationProvider::OpenRouter => {
-                model_title(&settings.open_router_text_model, &settings.provider)
-            }
-        },
+        model: selected_model_title(settings),
         cost_credits: None,
         permission_action: None,
         toast_duration: settings.toast_duration,
@@ -1584,6 +1590,64 @@ fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
     }
 }
 
+fn apply_preview_target_language(
+    mut settings: Settings,
+    target_language: &str,
+) -> Result<Settings, String> {
+    let requested_target = target_language.trim();
+    let target_is_supported = language_options(false)
+        .iter()
+        .any(|option| option.value == requested_target);
+    if requested_target.is_empty() || !target_is_supported {
+        return Err(format!("Unsupported target language: {target_language}"));
+    }
+
+    settings.target_language = requested_target.to_string();
+    Ok(normalize_settings(settings))
+}
+
+fn apply_preview_model_selection(
+    mut settings: Settings,
+    provider: TranslationProvider,
+    model_id: &str,
+) -> Result<Settings, String> {
+    let model_id = model_id.trim();
+    if model_id.is_empty() {
+        return Err("Model is empty.".to_string());
+    }
+
+    settings.provider = provider;
+    match &settings.provider {
+        TranslationProvider::LocalHyMT2 => settings.local_model_id = model_id.to_string(),
+        TranslationProvider::OpenRouter => settings.open_router_text_model = model_id.to_string(),
+    }
+    Ok(normalize_settings(settings))
+}
+
+fn prepare_translation_preview_for_retranslate(
+    state: &mut TranslationPreviewState,
+    settings: &Settings,
+    target_language: Option<String>,
+) {
+    let target_language = target_language
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| {
+            let current = state.target_language.trim();
+            if current.is_empty() {
+                settings.target_language.clone()
+            } else {
+                current.to_string()
+            }
+        });
+
+    state.target_language = target_language;
+    state.toast_duration = settings.toast_duration;
+    state.provider_title = provider_title(&settings.provider).to_string();
+    state.model = selected_model_title(settings);
+    state.cost_credits = None;
+}
+
 fn default_toast_duration_value() -> f64 {
     default_settings().toast_duration
 }
@@ -1592,6 +1656,17 @@ fn provider_title(provider: &TranslationProvider) -> &'static str {
     match provider {
         TranslationProvider::LocalHyMT2 => "Local Model",
         TranslationProvider::OpenRouter => "OpenRouter LLM",
+    }
+}
+
+fn selected_model_title(settings: &Settings) -> String {
+    match &settings.provider {
+        TranslationProvider::LocalHyMT2 => {
+            model_title(&settings.local_model_id, &settings.provider)
+        }
+        TranslationProvider::OpenRouter => {
+            model_title(&settings.open_router_text_model, &settings.provider)
+        }
     }
 }
 
@@ -2992,6 +3067,64 @@ mod tests {
 
         assert_eq!(settings.toast_position, ToastPosition::TopLeft);
         assert_eq!(settings.toast_custom_position, None);
+    }
+
+    #[test]
+    fn preview_model_selection_updates_openrouter_text_model() {
+        let settings = apply_preview_model_selection(
+            default_settings(),
+            TranslationProvider::OpenRouter,
+            " anthropic/claude-opus-4.8 ",
+        )
+        .unwrap();
+
+        assert_eq!(settings.provider, TranslationProvider::OpenRouter);
+        assert_eq!(settings.open_router_text_model, "anthropic/claude-opus-4.8");
+        assert_eq!(settings.local_model_id, default_settings().local_model_id);
+    }
+
+    #[test]
+    fn preview_model_selection_updates_local_model() {
+        let settings = apply_preview_model_selection(
+            default_settings(),
+            TranslationProvider::LocalHyMT2,
+            "hymt2-transformers-1.8b",
+        )
+        .unwrap();
+
+        assert_eq!(settings.provider, TranslationProvider::LocalHyMT2);
+        assert_eq!(settings.local_model_id, "hymt2-transformers-1.8b");
+    }
+
+    #[test]
+    fn preview_model_selection_rejects_empty_model() {
+        let error = apply_preview_model_selection(
+            default_settings(),
+            TranslationProvider::OpenRouter,
+            "   ",
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "Model is empty.");
+    }
+
+    #[test]
+    fn preview_retranslate_metadata_uses_selected_model_and_clears_cost() {
+        let mut settings = default_settings();
+        settings.provider = TranslationProvider::OpenRouter;
+        settings.open_router_text_model = "anthropic/claude-opus-4.8".to_string();
+        settings.toast_duration = 8.0;
+        let mut state = sample_translation_preview(&default_settings());
+        state.target_language = "Japanese".to_string();
+        state.cost_credits = Some(0.25);
+
+        prepare_translation_preview_for_retranslate(&mut state, &settings, None);
+
+        assert_eq!(state.target_language, "Japanese");
+        assert_eq!(state.provider_title, "OpenRouter LLM");
+        assert_eq!(state.model, "Claude Opus 4.8");
+        assert_eq!(state.cost_credits, None);
+        assert_eq!(state.toast_duration, 8.0);
     }
 
     #[test]

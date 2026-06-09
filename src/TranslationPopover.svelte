@@ -4,7 +4,7 @@
   import { onMount } from "svelte";
   import { Check, Copy, Cpu, Eye, Languages, ShieldCheck, X } from "@lucide/svelte";
   import { fallbackTranslationState, type ShowToastResult, type TranslationMode, type TranslationPreviewState } from "./lib/translation";
-  import { fallbackState, type SettingsState } from "./lib/settings";
+  import { fallbackState, type SettingsState, type TranslationProvider } from "./lib/settings";
 
   const params = new URLSearchParams(window.location.search);
   const debugMode = params.get("debug") === "1";
@@ -27,6 +27,7 @@
   let targetLanguageOptions = $state<PreviewLanguageOption[]>([]);
   let selectedModelValue = $state("");
   let selectedTargetLanguage = $state("");
+  let isChangingModel = $state(false);
   let isChangingLanguage = $state(false);
   let copyResetTimer: number | undefined;
   let dismissTimer: number | undefined;
@@ -48,9 +49,11 @@
   // Persist only after a real drag so the app's own repositioning never overwrites toast_position.
   let userInitiatedMove = false;
   let countdownStartedAt = $state(0);
+  let countdownStartedRemaining = $state(fallbackTranslationState.toastDuration);
   let countdownDuration = $state(fallbackTranslationState.toastDuration);
   let countdownRemaining = $state(fallbackTranslationState.toastDuration);
   let countdownPaused = $state(false);
+  let pointerOverToast = false;
   let backdropNudge = $state(0);
 
   const uiStrings = {
@@ -93,6 +96,8 @@
   type PreviewModelOption = {
     label: string;
     value: string;
+    provider: TranslationProvider;
+    modelId: string;
   };
 
   type PreviewLanguageOption = {
@@ -127,8 +132,9 @@
       // global cursor and tells us when it crosses the toast frame to pause/resume the countdown.
       void getCurrentWindow()
         .listen<boolean>("toast-hover", ({ payload }) => {
+          pointerOverToast = payload;
           if (payload) pauseAutoDismiss();
-          else scheduleAutoDismiss();
+          else resumeAutoDismiss();
         })
         .then((unlisten) => {
           if (disposed) {
@@ -309,6 +315,10 @@
         next.translatedText !== preview.translatedText ||
         next.errorText !== preview.errorText ||
         next.originalText !== preview.originalText ||
+        next.targetLanguage !== preview.targetLanguage ||
+        next.providerTitle !== preview.providerTitle ||
+        next.model !== preview.model ||
+        next.costCredits !== preview.costCredits ||
         (next.requestSequence ?? 0) !== (preview.requestSequence ?? 0);
       if (!changed) return;
       preview = next;
@@ -336,15 +346,24 @@
   }
 
   function applySettingsState(state: SettingsState) {
+    const favoriteOpenRouterModels = state.options.openRouterModels.filter(
+      (option) =>
+        option.value === state.settings.openRouterTextModel ||
+        state.settings.favoriteOpenRouterModels.includes(option.value)
+    );
     modelOptions = [
       ...state.options.localModels.map((option) => ({
         label: option.label,
-        value: `localHyMT2:${option.value}`
+        value: `localHyMT2:${option.value}`,
+        provider: "localHyMT2" as const,
+        modelId: option.value
       })),
-      {
-        label: state.settings.openRouterTextModel,
-        value: `openRouter:${state.settings.openRouterTextModel}`
-      }
+      ...favoriteOpenRouterModels.map((option) => ({
+        label: option.label,
+        value: `openRouter:${option.value}`,
+        provider: "openRouter" as const,
+        modelId: option.value
+      }))
     ];
     targetLanguageOptions = state.options.targetLanguages;
     syncSelectedModel();
@@ -352,7 +371,10 @@
   }
 
   function syncSelectedModel() {
-    selectedModelValue = modelOptions.find((option) => option.label === preview.model)?.value ?? modelOptions[0]?.value ?? "";
+    selectedModelValue =
+      modelOptions.find((option) => option.label === preview.model || option.modelId === preview.model)?.value ??
+      modelOptions[0]?.value ??
+      "";
   }
 
   function syncSelectedTargetLanguage() {
@@ -402,17 +424,51 @@
     visibleMode = visibleMode === "original" ? "translated" : "original";
   }
 
-  function selectModel(event: Event) {
+  async function selectModel(event: Event) {
     const value = event.currentTarget instanceof HTMLSelectElement ? event.currentTarget.value : "";
     const option = modelOptions.find((candidate) => candidate.value === value);
-    if (!option) return;
+    if (!option || option.value === selectedModelValue) return;
+
     selectedModelValue = value;
-    preview = {
-      ...preview,
-      model: option.label
-    };
-    visibleMode = "translated";
-    scheduleAutoDismiss();
+    isChangingModel = true;
+    const previousMode = visibleMode;
+    visibleMode = "loading";
+    clearAutoDismiss();
+    clearCountdown();
+
+    try {
+      if (isTauri) {
+        preview = await invoke<TranslationPreviewState>("translate_preview_to_model", {
+          provider: option.provider,
+          modelId: option.modelId
+        });
+      } else {
+        preview = {
+          ...preview,
+          providerTitle: option.provider === "openRouter" ? "OpenRouter LLM" : "Local Model",
+          model: option.label,
+          translatedText: `${preview.originalText} (${option.label})`
+        };
+      }
+      visibleMode = preview.mode === "error" ? "error" : "translated";
+      await loadModelOptions();
+    } catch (error) {
+      preview = {
+        ...preview,
+        mode: "error",
+        providerTitle: option.provider === "openRouter" ? "OpenRouter LLM" : "Local Model",
+        model: option.label,
+        errorText: error instanceof Error ? error.message : String(error)
+      };
+      visibleMode = "error";
+    } finally {
+      isChangingModel = false;
+      if (visibleMode === "loading") {
+        visibleMode = previousMode;
+      }
+      syncSelectedModel();
+      scheduleAutoDismiss();
+    }
   }
 
   async function selectTargetLanguage(event: Event) {
@@ -538,12 +594,22 @@
     resultShownAt = performance.now();
     countdownDuration = dismissDurationForText(bodyText);
     countdownRemaining = countdownDuration;
+    countdownStartedRemaining = countdownDuration;
+    if (pointerOverToast) {
+      countdownPaused = true;
+      return;
+    }
+    startCountdown(countdownRemaining);
+  }
+
+  function startCountdown(duration: number) {
     countdownPaused = false;
     countdownStartedAt = performance.now();
+    countdownStartedRemaining = Math.max(0, duration);
     countdownInterval = window.setInterval(updateCountdown, 100);
     dismissTimer = window.setTimeout(() => {
       void closePopover();
-    }, countdownDuration * 1000);
+    }, countdownStartedRemaining * 1000);
   }
 
   function clearAutoDismiss() {
@@ -554,12 +620,24 @@
   }
 
   function pauseAutoDismiss() {
+    if (debugMode || visibleMode === "loading") return;
+    if (dismissTimer !== undefined || countdownInterval !== undefined) {
+      updateCountdown();
+    }
+    clearAutoDismiss();
+    clearCountdown();
+    countdownPaused = true;
+  }
+
+  function resumeAutoDismiss() {
     clearAutoDismiss();
     clearCountdown();
     if (debugMode || visibleMode === "loading") return;
-    countdownDuration = dismissDurationForText(bodyText);
-    countdownRemaining = countdownDuration;
-    countdownPaused = true;
+    if (countdownRemaining <= 0) {
+      void closePopover();
+      return;
+    }
+    startCountdown(countdownRemaining);
   }
 
   function dismissDurationForText(text: string) {
@@ -577,7 +655,7 @@
 
   function updateCountdown() {
     const elapsed = (performance.now() - countdownStartedAt) / 1000;
-    countdownRemaining = Math.max(0, countdownDuration - elapsed);
+    countdownRemaining = Math.max(0, countdownStartedRemaining - elapsed);
     if (countdownRemaining <= 0) {
       clearCountdown();
     }
@@ -626,7 +704,7 @@
         <footer class="bubble-footer error-footer">
           <label class="language-select-shell" aria-label="Target language">
             <Languages size={14} />
-            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
+            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage || isChangingModel}>
               {#each targetLanguageOptions as option}
                 <option value={option.value}>{option.label}</option>
               {/each}
@@ -641,7 +719,7 @@
             {#if modelOptions.length > 1}
               <label class="model-select-shell" aria-label="Model">
                 <Cpu size={16} />
-                <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+                <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel} disabled={isChangingModel}>
                   {#each modelOptions as option}
                     <option value={option.value}>{option.label}</option>
                   {/each}
@@ -656,7 +734,7 @@
         <footer class="bubble-footer">
           <label class="language-select-shell" aria-label="Target language">
             <Languages size={14} />
-            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage}>
+            <select class="language-select" aria-label="Target language" value={selectedTargetLanguage} onchange={selectTargetLanguage} disabled={isChangingLanguage || isChangingModel}>
               {#each targetLanguageOptions as option}
                 <option value={option.value}>{option.label}</option>
               {/each}
@@ -666,7 +744,7 @@
             {#if modelOptions.length > 1}
               <label class="model-select-shell" aria-label="Model">
                 <Cpu size={16} />
-                <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel}>
+                <select class="model-select" aria-label="Model" value={selectedModelValue} onchange={selectModel} disabled={isChangingModel}>
                   {#each modelOptions as option}
                     <option value={option.value}>{option.label}</option>
                   {/each}
