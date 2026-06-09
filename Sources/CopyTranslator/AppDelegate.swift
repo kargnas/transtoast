@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastClipboardTriggerAt: Date?
     private var lastTranslationCaretBounds: CGRect?
     private var translationRequestSequence = 0
+    private var lastPartialWriteAt = Date.distantPast
+    private var lastPartialTranslatedLength = 0
     private var currentTextTranslationTask: Task<Void, Never>?
     private var currentScreenshotTranslationTask: Task<Void, Never>?
     private var currentTextTranslationUsesLocalBackend = false
@@ -367,6 +369,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             localModelWarmupNotifier.warmingUp(modelTitle: warmupModel.title)
         }
         showTranslationLoading(originalText: text, sourceTitle: sourceTitle, settings: settings)
+        lastPartialTranslatedLength = 0
+        let requestSeq = translationRequestSequence
         let task = Task { [weak self] in
             if usesLocalBackend && previousUsesLocalBackend {
                 await previousTask?.value
@@ -388,7 +392,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     text,
                     settings: settings,
                     credentials: credentialsProvider.credentials(),
-                    contextImagePNGData: screenContext.pngData
+                    contextImagePNGData: screenContext.pngData,
+                    onPartial: { [weak self] partial in
+                        Task { @MainActor in
+                            self?.showTranslationPartial(
+                                partial,
+                                originalText: text,
+                                sourceTitle: sourceTitle,
+                                requestSeq: requestSeq,
+                                settings: settings
+                            )
+                        }
+                    }
                 )
                 guard !Task.isCancelled else {
                     return
@@ -619,6 +634,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model: result.model,
             costCredits: result.usage?.costCredits
         ), sourceTitle: result.providerTitle, settings: settings)
+    }
+
+    private func showTranslationPartial(
+        _ partial: String,
+        originalText: String,
+        sourceTitle: String,
+        requestSeq: Int,
+        settings: TranslatorSettings
+    ) {
+        // Drop deltas from a superseded request: a newer Cmd+C already bumped the sequence and owns
+        // the toast, so writing this stale partial would overwrite the new translation in place.
+        guard requestSeq == translationRequestSequence else { return }
+        // MainActor Task hops are not ordered, so ignore any delta that does not extend what we last
+        // showed; this keeps the streamed text monotonic instead of flickering backward.
+        let length = partial.count
+        guard length > lastPartialTranslatedLength else { return }
+        lastPartialTranslatedLength = length
+
+        let languages = resolvedLanguages(for: originalText, settings: settings)
+        showTranslationPopover(TranslationPreviewPayload(
+            mode: "translated",
+            sourceLanguage: languages.sourceLanguage,
+            targetLanguage: languages.targetLanguage,
+            originalText: originalText,
+            translatedText: partial,
+            errorText: nil,
+            providerTitle: settings.provider.title,
+            model: activeModelTitle(settings: settings),
+            costCredits: nil
+        ), sourceTitle: sourceTitle, settings: settings)
     }
 
     private func showTranslationError(

@@ -1110,6 +1110,11 @@ kbd {
   margin: 0;
   max-width: none;
   min-height: 24px;
+  /* Cap height so streamed long output scrolls inside the bubble instead of clipping when the
+     window hits its 720px resize ceiling. */
+  max-height: 560px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0;
   color: var(--text);
   font-size: 16px;

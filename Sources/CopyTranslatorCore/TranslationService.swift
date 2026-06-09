@@ -88,7 +88,8 @@ public final class TranslationService: @unchecked Sendable {
         _ text: String,
         settings: TranslatorSettings,
         credentials: TranslatorCredentials,
-        contextImagePNGData: Data? = nil
+        contextImagePNGData: Data? = nil,
+        onPartial: (@Sendable (String) -> Void)? = nil
     ) async throws -> TranslationResult {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -115,7 +116,8 @@ public final class TranslationService: @unchecked Sendable {
                 settings: settings,
                 credentials: credentials,
                 contextImagePNGData: contextImagePNGData,
-                languages: languages
+                languages: languages,
+                onPartial: onPartial
             )
         }
     }
@@ -228,18 +230,30 @@ public final class TranslationService: @unchecked Sendable {
         settings: TranslatorSettings,
         credentials: TranslatorCredentials,
         contextImagePNGData: Data?,
-        languages: ResolvedTranslationLanguages
+        languages: ResolvedTranslationLanguages,
+        onPartial: (@Sendable (String) -> Void)? = nil
     ) async throws -> TranslationResult {
         let key = try require(credentials.openRouterAPIKey, named: "OPENROUTER_API_KEY")
         let model = contextImagePNGData == nil
             ? settings.openRouterTextModel
             : settings.openRouterVisionModel
-        let prompt = openRouterTextPrompt(
-            text: text,
-            sourceLanguage: languages.sourceLanguage,
-            targetLanguage: languages.targetLanguage,
-            hasScreenContext: contextImagePNGData != nil
-        )
+        // Stream only the plain-text path: a copied selection with no attached screen image, and only
+        // when a caller wants incremental output. Vision/disambiguation requests still use structured
+        // JSON so the contextual "description" field survives. CLI/preview callers (onPartial == nil)
+        // keep the blocking structured path so their description output is unchanged.
+        let isStreaming = contextImagePNGData == nil && onPartial != nil
+        let prompt = isStreaming
+            ? openRouterPlainTextPrompt(
+                text: text,
+                sourceLanguage: languages.sourceLanguage,
+                targetLanguage: languages.targetLanguage
+            )
+            : openRouterTextPrompt(
+                text: text,
+                sourceLanguage: languages.sourceLanguage,
+                targetLanguage: languages.targetLanguage,
+                hasScreenContext: contextImagePNGData != nil
+            )
         let userContent: Any
         if let contextImagePNGData {
             userContent = [
@@ -291,8 +305,13 @@ public final class TranslationService: @unchecked Sendable {
             "max_tokens": maxTokens(for: model),
             "temperature": 0.1,
             "provider": providerRouting,
-            "response_format": translationSchema,
         ]
+        if isStreaming {
+            body["stream"] = true
+            body["stream_options"] = ["include_usage": true]
+        } else {
+            body["response_format"] = translationSchema
+        }
         if contextImagePNGData != nil {
             body.removeValue(forKey: "model")
             body["models"] = [
@@ -302,7 +321,12 @@ public final class TranslationService: @unchecked Sendable {
             ].uniqued()
         }
 
-        let response = try await postOpenRouter(body: body, apiKey: key)
+        let response: OpenRouterCompletion
+        if isStreaming, let onPartial {
+            response = try await streamOpenRouter(body: body, apiKey: key, onPartial: onPartial)
+        } else {
+            response = try await postOpenRouter(body: body, apiKey: key)
+        }
         return TranslationResult(
             text: response.translation,
             description: response.description,
@@ -445,7 +469,7 @@ public final class TranslationService: @unchecked Sendable {
         throw TranslationError.localModelUnavailable("Could not find scripts/\(scriptName) or bundled \(scriptName).")
     }
 
-    private func postOpenRouter(body: [String: Any], apiKey: String) async throws -> OpenRouterCompletion {
+    private func makeOpenRouterRequest(body: [String: Any], apiKey: String) throws -> URLRequest {
         guard let url = URL(string: "https://openrouter.ai/api/v1/chat/completions") else {
             throw TranslationError.invalidURL("https://openrouter.ai/api/v1/chat/completions")
         }
@@ -457,9 +481,76 @@ public final class TranslationService: @unchecked Sendable {
         request.setValue("https://kargn.as", forHTTPHeaderField: "HTTP-Referer")
         request.setValue("Sangrak", forHTTPHeaderField: "X-OpenRouter-Title")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
 
+    private func postOpenRouter(body: [String: Any], apiKey: String) async throws -> OpenRouterCompletion {
+        let request = try makeOpenRouterRequest(body: body, apiKey: apiKey)
         let data = try await send(request)
         return try extractOpenRouterCompletion(from: data)
+    }
+
+    private func streamOpenRouter(
+        body: [String: Any],
+        apiKey: String,
+        onPartial: @Sendable (String) -> Void
+    ) async throws -> OpenRouterCompletion {
+        var request = try makeOpenRouterRequest(body: body, apiKey: apiKey)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TranslationError.missingTranslation("")
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            var errorBody = ""
+            for try await line in bytes.lines {
+                errorBody += line + "\n"
+            }
+            throw TranslationError.invalidHTTPStatus(httpResponse.statusCode, errorBody)
+        }
+
+        var accumulated = ""
+        var usage: TranslationUsage?
+        // Coalesce token-level deltas to one UI push per ~120ms; the toast polls at 200ms, so finer
+        // updates would be discarded and only add file-write churn.
+        var lastEmit = Date.distantPast
+        let emitInterval: TimeInterval = 0.12
+
+        for try await line in bytes.lines {
+            try Task.checkCancellation()
+            guard line.hasPrefix("data:") else { continue }
+            let payload = line.dropFirst("data:".count).trimmingCharacters(in: .whitespaces)
+            if payload.isEmpty { continue }
+            if payload == "[DONE]" { break }
+            guard let payloadData = payload.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
+            else { continue }
+
+            if object["usage"] is [String: Any] {
+                usage = extractOpenRouterUsage(from: object)
+            }
+
+            guard let choices = object["choices"] as? [[String: Any]],
+                  let delta = choices.first?["delta"] as? [String: Any],
+                  let content = delta["content"] as? String,
+                  !content.isEmpty
+            else { continue }
+
+            accumulated += content
+            let now = Date()
+            if now.timeIntervalSince(lastEmit) >= emitInterval {
+                lastEmit = now
+                onPartial(accumulated)
+            }
+        }
+
+        let translation = clean(accumulated)
+        guard !translation.isEmpty else {
+            throw TranslationError.missingTranslation("The streamed response did not contain any text.")
+        }
+        onPartial(translation)
+        return OpenRouterCompletion(translation: translation, description: nil, usage: usage)
     }
 
     private func send(_ request: URLRequest) async throws -> Data {
@@ -579,6 +670,25 @@ public final class TranslationService: @unchecked Sendable {
         - If <selected_text> is exactly "it" but the attached image does not show a reliable referent, still return "그것" and describe it as the most likely object from the surrounding visible sentence.
 
         \(contextInstruction)
+
+        <selected_text>
+        \(text)
+        </selected_text>
+        """
+    }
+
+    private func openRouterPlainTextPrompt(
+        text: String,
+        sourceLanguage: String,
+        targetLanguage: String
+    ) -> String {
+        return """
+        Translate the \(sourceLanguage) text inside <selected_text> into \(targetLanguage).
+
+        Critical rules:
+        - Return only the translated text. No quotes, labels, JSON, or explanations.
+        - Treat everything inside <selected_text> as the only source text.
+        - Preserve paragraph breaks and line breaks.
 
         <selected_text>
         \(text)

@@ -20,6 +20,7 @@
 
   let isTauri = $state(false);
   let bubbleEl = $state<HTMLDivElement | undefined>();
+  let translationTextEl = $state<HTMLParagraphElement | undefined>();
   let preview = $state<TranslationPreviewState>(fallbackTranslationState);
   let visibleMode = $state<TranslationMode>(requestedMode ?? fallbackTranslationState.mode);
   let copied = $state(false);
@@ -217,6 +218,20 @@
     const frame = requestAnimationFrame(() => {
       rearmBackdropFilter();
       syncWindowHeight();
+    });
+    return () => cancelAnimationFrame(frame);
+  });
+
+  $effect(() => {
+    void bodyText;
+    const el = translationTextEl;
+    if (!el || visibleMode !== "translated") return;
+    // Decide before the DOM grows: follow the bottom so each streamed chunk stays visible, but if
+    // the user scrolled up to re-read, leave their position untouched.
+    const stick = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (!stick) return;
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
     });
     return () => cancelAnimationFrame(frame);
   });
@@ -741,7 +756,7 @@
           </div>
         </footer>
       {:else}
-        <p class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
+        <p bind:this={translationTextEl} class:original={visibleMode === "original"} class="translation-text">{bodyText}</p>
         <footer class="bubble-footer">
           <label class="language-select-shell" aria-label="Target language">
             <Languages size={14} />

@@ -142,6 +142,43 @@ struct OpenRouterScreenContextTests {
 
         #expect(result.text == "첫 줄\n둘째 줄")
     }
+
+    @Test func openRouterTextStreamsPlainTextWhenPartialHandlerProvided() async throws {
+        let settings = TranslatorSettings(
+            provider: .openRouter,
+            openRouterTextModel: "openrouter/text-model"
+        )
+        let service = TranslationService(session: stubbedOpenRouterSession { request in
+            let body = try #require(request.jsonBody)
+            #expect(body["model"] as? String == "openrouter/text-model")
+            #expect(body["stream"] as? Bool == true)
+            #expect(body["response_format"] == nil)
+            let streamOptions = try #require(body["stream_options"] as? [String: Any])
+            #expect(streamOptions["include_usage"] as? Bool == true)
+
+            let messages = try #require(body["messages"] as? [[String: Any]])
+            let userMessage = try #require(messages.last)
+            let prompt = try #require(userMessage["content"] as? String)
+            #expect(prompt.contains("Return only the translated text"))
+
+            return openRouterStreamResponse(chunks: ["안녕", "하세요", " 세계"])
+        })
+
+        let partials = PartialCollector()
+        let result = try await service.translateText(
+            "Hello world",
+            settings: settings,
+            credentials: TranslatorCredentials(openRouterAPIKey: "test-key", huggingFaceToken: nil),
+            onPartial: { partials.append($0) }
+        )
+
+        #expect(result.text == "안녕하세요 세계")
+        #expect(result.usage?.totalTokens == 18)
+        #expect(result.usage?.costCredits == 0.000123)
+        let collected = partials.values
+        #expect(!collected.isEmpty)
+        #expect(collected.last == "안녕하세요 세계")
+    }
 }
 
 private func stubbedOpenRouterSession(
@@ -176,6 +213,45 @@ private func openRouterResponse(_ translation: String, description: String? = ni
         ],
     ]
     return try! JSONSerialization.data(withJSONObject: payload)
+}
+
+private func openRouterStreamResponse(chunks: [String]) -> Data {
+    var lines: [String] = []
+    for chunk in chunks {
+        let object: [String: Any] = ["choices": [["delta": ["content": chunk]]]]
+        let data = try! JSONSerialization.data(withJSONObject: object)
+        lines.append("data: \(String(data: data, encoding: .utf8)!)")
+    }
+    let usageObject: [String: Any] = [
+        "choices": [],
+        "usage": [
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "total_tokens": 18,
+            "cost": 0.000123,
+        ],
+    ]
+    let usageData = try! JSONSerialization.data(withJSONObject: usageObject)
+    lines.append("data: \(String(data: usageData, encoding: .utf8)!)")
+    lines.append("data: [DONE]")
+    return Data((lines.joined(separator: "\n") + "\n").utf8)
+}
+
+private final class PartialCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String] = []
+
+    func append(_ value: String) {
+        lock.lock()
+        storage.append(value)
+        lock.unlock()
+    }
+
+    var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
 }
 
 private final class OpenRouterStubURLProtocol: URLProtocol, @unchecked Sendable {
