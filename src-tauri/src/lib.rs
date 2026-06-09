@@ -1064,11 +1064,7 @@ pub fn run() {
                 if is_persistent_toast() {
                     // Built hidden and positioned per-translation by show_translation_toast, so one
                     // warm WebView is reused instead of cold-starting a process on every Cmd+C.
-                    let url = format!(
-                        "index.html?surface=translation&mode={}&debug={}",
-                        request.mode,
-                        if request.debug { "1" } else { "0" }
-                    );
+                    let url = persistent_translation_url(request.debug);
                     let window =
                         WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
                             .title("CopyTranslator Translation")
@@ -1242,6 +1238,15 @@ fn translation_preview_request() -> Option<TranslationPreviewRequest> {
 
 fn is_persistent_toast() -> bool {
     std::env::args().skip(1).any(|arg| arg == "--persistent")
+}
+
+fn persistent_translation_url(debug: bool) -> String {
+    // Persistent toasts are reused across loading/result/error states. Do not pin `mode` in the URL;
+    // the shared preview state is the runtime source of truth.
+    format!(
+        "index.html?surface=translation&debug={}",
+        if debug { "1" } else { "0" }
+    )
 }
 
 fn normalized_translation_mode(value: &str) -> &'static str {
@@ -2936,6 +2941,13 @@ mod tests {
         let encoded = serde_json::to_string(&state).unwrap();
         assert!(encoded.contains("\"requestSequence\":7"));
         assert!(encoded.contains("\"anchorBottom\":true"));
+    }
+
+    #[test]
+    fn persistent_translation_url_keeps_mode_state_dynamic() {
+        let url = persistent_translation_url(false);
+        assert_eq!(url, "index.html?surface=translation&debug=0");
+        assert!(!url.contains("mode="));
     }
 
     #[test]
