@@ -82,6 +82,7 @@ Critical rules:
 - If <selected_text> is a word or fragment inside a larger sentence, return only that word or fragment's translation.
 - Use surrounding screen context only to choose the right meaning and to write the optional description.
 - Put only the translated text in "translation". Put contextual details only in "description".
+- Preserve source paragraph breaks and line breaks in "translation"; do not flatten separate messages, speaker/timestamp lines, or paragraphs into one paragraph.
 - Write every returned string value in ${targetLanguage}, including "description". Do not write English explanations unless ${targetLanguage} is English.
 - Set "description" to null unless the selected text is ambiguous, pronominal, deictic, or needs screen context to be understood.
 - When a screen image is attached and <selected_text> is a pronoun or deictic word such as "it", "this", "that", or "they", "description" must be a short ${targetLanguage} sentence that explains the referent from the visible context.

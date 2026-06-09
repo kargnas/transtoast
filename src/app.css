@@ -1115,6 +1115,7 @@ kbd {
   font-size: 16px;
   font-weight: 580;
   line-height: 1.42;
+  white-space: pre-wrap;
 }
 
 .translation-text.original {

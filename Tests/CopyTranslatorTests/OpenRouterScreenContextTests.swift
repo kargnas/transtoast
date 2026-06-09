@@ -117,6 +117,31 @@ struct OpenRouterScreenContextTests {
         #expect(result.text == "텍스트 번역")
         #expect(result.model == "openrouter/text-model")
     }
+
+    @Test func openRouterTextPromptPreservesLineBreaks() async throws {
+        let settings = TranslatorSettings(
+            provider: .openRouter,
+            openRouterTextModel: "openrouter/text-model"
+        )
+        let service = TranslationService(session: stubbedOpenRouterSession { request in
+            let body = try #require(request.jsonBody)
+            let messages = try #require(body["messages"] as? [[String: Any]])
+            let userMessage = try #require(messages.last)
+            let prompt = try #require(userMessage["content"] as? String)
+            #expect(prompt.contains("Preserve source paragraph breaks and line breaks"))
+            #expect(prompt.contains("do not flatten separate messages"))
+            #expect(prompt.contains("first line\nsecond line"))
+            return openRouterResponse("첫 줄\n둘째 줄")
+        })
+
+        let result = try await service.translateText(
+            "first line\nsecond line",
+            settings: settings,
+            credentials: TranslatorCredentials(openRouterAPIKey: "test-key", huggingFaceToken: nil)
+        )
+
+        #expect(result.text == "첫 줄\n둘째 줄")
+    }
 }
 
 private func stubbedOpenRouterSession(
