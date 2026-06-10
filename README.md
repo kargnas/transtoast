@@ -13,6 +13,9 @@
 
 Press `Cmd+C` twice in any app — the copied text pops up as a translation toast, translated by a local model that never sends your text anywhere. A macOS menu-bar translator in the spirit of DeepL's quick-translate shortcut.
 
+- **Run it all locally if you want** — fast, accurate AI translation on your own machine, from a local model that takes just ~1.3 GB of memory (970 MB on disk).
+- **Or run it all on the smartest LLMs** — CCTrans captures your screen along with the copied text, so the model sees the surrounding context and translates what you actually mean.
+
 [**Download for macOS →**](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
 
 ## What it does
@@ -25,6 +28,8 @@ Press `Cmd+C` twice in any app — the copied text pops up as a translation toas
 
 <p align="center">
   <img src="docs/images/menubar.png" width="210" alt="CCTrans ⌘C item in the macOS menu bar">
+  <br>
+  <img src="docs/images/menu.png" width="540" alt="Menu bar menu: Translation Model submenu with local models (Hy-MT2, Kanana, NLLB, ...) and OpenRouter LLM choices">
 </p>
 
 The default model is **Hy-MT2 1.8B 4-bit running locally on MLX** — no API key, no network, nothing leaves the Mac:
