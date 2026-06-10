@@ -920,76 +920,62 @@
                 <RotateCcw size={13} />
               </button>
             </label>
-            <div class="openrouter-table-wrap">
-              <table class="openrouter-table">
-                <thead>
-                  <tr>
-                    <th class="favorite-column" aria-label="Favorite"></th>
-                    <th>
-                      <button type="button" class:active={openRouterSort.key === "model"} onclick={() => updateOpenRouterSort("model")}>
-                        Model <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("model")}</span>
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" class:active={openRouterSort.key === "inputPrice"} onclick={() => updateOpenRouterSort("inputPrice")}>
-                        Input <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("inputPrice")}</span>
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" class:active={openRouterSort.key === "outputPrice"} onclick={() => updateOpenRouterSort("outputPrice")}>
-                        Output <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("outputPrice")}</span>
-                      </button>
-                    </th>
-                    <th>Modalities</th>
-                    <th>
-                      <button type="button" class:active={openRouterSort.key === "context"} onclick={() => updateOpenRouterSort("context")}>
-                        Context <ArrowUpDown size={12} /><span class="sort-state">{sortLabel("context")}</span>
-                      </button>
-                    </th>
-                    <th>Release</th>
-                    <th>Use</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each sortOpenRouterModels(settingsState.options.openRouterModels) as model}
-                    <tr class={settingsState.settings.provider === "openRouter" && settingsState.settings.openRouterTextModel === model.value ? "selected-model" : ""}>
-                      <td class="favorite-column">
-                        <button
-                          class="favorite-button"
-                          class:active={settingsState.settings.favoriteOpenRouterModels.includes(model.value)}
-                          title="Toggle favorite"
-                          onclick={() => toggleFavorite("favoriteOpenRouterModels", model.value)}
-                        >
-                          <Star size={14} />
-                        </button>
-                      </td>
-                      <td class="model-name-cell">
-                        <strong>{model.label}</strong>
-                        <span>{model.value}</span>
-                        <div class="model-badges">
-                          {#if model.isRecommended}<em>Recommended</em>{/if}
-                          {#if model.isFree}<em>Free</em>{/if}
-                          {#if model.isReasoning}<em>Reasoning</em>{/if}
-                        </div>
-                      </td>
-                      <td class="price-cell">{formatUnitPrice(model.promptPricePerMillion)}</td>
-                      <td class="price-cell">{formatUnitPrice(model.completionPricePerMillion)}</td>
-                      <td>{modalityText(model)}</td>
-                      <td>{formatContextWindow(model.contextWindow)}</td>
-                      <td>{model.releaseDate}</td>
-                      <td>
-                        <div class="model-actions">
-                          <button class="inline-action" onclick={() => useOpenRouterTextModel(model.value)}><Cloud size={13} />Text</button>
-                          {#if model.modalities.includes("image")}
-                            <button class="inline-action" onclick={() => useOpenRouterVisionModel(model.value)}>Vision</button>
-                          {/if}
-                        </div>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
+            <div class="openrouter-sort-bar" role="group" aria-label="Sort models">
+              <span class="sort-caption">Sort by</span>
+              <button type="button" class:active={openRouterSort.key === "model"} onclick={() => updateOpenRouterSort("model")}>
+                Model <ArrowUpDown size={11} /><span class="sort-state">{sortLabel("model")}</span>
+              </button>
+              <button type="button" class:active={openRouterSort.key === "inputPrice"} onclick={() => updateOpenRouterSort("inputPrice")}>
+                Input <ArrowUpDown size={11} /><span class="sort-state">{sortLabel("inputPrice")}</span>
+              </button>
+              <button type="button" class:active={openRouterSort.key === "outputPrice"} onclick={() => updateOpenRouterSort("outputPrice")}>
+                Output <ArrowUpDown size={11} /><span class="sort-state">{sortLabel("outputPrice")}</span>
+              </button>
+              <button type="button" class:active={openRouterSort.key === "context"} onclick={() => updateOpenRouterSort("context")}>
+                Context <ArrowUpDown size={11} /><span class="sort-state">{sortLabel("context")}</span>
+              </button>
             </div>
+            {#each sortOpenRouterModels(settingsState.options.openRouterModels) as model}
+              <div
+                class="model-row openrouter-row"
+                class:selected-model={settingsState.settings.provider === "openRouter" && settingsState.settings.openRouterTextModel === model.value}
+              >
+                <button
+                  class="favorite-button"
+                  class:active={settingsState.settings.favoriteOpenRouterModels.includes(model.value)}
+                  title="Toggle favorite"
+                  onclick={() => toggleFavorite("favoriteOpenRouterModels", model.value)}
+                >
+                  <Star size={14} />
+                </button>
+                <div class="model-copy">
+                  <strong>{model.label}</strong>
+                  <span class="model-id">{model.value}</span>
+                  <span>{modalityText(model)} · {formatContextWindow(model.contextWindow)} context · {model.releaseDate}</span>
+                  {#if model.isRecommended || model.isFree || model.isReasoning}
+                    <div class="model-badges">
+                      {#if model.isRecommended}<em>Recommended</em>{/if}
+                      {#if model.isFree}<em>Free</em>{/if}
+                      {#if model.isReasoning}<em>Reasoning</em>{/if}
+                    </div>
+                  {/if}
+                </div>
+                <div class="openrouter-price">
+                  {#if model.isFree}
+                    <strong>Free</strong>
+                  {:else}
+                    <span>In {formatUnitPrice(model.promptPricePerMillion)}</span>
+                    <span>Out {formatUnitPrice(model.completionPricePerMillion)}</span>
+                  {/if}
+                </div>
+                <div class="model-actions">
+                  <button class="inline-action" onclick={() => useOpenRouterTextModel(model.value)}><Cloud size={13} />Text</button>
+                  {#if model.modalities.includes("image")}
+                    <button class="inline-action" onclick={() => useOpenRouterVisionModel(model.value)}>Vision</button>
+                  {/if}
+                </div>
+              </div>
+            {/each}
           </div>
         </section>
       {:else if activeSection === "shortcuts"}

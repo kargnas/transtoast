@@ -681,24 +681,24 @@ input {
   padding: 0 9px;
 }
 
-.openrouter-table-wrap {
-  overflow: auto;
-  border-top: 1px solid var(--border);
-}
-
-.openrouter-table {
-  min-width: 860px;
+/* The OpenRouter catalog reuses the model-row list language instead of a wide
+   table: a fixed-min-width table forced a horizontal scroll inside the card and
+   clipped half the columns at narrow window widths. */
+.openrouter-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--border);
+  color: var(--secondary);
   font-size: 10px;
 }
 
-.openrouter-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--surface-pop);
+.openrouter-sort-bar .sort-caption {
+  font-weight: 560;
 }
 
-.openrouter-table th button {
+.openrouter-sort-bar button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -710,54 +710,42 @@ input {
   font-weight: 650;
 }
 
-.openrouter-table th button.active {
+.openrouter-sort-bar button.active {
   color: var(--blue);
 }
 
-.openrouter-table .sort-state {
+.openrouter-sort-bar .sort-state {
   color: var(--tertiary);
   font-size: 9px;
   font-weight: 560;
 }
 
-.openrouter-table td {
-  color: var(--control-ink);
-  vertical-align: middle;
+.model-row.openrouter-row {
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
 }
 
-.openrouter-table tr.selected-model td {
+.model-row.selected-model {
   background: var(--accent-soft);
 }
 
-.favorite-column {
-  width: 42px;
-  text-align: center;
+.openrouter-row .model-id {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 9px;
 }
 
-.model-name-cell {
-  min-width: 220px;
-  max-width: 280px;
-}
-
-.model-name-cell strong,
-.model-name-cell span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.openrouter-price {
+  display: grid;
+  gap: 1px;
+  color: var(--control-ink);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
   white-space: nowrap;
 }
 
-.model-name-cell strong {
-  color: var(--text-strong);
-  font-size: 11px;
+.openrouter-price strong {
+  color: var(--green-text);
   font-weight: 650;
-}
-
-.model-name-cell span {
-  margin-top: 2px;
-  color: var(--secondary);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 9px;
 }
 
 .model-badges {
@@ -776,11 +764,6 @@ input {
   font-size: 9px;
   font-style: normal;
   font-weight: 560;
-}
-
-.price-cell {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .api-key-row {
