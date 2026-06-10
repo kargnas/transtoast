@@ -44,6 +44,13 @@ VS Code's `🚀 Run Dev App Bundle` launch configuration runs:
 
 After completed development or documentation work is verified and committed, run this launch path before reporting completion so the user's currently running `dist/TransToast.app` is replaced with the latest build.
 
+## Release And Auto Update
+
+- Sparkle 2 (SPM) drives auto update. `scripts/build-app.zsh` embeds `Sparkle.framework`, adds the `@executable_path/../Frameworks` rpath, and injects `SUFeedURL`/`SUPublicEDKey` plus `TRANSTOAST_VERSION` into Info.plist.
+- Pushing a `v*` tag runs `.github/workflows/build-release.yml`: build → Developer ID sign (hardened runtime, inside-out, no ad-hoc fallback) → notarize app and DMG → Sparkle-sign DMG → publish DMG + `appcast.xml` to GitHub Releases.
+- The Sparkle EdDSA private key lives in the login keychain (account `TransToast`) and as the `SPARKLE_PRIVATE_KEY` repo secret. Never commit it. The release tag version must exceed the last released version.
+- Dev runs outside an `.app` bundle skip updater startup on purpose (`startUpdaterIfBundled`).
+
 ## Defaults And Behavior
 
 - Default UI language: English.

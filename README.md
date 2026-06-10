@@ -87,6 +87,24 @@ To build and install the app on this Mac:
 
 For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
 
+## Auto Update & Releases
+
+TransToast updates itself through [Sparkle 2](https://sparkle-project.org/). The app checks `https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml` once a day and installs updates automatically; **Check for Updates...** in the menu-bar icon triggers a manual check.
+
+To ship a release, push a version tag:
+
+```sh
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+The `Build and Release` GitHub Actions workflow then builds the app, signs it with the Developer ID certificate, notarizes both the app and the DMG, signs the DMG with the Sparkle EdDSA key, and publishes `TransToast-vX.Y.Z.dmg` plus `appcast.xml` to GitHub Releases. The tag version must be higher than the previously released `CFBundleShortVersionString`, or installed apps will report "You're up to date".
+
+Signing material lives in two places:
+
+- Sparkle EdDSA private key: login keychain item (account `TransToast`) and the `SPARKLE_PRIVATE_KEY` repository secret. The public key is pinned in `scripts/build-app.zsh`.
+- Apple signing: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` repository secrets.
+
 When the selected **Translation Model** is an **OpenRouter LLM**, TransToast automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
 
 In Settings, **General** shows the active **Translation Model** directly. **Models** manages favorite local/OpenRouter models, default model selections, OpenRouter text/vision models, model pricing, free model status, modality support, and the local OpenRouter API key entry stored in `~/.config/transtoast/.env`.
