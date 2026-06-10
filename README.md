@@ -39,6 +39,24 @@ That run took 2.5 s warm on Apple Silicon, fully offline.
 
 Pick an **OpenRouter LLM** instead and CCTrans silently attaches a downscaled screenshot of your current screen as context (only when Screen Recording is already granted), so short ambiguous snippets get translated the way the page around them means it.
 
+## Local Models, Measured
+
+Every built-in model was benchmarked on an Apple Silicon Mac before earning its menu slot — full data and sample outputs in [docs/local-translation-benchmark-2026.md](docs/local-translation-benchmark-2026.md):
+
+| Model | Status | Peak memory | Per request | Note |
+|---|---|---:|---:|---|
+| **Hy-MT2 1.8B 4-bit (MLX)** | ✅ default | 1.5 GB | 0.08–0.17 s | Best quality — keeps terminology right where others slip |
+| Hy-MT2 1.8B (Transformers) | ✅ bundled | — | — | Legacy Python backend; slower than MLX on the same Mac |
+| Hy-MT2 30B-A3B (Transformers) | ✅ bundled | — | — | Highest quality, needs serious RAM |
+| QuickMT En-Ko | ✅ bundled | 1.2 GB | 0.02–0.03 s | Fastest of all, but fails isolated short words |
+| Hy-MT2 1.8B IQ4_XS (GGUF) | 🔌 planned | 1.4 GB | 0.08–0.61 s | Benchmarked well; llama.cpp adapter not bundled yet |
+| LFM2 Ko-En Q4_K_M (GGUF) | 🔌 planned | 1.6 GB | 0.07–0.20 s | Fast Ko↔En; license still under review |
+| NLLB CTranslate2 int8 | 🔌 planned | 1.6 GB | 0.06–0.21 s | Widest language coverage, stiffer Korean output |
+| Kanana 1.5 2.1B AIHub Ko-En LoRA | ⚠️ off by default | 0.8 GB | 0.4–1.7 s | CC-BY-NC license and fragile Python deps |
+| MADLAD-400 Swift int4 | 🔌 planned | — | — | Swift runtime builds, MLX metallib loading still fails |
+
+Numbers are peak RSS and warm per-request latency from the standalone benchmark runs. First launch opens **Local Model Setup** with this comparison built in, and custom models drop into `~/.config/cctrans/local-models.json` ([protocol](docs/local-runtimes.md)).
+
 ## Stack at a Glance
 
 | Layer | Tech |
