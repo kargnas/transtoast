@@ -2,7 +2,7 @@
   "created_at_utc": "2026-05-31T18:26:49Z",
   "host": {
     "os": "macOS",
-    "note": "Measured locally from /Users/kargnas/projects/copy-translator with uv-managed Python environments."
+    "note": "Measured locally from the repository checkout with uv-managed Python environments."
   },
   "task": {
     "source_language": "English",
