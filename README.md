@@ -9,7 +9,7 @@ Press `Cmd+C` twice in any app — the copied text pops up as a translation toas
 [**Download for macOS →**](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
 
 <p align="center">
-  <img src="docs/images/menubar.png" width="210" alt="CCTrans ⌘C item in the macOS menu bar">
+  <img src="docs/images/toast.png" width="442" alt="Translation toast: copied text translated to English by the local model, with language badge and copy/settings actions">
 </p>
 
 ## What it does
@@ -19,6 +19,10 @@ Press `Cmd+C` twice in any app — the copied text pops up as a translation toas
 | `Cmd+C` twice on any text | Translates the clipboard and shows a toast where you parked it on screen |
 | `Shift+Cmd+2` | Captures the screen and translates the visible text through a vision model |
 | Click `⌘C` in the menu bar | Model picker, source/target language, toast position, request logs, settings |
+
+<p align="center">
+  <img src="docs/images/menubar.png" width="210" alt="CCTrans ⌘C item in the macOS menu bar">
+</p>
 
 The default model is **Hy-MT2 1.8B 4-bit running locally on MLX** — no API key, no network, nothing leaves the Mac:
 
