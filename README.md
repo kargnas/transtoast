@@ -11,7 +11,11 @@ Press `Cmd+C` twice in any app — the copied text pops up as a translation toas
 - **Run it all locally if you want** — fast, accurate AI translation on your own machine, from a local model that takes just ~1.3 GB of memory (970 MB on disk).
 - **Or run it all on the smartest LLMs** — CCTrans captures your screen along with the copied text, so the model sees the surrounding context and translates what you actually mean.
 
-[**Download for macOS →**](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
+```sh
+brew install --cask kargnas/tap/cctrans
+```
+
+…or [download the DMG →](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
 
 ## What it does
 
@@ -93,7 +97,7 @@ Global shortcuts need macOS privacy approval once:
 
 ## Releases & Auto-Update
 
-Every code push to `main` releases itself: a 10-minute cooldown collects follow-up commits, the patch version bumps from the latest tag, and GitHub Actions ships a signed, notarized `CCTrans-vX.Y.Z.dmg` plus `appcast.xml`. Installed apps check the appcast daily and update in place via Sparkle; **Check for Updates...** in the menu bar checks immediately. Commit with `[skip release]` to opt out, or run the `Auto Release` workflow manually for a minor/major bump.
+Every code push to `main` releases itself: a 10-minute cooldown collects follow-up commits, the patch version bumps from the latest tag, and GitHub Actions ships a signed, notarized `CCTrans-vX.Y.Z.dmg` plus `appcast.xml`. The same run then bumps the Homebrew cask in [kargnas/homebrew-tap](https://github.com/kargnas/homebrew-tap). Installed apps check the appcast daily and update in place via Sparkle; **Check for Updates...** in the menu bar checks immediately. Commit with `[skip release]` to opt out, or run the `Auto Release` workflow manually for a minor/major bump.
 
 ## More
 

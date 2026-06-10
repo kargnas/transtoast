@@ -50,6 +50,7 @@ After completed development or documentation work is verified and committed, run
 - Pushing a `v*` tag runs `.github/workflows/build-release.yml`: build → Developer ID sign (hardened runtime, inside-out, no ad-hoc fallback) → notarize app and DMG → Sparkle-sign DMG → publish DMG + `appcast.xml` to GitHub Releases.
 - Code pushes to `main` auto-release via `.github/workflows/auto-release.yml`: 10-minute cooldown (newer push cancels and restarts), patch bump from the latest tag, then dispatches `build-release.yml`. `[skip release]` in the head commit message opts out; manual dispatch chooses patch/minor/major.
 - The Sparkle EdDSA private key lives in the login keychain (account `CCTrans`) and as the `SPARKLE_PRIVATE_KEY` repo secret. Never commit it. The release tag version must exceed the last released version.
+- After publishing, the `update-tap` job in `build-release.yml` bumps `Casks/cctrans.rb` (version + sha256 only) in [kargnas/homebrew-tap](https://github.com/kargnas/homebrew-tap) over a write deploy key stored as the `TAP_SSH_KEY` secret. The cask structure itself is owned by the tap repo; edit it there.
 - Dev runs outside an `.app` bundle skip updater startup on purpose (`startUpdaterIfBundled`).
 
 ## Defaults And Behavior
