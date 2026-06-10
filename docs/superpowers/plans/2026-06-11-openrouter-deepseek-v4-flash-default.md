@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Change CCTrans's default OpenRouter text model to DeepSeek V4 Flash while keeping vision/screenshot translation on Gemini Flash Latest.
+**Goal:** Change CCTrans's default OpenRouter text model to DeepSeek V4 Flash while keeping vision/screenshot translation on Gemini Flash Lite Latest.
 
 **Architecture:** Split OpenRouter text and vision defaults in Swift core, then mirror those defaults in Tauri and Svelte fallback state. Keep the catalog static and mark only DeepSeek V4 Flash as the recommended OpenRouter text option.
 
@@ -32,7 +32,7 @@ Change `defaultsToLocalModelAutoSourceAndKorean()` expectations to:
 
 ```swift
 #expect(settings.openRouterTextModel == "deepseek/deepseek-v4-flash")
-#expect(settings.openRouterVisionModel == "~google/gemini-flash-latest")
+#expect(settings.openRouterVisionModel == "~google/gemini-flash-lite-latest")
 #expect(settings.favoriteOpenRouterModels == ["deepseek/deepseek-v4-flash"])
 ```
 
@@ -52,7 +52,7 @@ Use these constants:
 
 ```swift
 public static let defaultOpenRouterTextModel = "deepseek/deepseek-v4-flash"
-public static let defaultOpenRouterVisionModel = "~google/gemini-flash-latest"
+public static let defaultOpenRouterVisionModel = "~google/gemini-flash-lite-latest"
 public static let defaultOpenRouterModel = defaultOpenRouterTextModel
 ```
 
@@ -76,7 +76,7 @@ OpenRouterModelSpec(
 )
 ```
 
-Keep Gemini in the catalog but set `isRecommended` to false.
+Keep Gemini Flash Latest in the catalog but set `isRecommended` to false. Add `~google/gemini-flash-lite-latest` for vision defaults and remove the version-pinned Gemini Flash Lite catalog option.
 
 - [ ] **Step 5: Run targeted Swift test and verify it passes**
 
@@ -100,7 +100,7 @@ In `default_settings()`, set:
 
 ```rust
 open_router_text_model: "deepseek/deepseek-v4-flash".to_string(),
-open_router_vision_model: "~google/gemini-flash-latest".to_string(),
+open_router_vision_model: "~google/gemini-flash-lite-latest".to_string(),
 favorite_open_router_models: vec!["deepseek/deepseek-v4-flash".to_string()],
 ```
 
@@ -126,7 +126,7 @@ openrouter_model(
 
 - [ ] **Step 3: Update Svelte fallback state**
 
-In `src/lib/settings.ts`, set both `settings` and `defaults` fallback text model/favorites to DeepSeek V4 Flash while keeping vision on Gemini.
+In `src/lib/settings.ts`, set both `settings` and `defaults` fallback text model/favorites to DeepSeek V4 Flash while keeping vision on Gemini Flash Lite Latest.
 
 - [ ] **Step 4: Run Tauri tests**
 
@@ -148,7 +148,7 @@ Expected: PASS.
 Document OpenRouter text default and screenshot default separately:
 
 ```markdown
-| Cloud translation & vision | OpenRouter (`deepseek/deepseek-v4-flash` text default, `~google/gemini-flash-latest` screenshot default) |
+| Cloud translation & vision | OpenRouter (`deepseek/deepseek-v4-flash` text default, `~google/gemini-flash-lite-latest` screenshot default) |
 ```
 
 - [ ] **Step 2: Run frontend checks**

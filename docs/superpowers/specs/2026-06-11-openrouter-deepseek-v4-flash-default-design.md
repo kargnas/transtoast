@@ -4,7 +4,7 @@
 
 Change CCTrans's default OpenRouter text translation model from `~google/gemini-flash-latest` to `deepseek/deepseek-v4-flash`.
 
-Keep screenshot and vision translation on `~google/gemini-flash-latest` because DeepSeek V4 Flash is text-only. This preserves the existing screenshot translation surface while making ordinary OpenRouter text translation cheaper and faster by default.
+Keep screenshot and vision translation on `~google/gemini-flash-lite-latest` because DeepSeek V4 Flash is text-only. This preserves the existing screenshot translation surface while making ordinary OpenRouter text translation cheaper and faster by default.
 
 ## Current State
 
@@ -20,14 +20,14 @@ Keep screenshot and vision translation on `~google/gemini-flash-latest` because 
 Use separate default constants:
 
 - `defaultOpenRouterTextModel = "deepseek/deepseek-v4-flash"`
-- `defaultOpenRouterVisionModel = "~google/gemini-flash-latest"`
+- `defaultOpenRouterVisionModel = "~google/gemini-flash-lite-latest"`
 
 `TranslatorSettings.defaultOpenRouterModel` may remain as a compatibility alias for the text default if needed by existing call sites, but new default assignments should be explicit about text vs vision.
 
 ## Behavior
 
 - New installs and users with no OpenRouter override get DeepSeek V4 Flash for text translation when they choose OpenRouter LLM.
-- New installs and users with no OpenRouter vision override continue using Gemini Flash Latest for screenshot translation.
+- New installs and users with no OpenRouter vision override continue using Gemini Flash Lite Latest for screenshot translation.
 - Existing users with stored `openRouterTextModel` or `openRouterVisionModel` overrides keep their saved values because settings persist only non-default overrides.
 - `favoriteOpenRouterModels` defaults to include the text default. Users can still favorite/select Gemini manually from the catalog.
 
@@ -35,7 +35,9 @@ Use separate default constants:
 
 - Add or update catalog entry for `deepseek/deepseek-v4-flash` as "DeepSeek V4 Flash".
 - Mark DeepSeek V4 Flash as recommended.
-- Remove the recommended flag from Gemini Flash Latest, while keeping it in the list for vision/manual use.
+- Add `~google/gemini-flash-lite-latest` for vision defaults.
+- Remove the version-pinned Gemini Flash Lite catalog option.
+- Remove the recommended flag from Gemini Flash Latest, while keeping it in the list for manual use.
 - Use OpenRouter's public model page values:
   - Input price: $0.0983 / 1M tokens
   - Output price: $0.1966 / 1M tokens
@@ -45,7 +47,7 @@ Use separate default constants:
 
 ## Verification
 
-- Swift tests should confirm text default is DeepSeek V4 Flash and vision default remains Gemini Flash Latest.
+- Swift tests should confirm text default is DeepSeek V4 Flash and vision default remains Gemini Flash Lite Latest.
 - Tauri/Rust tests should confirm settings defaults and reset behavior use the split defaults.
 - Svelte check/build should pass after fallback state updates.
 - Manual CLI smoke should run the app binary with `--provider openrouter --openrouter-text-model deepseek/deepseek-v4-flash --translate-text-once` only if an OpenRouter key is available; otherwise verify the command construction/settings surface without sending a live request.
@@ -53,5 +55,5 @@ Use separate default constants:
 ## Out of Scope
 
 - Do not change the app-wide default provider; local Hy-MT2 remains default.
-- Do not change screenshot translation away from Gemini.
+- Use Gemini Flash Lite Latest for screenshot translation.
 - Do not add model-routing fallback logic.
