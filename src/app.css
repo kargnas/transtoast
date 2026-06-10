@@ -256,6 +256,11 @@ h2 {
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
+  /* Native scroll-edge treatment: rows sliced mid-text at the scrollport bottom read
+     as a web page, so fade the last 14px like macOS does in Spotlight/Music. The
+     fade stays smaller than the trailing .setting-group margin (18px), so a pane
+     scrolled to its end shows no fade on real content. */
+  mask-image: linear-gradient(to bottom, black calc(100% - 14px), transparent);
 }
 
 .setting-group {
