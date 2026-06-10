@@ -88,10 +88,10 @@ export const fallbackState: SettingsState = {
     localModelID: "hymt2-mlx-1.8b-4bit",
     localHyMT2BackendPath: null,
     customLocalModelsPath: null,
-    openRouterTextModel: "~google/gemini-flash-latest",
-    openRouterVisionModel: "~google/gemini-flash-latest",
+    openRouterTextModel: "deepseek/deepseek-v4-flash",
+    openRouterVisionModel: "~google/gemini-flash-lite-latest",
     favoriteLocalModelIDs: ["hymt2-mlx-1.8b-4bit"],
-    favoriteOpenRouterModels: ["~google/gemini-flash-latest"],
+    favoriteOpenRouterModels: ["deepseek/deepseek-v4-flash"],
     includeScreenContextForLLM: false,
     sourceLanguage: "Auto",
     targetLanguage: "Korean",
@@ -105,10 +105,10 @@ export const fallbackState: SettingsState = {
     localModelID: "hymt2-mlx-1.8b-4bit",
     localHyMT2BackendPath: null,
     customLocalModelsPath: null,
-    openRouterTextModel: "~google/gemini-flash-latest",
-    openRouterVisionModel: "~google/gemini-flash-latest",
+    openRouterTextModel: "deepseek/deepseek-v4-flash",
+    openRouterVisionModel: "~google/gemini-flash-lite-latest",
     favoriteLocalModelIDs: ["hymt2-mlx-1.8b-4bit"],
-    favoriteOpenRouterModels: ["~google/gemini-flash-latest"],
+    favoriteOpenRouterModels: ["deepseek/deepseek-v4-flash"],
     includeScreenContextForLLM: false,
     sourceLanguage: "Auto",
     targetLanguage: "Korean",
@@ -150,7 +150,6 @@ export const fallbackState: SettingsState = {
       {
         label: "Google Gemini Flash Latest",
         value: "~google/gemini-flash-latest",
-        note: "Recommended",
         promptPricePerMillion: 1.5,
         completionPricePerMillion: 9,
         modalities: ["text", "image", "video", "pdf", "audio"],
@@ -158,7 +157,7 @@ export const fallbackState: SettingsState = {
         contextWindow: 1048576,
         isReasoning: true,
         isFree: false,
-        isRecommended: true
+        isRecommended: false
       },
       {
         label: "MiniMax-M3",
@@ -197,8 +196,8 @@ export const fallbackState: SettingsState = {
         isRecommended: false
       },
       {
-        label: "Gemini 3.1 Flash Lite",
-        value: "google/gemini-3.1-flash-lite",
+        label: "Google Gemini Flash Lite Latest",
+        value: "~google/gemini-flash-lite-latest",
         promptPricePerMillion: 0.25,
         completionPricePerMillion: 1.5,
         modalities: ["text", "image", "video", "pdf", "audio"],
@@ -207,6 +206,19 @@ export const fallbackState: SettingsState = {
         isReasoning: true,
         isFree: false,
         isRecommended: false
+      },
+      {
+        label: "DeepSeek V4 Flash",
+        value: "deepseek/deepseek-v4-flash",
+        note: "Recommended",
+        promptPricePerMillion: 0.0983,
+        completionPricePerMillion: 0.1966,
+        modalities: ["text"],
+        releaseDate: "2026-04-24",
+        contextWindow: 1048576,
+        isReasoning: true,
+        isFree: false,
+        isRecommended: true
       },
       {
         label: "Anthropic Claude Sonnet Latest",
