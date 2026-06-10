@@ -15,3 +15,7 @@ src-tauri/target/
 
 *.xcuserstate
 .DS_Store
+
+# Local AI agent state directories must never be committed.
+.omo/
+.omx/
