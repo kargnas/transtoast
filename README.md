@@ -1,168 +1,78 @@
+<p align="center">
+  <img src="assets/icon/app-icon-rounded-1024.png" width="128" alt="CCTrans icon">
+</p>
+
 # CCTrans
 
-CCTrans is a macOS menu-bar app that translates copied text after pressing `Cmd+C` twice, similar to DeepL's quick translation workflow. It also captures the screen with `Shift+Cmd+2` and sends the image to an OpenRouter vision model for translation.
+Press `Cmd+C` twice in any app — the copied text pops up as a translation toast, translated by a local model that never sends your text anywhere. A macOS menu-bar translator in the spirit of DeepL's quick-translate shortcut.
 
-## Features
+[**Download for macOS →**](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
 
-- `Cmd+C` twice: reads the clipboard text and translates it.
-- `Shift+Cmd+2`: captures the current screen and translates visible text in the image.
-- Toast results appear in the configured screen corner and stack when multiple translations finish close together.
-- Translation Model selection is model-first:
-  - **Local Model** choices run local Hy-MT2 inference. The default is the app-recommended local model.
-  - **OpenRouter LLM** choices use OpenRouter chat models. Selecting a model also selects the OpenRouter provider.
-  - Every model selector includes **Default** to return to the app recommendation.
-- Screenshot translation uses an OpenRouter multimodal model. The default is `~google/gemini-flash-latest`.
-- OpenRouter text translation automatically attaches the current screen as 1x visual context through the configured vision model when Screen Recording is already trusted.
-- OpenRouter text translation keeps the copied selection as the only translation target and may show a small contextual description for ambiguous short selections.
-- Request logs show request count, token usage, duplicate suspects, selected model, attached image dimensions, or the screen-context skip reason.
+<p align="center">
+  <img src="docs/images/menubar.png" width="210" alt="CCTrans ⌘C item in the macOS menu bar">
+</p>
 
-## Requirements
+## What it does
 
-- macOS 15 or later.
-- Xcode 26 or later.
-- Swift 6.2 or later.
-- `uv` for the local Hy-MT2 Python backend.
-- Accessibility/Input Monitoring permission for global keyboard detection.
-- Screen Recording permission for screenshot translation.
+| You do | CCTrans does |
+|---|---|
+| `Cmd+C` twice on any text | Translates the clipboard and shows a toast where you parked it on screen |
+| `Shift+Cmd+2` | Captures the screen and translates the visible text through a vision model |
+| Click `⌘C` in the menu bar | Model picker, source/target language, toast position, request logs, settings |
 
-Local Hy-MT2 inference downloads and runs the selected Hugging Face model on this Mac. The 30B-A3B model is large and may require substantial memory, disk, and accelerator support. If the machine cannot load it, select the 1.8B model or use OpenRouter.
+The default model is **Hy-MT2 1.8B 4-bit running locally on MLX** — no API key, no network, nothing leaves the Mac:
 
-## Setup
-
-Create a local environment file:
-
-```sh
-cp .env.example .env.local
+```console
+$ dist/CCTrans.app/Contents/MacOS/CCTrans --translate-text-once \
+    "The deployment failed because the signing certificate expired last night."
+지난 밤에 서명 인증서가 만료되었기 때문에 배포가 실패했습니다.
 ```
 
-Fill in:
+That run took 2.5 s warm on Apple Silicon, fully offline.
+
+Pick an **OpenRouter LLM** instead and CCTrans silently attaches a downscaled screenshot of your current screen as context (only when Screen Recording is already granted), so short ambiguous snippets get translated the way the page around them means it.
+
+## Stack at a Glance
+
+| Layer | Tech |
+|---|---|
+| Menu-bar shell | Swift 6.2 + AppKit (SwiftPM, `LSUIElement`) |
+| Settings / toast surfaces | Tauri 2 + Rust + Svelte |
+| Local inference | Hy-MT2 on MLX, launched through `uv` |
+| Cloud translation & vision | OpenRouter (`~google/gemini-flash-latest` default for screenshots) |
+| Auto-update | Sparkle 2, appcast on GitHub Releases |
+| Release pipeline | GitHub Actions: build → Developer ID sign → notarize → DMG |
+
+## Run Locally
 
 ```sh
-OPENROUTER_API_KEY=...
-HF_TOKEN=...
-```
-
-The `.env.local` file is ignored by Git.
-
-## macOS Permissions
-
-CCTrans needs these macOS privacy permissions for the global shortcuts:
-
-- **Input Monitoring** or **Accessibility** for `Cmd+C` twice from other apps.
-- **Screen Recording** for `Shift+Cmd+2` screenshot translation.
-
-Open the settings window and use **Permission Helper**. It opens the privacy pane and shows a draggable `CCTrans.app` icon. Drag that icon into the permission list, turn the toggle on if macOS adds it disabled, then relaunch CCTrans.
-
-You can also open System Settings manually:
-
-```sh
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
-```
-
-After changing either keyboard or screen permissions, quit and relaunch CCTrans so macOS applies the new trust state.
-
-Development builds are signed with a stable local Apple Development identity when one is available. If a previous ad-hoc build was already listed in Screen Recording, remove that old `CCTrans` entry or toggle it off and on once after rebuilding. macOS can show the same app name for a stale code identity, but CCTrans will report **Screen ready** only when the current signed bundle is actually trusted.
-
-## Run
-
-```sh
+git clone https://github.com/kargnas/cctrans && cd cctrans
+npm install
 ./scripts/run-dev.zsh
 ```
 
-Use the menu-bar icon to open options, request logs, the **Translation Model** selector, permission helpers, and Quit. For local UI verification, you can launch the settings window directly:
+`run-dev.zsh` builds the Swift shell and the Tauri helper, signs `dist/CCTrans.app` with a stable local identity (so macOS permissions stick across rebuilds), and launches it. Local models additionally need [`uv`](https://docs.astral.sh/uv/); OpenRouter features need `cp .env.example .env.local` with an `OPENROUTER_API_KEY`.
 
-```sh
-./scripts/run-dev.zsh --show-settings
-```
+To install on this Mac: `./scripts/install-app.zsh --open`. For another Mac, see [docs/other-mac-setup.md](docs/other-mac-setup.md).
 
-Development app runs intentionally use the signed `dist/CCTrans.app` bundle. This keeps Screen Recording, Accessibility, and Input Monitoring permissions tied to the stable `as.kargn.cctrans` bundle id instead of SwiftPM's ad-hoc debug executable identity.
+## Permissions
 
-To build and install the app on this Mac:
+Global shortcuts need macOS privacy approval once:
 
-```sh
-./scripts/install-app.zsh --open
-```
+| Permission | Needed for |
+|---|---|
+| Input Monitoring *or* Accessibility | Detecting `Cmd+C` twice in other apps |
+| Screen Recording | `Shift+Cmd+2` screenshot translation and LLM screen context |
 
-For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
+**Settings → Permission Helper** opens the right privacy pane and shows a draggable `CCTrans.app` icon to drop into the list. Quit and relaunch CCTrans after granting — macOS applies trust on the next launch.
 
-## Auto Update & Releases
+## Releases & Auto-Update
 
-CCTrans updates itself through [Sparkle 2](https://sparkle-project.org/). The app checks `https://github.com/kargnas/cctrans/releases/latest/download/appcast.xml` once a day and installs updates automatically; **Check for Updates...** in the menu-bar icon triggers a manual check.
+Every code push to `main` releases itself: a 10-minute cooldown collects follow-up commits, the patch version bumps from the latest tag, and GitHub Actions ships a signed, notarized `CCTrans-vX.Y.Z.dmg` plus `appcast.xml`. Installed apps check the appcast daily and update in place via Sparkle; **Check for Updates...** in the menu bar checks immediately. Commit with `[skip release]` to opt out, or run the `Auto Release` workflow manually for a minor/major bump.
 
-Releases ship automatically: pushing code changes (`Sources/`, `src/`, `src-tauri/`, `scripts/`, package manifests) to `main` starts the `Auto Release` workflow, which waits 10 minutes for follow-up commits (a newer push restarts the timer), bumps the patch version from the latest tag, and dispatches `Build and Release`. Add `[skip release]` to the commit message to opt out. For a minor/major bump, run the `Auto Release` workflow manually and pick the bump type:
+## More
 
-```sh
-gh workflow run auto-release.yml -f bump=minor
-```
-
-Pushing a `v*` tag by hand still triggers `Build and Release` directly. Either way the workflow builds the app, signs it with the Developer ID certificate, notarizes both the app and the DMG, signs the DMG with the Sparkle EdDSA key, and publishes `CCTrans-vX.Y.Z.dmg` plus `appcast.xml` to GitHub Releases.
-
-Signing material lives in two places:
-
-- Sparkle EdDSA private key: login keychain item (account `CCTrans`) and the `SPARKLE_PRIVATE_KEY` repository secret. The public key is pinned in `scripts/build-app.zsh`.
-- Apple signing: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` repository secrets.
-
-When the selected **Translation Model** is an **OpenRouter LLM**, CCTrans automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
-
-In Settings, **General** shows the active **Translation Model** directly. **Models** manages favorite local/OpenRouter models, default model selections, OpenRouter text/vision models, model pricing, free model status, modality support, and the local OpenRouter API key entry stored in `~/.config/cctrans/.env`.
-
-Open **Request Logs...** from the menu-bar icon to inspect recent translation requests. The log keeps the last 200 requests and shows whether token usage came from the provider response or an app-side estimate. OpenRouter requests report provider token usage when the response includes it; local model requests use an estimate.
-
-## Local Model Backend
-
-The default local model is `hymt2-mlx-1.8b-4bit`, which calls:
-
-```sh
-uv run scripts/runtimes/mlx_lm_translate.py
-```
-
-Legacy Hy-MT2 Transformers models still use:
-
-```sh
-uv run scripts/hy_mt2_translate.py
-```
-
-All local backends accept JSON on standard input:
-
-```json
-{
-  "text": "The deployment failed.",
-  "source_language": "English",
-  "target_language": "Korean",
-  "model_id": "mlx-community/Hy-MT2-1.8B-4bit"
-}
-```
-
-It prints:
-
-```json
-{
-  "translation": "배포가 실패했습니다."
-}
-```
-
-See [docs/local-runtimes.md](docs/local-runtimes.md) for custom model JSON and backend protocol details.
-
-On first launch, **Local Model Setup** opens with a benchmark-based comparison table before it asks the user to run any fresh test. The table summarizes the models already tested on this project, including recommended, supported, heavy, planned-adapter, fragile-dependency, runtime-issue, and rejected candidates.
-
-## Verification
-
-Useful checks:
-
-```sh
-swift build
-printf '{"text":"Hello world","source_language":"English","target_language":"Korean","model_id":"mlx-community/Hy-MT2-1.8B-4bit"}' | uv run scripts/runtimes/mlx_lm_translate.py
-./scripts/build-app.zsh
-./scripts/install-app.zsh --install-dir "$HOME/Applications"
-./scripts/package-app.zsh
-dist/CCTrans.app/Contents/MacOS/CCTrans --translate-text-once "Hello world"
-dist/CCTrans.app/Contents/MacOS/CCTrans --translate-text-once "Hello world" --local-model hymt2-mlx-1.8b-4bit
-dist/CCTrans.app/Contents/MacOS/CCTrans --list-local-models
-dist/CCTrans.app/Contents/MacOS/CCTrans --translate-text-once "Hello world" --provider openrouter
-dist/CCTrans.app/Contents/MacOS/CCTrans --screenshot-once
-node scripts/openrouter_prompt_probe.mjs --capture
-```
-
-For UI verification, run the app, open TextEdit or another text field, copy text twice with `Cmd+C`, and confirm that a translation toast appears. Then use `Shift+Cmd+2` and confirm that a screenshot translation toast appears.
+- [docs/local-runtimes.md](docs/local-runtimes.md) — local backend protocol, custom model JSON, benchmark results
+- [docs/other-mac-setup.md](docs/other-mac-setup.md) — installing on a second Mac
+- [AGENTS.md](AGENTS.md) — contract for coding agents working on this repo
+- **Request Logs...** in the menu bar — last 200 requests with token usage, model, attached image size, and duplicate suspects
