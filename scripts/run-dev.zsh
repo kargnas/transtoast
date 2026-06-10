@@ -3,12 +3,12 @@ set -euo pipefail
 
 ROOT="${0:A:h}/.."
 ROOT="${ROOT:A}"
-APP_NAME="TransToast"
+APP_NAME="CCTrans"
 APP_DIR="$ROOT/dist/$APP_NAME.app"
-BUNDLE_ID="as.kargn.transtoast"
+BUNDLE_ID="as.kargn.cctrans"
 APP_EXEC="$APP_DIR/Contents/MacOS/$APP_NAME"
 DEBUG_EXEC="$ROOT/.build/arm64-apple-macosx/debug/$APP_NAME"
-TAURI_HELPER_EXEC="$APP_DIR/Contents/Resources/TransToastTauri.app/Contents/MacOS/transtoast-tauri"
+TAURI_HELPER_EXEC="$APP_DIR/Contents/Resources/CCTransTauri.app/Contents/MacOS/cctrans-tauri"
 
 cd "$ROOT"
 

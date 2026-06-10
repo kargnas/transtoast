@@ -33,7 +33,7 @@ mod macos_drag {
     define_class!(
         #[unsafe(super(NSObject))]
         #[derive(Debug, PartialEq, Eq, Hash)]
-        #[name = "TransToastPermissionDragSource"]
+        #[name = "CCTransPermissionDragSource"]
         #[thread_kind = MainThreadOnly]
         struct PermissionDragSource;
 
@@ -644,7 +644,7 @@ fn permission_app_target(app: AppHandle) -> Result<PermissionAppTarget, String> 
         bundle_name: bundle_path
             .file_name()
             .and_then(|name| name.to_str())
-            .unwrap_or("TransToast.app")
+            .unwrap_or("CCTrans.app")
             .to_string(),
         bundle_file_url: file_url_for_path(&bundle_path),
         bundle_path: bundle_path.display().to_string(),
@@ -670,7 +670,7 @@ fn start_permission_app_drag(
         macos_drag::start_app_drag(&bundle_path, ns_window)?;
         return Ok(ActionResult {
             title: "Drag started".to_string(),
-            message: "Drop TransToast.app into the open macOS Privacy list.".to_string(),
+            message: "Drop CCTrans.app into the open macOS Privacy list.".to_string(),
             ok: true,
         });
     }
@@ -978,7 +978,7 @@ fn prepare_custom_local_models(app: AppHandle) -> Result<SettingsState, String> 
     let mut settings = load_effective_settings(&app)?;
     if settings.custom_local_models_path.is_none() {
         settings.custom_local_models_path =
-            Some("~/.config/transtoast/local-models.json".to_string());
+            Some("~/.config/cctrans/local-models.json".to_string());
         write_settings(&app, settings)?;
     }
     state_from_disk(&app)
@@ -1079,7 +1079,7 @@ pub fn run() {
                     let url = persistent_translation_url(request.debug);
                     let window =
                         WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
-                            .title("TransToast Translation")
+                            .title("CCTrans Translation")
                             .inner_size(TRANSLATION_WINDOW_WIDTH, height)
                             .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
                             .resizable(false)
@@ -1120,7 +1120,7 @@ pub fn run() {
                         if anchor_bottom { "bottom" } else { "top" }
                     );
                     WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
-                        .title("TransToast Translation")
+                        .title("CCTrans Translation")
                         .inner_size(TRANSLATION_WINDOW_WIDTH, height)
                         .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
                         .resizable(false)
@@ -1196,7 +1196,7 @@ pub fn run() {
             close_settings_window
         ])
         .build(tauri::generate_context!())
-        .expect("error while building TransToast Tauri app")
+        .expect("error while building CCTrans Tauri app")
         .run(|_app, event| {
             // The persistent toast must survive dismissing its only window so the next translation
             // reuses the warm WebView; legacy throwaway processes are unaffected and exit normally.
@@ -2415,14 +2415,14 @@ fn legacy_binary_path(app: &AppHandle) -> Result<PathBuf, String> {
     let roots = candidate_roots(app);
     for root in roots {
         let candidates = [
-            root.join(".build/debug/TransToast"),
-            root.join("dist/TransToast.app/Contents/MacOS/TransToast"),
+            root.join(".build/debug/CCTrans"),
+            root.join("dist/CCTrans.app/Contents/MacOS/CCTrans"),
         ];
         if let Some(path) = candidates.into_iter().find(|path| path.exists()) {
             return Ok(path);
         }
     }
-    Err("TransToast CLI binary not found. Build the Swift app first.".to_string())
+    Err("CCTrans CLI binary not found. Build the Swift app first.".to_string())
 }
 
 fn legacy_working_dir(app: &AppHandle) -> Option<PathBuf> {
@@ -2441,16 +2441,16 @@ fn resolve_permission_app_bundle(app: &AppHandle) -> Result<PathBuf, String> {
     let roots = candidate_roots(app);
     for root in roots {
         let candidates = [
-            root.join("dist/TransToast.app"),
-            root.join("src-tauri/target/release/bundle/macos/TransToast.app"),
-            root.join("src-tauri/target/debug/bundle/macos/TransToast.app"),
+            root.join("dist/CCTrans.app"),
+            root.join("src-tauri/target/release/bundle/macos/CCTrans.app"),
+            root.join("src-tauri/target/debug/bundle/macos/CCTrans.app"),
         ];
         if let Some(path) = candidates.into_iter().find(|path| path.exists()) {
             return Ok(existing_path(path));
         }
     }
 
-    Err("TransToast.app bundle not found. Build and launch the app bundle first.".to_string())
+    Err("CCTrans.app bundle not found. Build and launch the app bundle first.".to_string())
 }
 
 fn app_bundle_ancestor(path: &Path) -> Option<PathBuf> {
@@ -2499,7 +2499,7 @@ fn reveal_permission_app_impl(app: &AppHandle) -> Result<ActionResult, String> {
             .spawn()
             .map_err(|error| format!("Could not reveal {}: {error}", bundle_path.display()))?;
         return Ok(action_result(
-            "TransToast.app",
+            "CCTrans.app",
             "Revealed in Finder. Drag the selected app into the open Privacy list.",
             true,
         ));
@@ -2508,7 +2508,7 @@ fn reveal_permission_app_impl(app: &AppHandle) -> Result<ActionResult, String> {
     #[cfg(not(target_os = "macos"))]
     {
         Ok(action_result(
-            "TransToast.app",
+            "CCTrans.app",
             "Revealing the app bundle is macOS-only.",
             false,
         ))
@@ -2530,7 +2530,7 @@ fn candidate_roots(app: &AppHandle) -> Vec<PathBuf> {
 }
 
 fn workspace_root_env() -> Option<PathBuf> {
-    std::env::var("TRANSTOAST_WORKSPACE_ROOT")
+    std::env::var("CCTRANS_WORKSPACE_ROOT")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .map(PathBuf::from)
@@ -2643,7 +2643,7 @@ fn openrouter_api_key_state() -> Result<OpenRouterAPIKeyState, String> {
 
 fn credential_env_path() -> Result<PathBuf, String> {
     let home = std::env::var("HOME").map_err(|_| "HOME is not set.".to_string())?;
-    Ok(PathBuf::from(home).join(".config/transtoast/.env"))
+    Ok(PathBuf::from(home).join(".config/cctrans/.env"))
 }
 
 fn read_env_key(path: &Path, key: &str) -> Result<Option<String>, String> {
@@ -3190,21 +3190,23 @@ mod tests {
 
     #[test]
     fn app_bundle_ancestor_finds_containing_bundle() {
-        let path = PathBuf::from("/Applications/TransToast.app/Contents/MacOS/TransToast");
+        let path = PathBuf::from("/Applications/CCTrans.app/Contents/MacOS/CCTrans");
 
         assert_eq!(
             app_bundle_ancestor(&path).as_deref(),
-            Some(Path::new("/Applications/TransToast.app"))
+            Some(Path::new("/Applications/CCTrans.app"))
         );
     }
 
     #[test]
     fn file_url_escapes_spaces_for_drag_payload() {
-        let path = Path::new("/Applications/TransToast.app");
+        // The app name itself has no space anymore, so use a spaced path to
+        // keep exercising the percent-escaping this test exists for.
+        let path = Path::new("/Applications/CC Trans.app");
 
         assert_eq!(
             file_url_for_path(path),
-            "file:///Applications/Copy%20Translator.app"
+            "file:///Applications/CC%20Trans.app"
         );
     }
 

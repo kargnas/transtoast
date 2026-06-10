@@ -3,23 +3,23 @@
 import PackageDescription
 
 let package = Package(
-    name: "TransToast",
+    name: "CCTrans",
     platforms: [
         .macOS(.v15),
     ],
     products: [
-        .library(name: "TransToastCore", targets: ["TransToastCore"]),
-        .executable(name: "TransToast", targets: ["TransToast"]),
+        .library(name: "CCTransCore", targets: ["CCTransCore"]),
+        .executable(name: "CCTrans", targets: ["CCTrans"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.0"),
     ],
     targets: [
-        .target(name: "TransToastCore"),
+        .target(name: "CCTransCore"),
         .executableTarget(
-            name: "TransToast",
+            name: "CCTrans",
             dependencies: [
-                "TransToastCore",
+                "CCTransCore",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             linkerSettings: [
@@ -31,8 +31,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "TransToastTests",
-            dependencies: ["TransToastCore"]
+            name: "CCTransTests",
+            dependencies: ["CCTransCore"]
         ),
     ]
 )

@@ -41,7 +41,7 @@ def translate(model_id: str, prompt: str) -> str:
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    offload_folder = Path.home() / ".cache" / "transtoast" / "offload" / model_id.replace("/", "--")
+    offload_folder = Path.home() / ".cache" / "cctrans" / "offload" / model_id.replace("/", "--")
     offload_folder.mkdir(parents=True, exist_ok=True)
     device_map: str | dict[str, str] = "auto"
     if "30B-A3B" in model_id and not torch.cuda.is_available():

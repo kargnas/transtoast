@@ -100,7 +100,7 @@
       "examples": [
         "soundstarrain/Murasaki-project"
       ],
-      "reason": "2026 GitHub project for ACGN translation. Not tested for TransToast default because it is domain-specific, not a light general English-to-Korean local model."
+      "reason": "2026 GitHub project for ACGN translation. Not tested for CCTrans default because it is domain-specific, not a light general English-to-Korean local model."
     },
     {
       "family": "Large/older GGUF translation models updated in 2026",
@@ -118,7 +118,7 @@
         "estincelle/Translator_models_experiments_english--korean",
         "minovermax/ko-entity-fidelity"
       ],
-      "reason": "Found in 2026 GitHub search. They are training/evaluation notebooks or analysis repos, not downloadable light local model artifacts for TransToast."
+      "reason": "Found in 2026 GitHub search. They are training/evaluation notebooks or analysis repos, not downloadable light local model artifacts for CCTrans."
     }
   ],
   "results": [

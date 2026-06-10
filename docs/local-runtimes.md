@@ -1,6 +1,6 @@
 # Local Translation Runtimes
 
-TransToast now treats local translators as registry entries instead of hard-coding Hy-MT2.
+CCTrans now treats local translators as registry entries instead of hard-coding Hy-MT2.
 
 ## Built-In Model IDs
 
@@ -70,7 +70,7 @@ stdout on failure:
 Custom models live in:
 
 ```zsh
-~/.config/transtoast/local-models.json
+~/.config/cctrans/local-models.json
 ```
 
 Create a template:
@@ -82,7 +82,7 @@ uv run scripts/local_model_setup.py --write-template
 Then set `customBackendPath` to a backend that follows the protocol above. The app can also use another config path through Settings or:
 
 ```zsh
-swift run TransToast --list-local-models --custom-local-models /path/to/local-models.json
+swift run CCTrans --list-local-models --custom-local-models /path/to/local-models.json
 ```
 
 The app does not automatically execute `setupCommand`; it records the command so a setup flow can present it explicitly before installing new model dependencies.

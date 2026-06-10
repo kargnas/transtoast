@@ -1,4 +1,4 @@
-import TransToastCore
+import CCTransCore
 import Foundation
 import Testing
 
@@ -54,7 +54,7 @@ import Testing
 
 @Test func registryLoadsCustomModelJSON() throws {
     let path = FileManager.default.temporaryDirectory
-        .appendingPathComponent("transtoast-custom-model-\(UUID().uuidString).json")
+        .appendingPathComponent("cctrans-custom-model-\(UUID().uuidString).json")
     let json = """
     [
       {

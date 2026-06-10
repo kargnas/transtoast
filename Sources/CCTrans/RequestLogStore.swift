@@ -1,4 +1,4 @@
-import TransToastCore
+import CCTransCore
 import Foundation
 
 struct RequestLogEntry: Identifiable {

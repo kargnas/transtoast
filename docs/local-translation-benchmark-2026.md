@@ -1,6 +1,6 @@
 # Local Translation Benchmark 2026
 
-Goal: find local translation models that are light and fast enough for TransToast, with Korean target quality that is not bad.
+Goal: find local translation models that are light and fast enough for CCTrans, with Korean target quality that is not bad.
 
 Scope note: Hugging Face and GitHub returned many 2026 translation uploads, most of them near-duplicate fine-tunes or exports of the same few families. This benchmark tracks by family and tests one representative per meaningfully different runtime/model family, per the "do not test similar ones" constraint.
 

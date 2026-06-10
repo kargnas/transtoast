@@ -61,7 +61,7 @@ public enum TranslationError: LocalizedError, Sendable {
         case .emptyInput:
             "There is no text to translate."
         case let .missingCredential(name):
-            "Missing \(name). Add it to .env.local or ~/.config/transtoast/.env."
+            "Missing \(name). Add it to .env.local or ~/.config/cctrans/.env."
         case let .invalidURL(url):
             "Invalid URL: \(url)"
         case let .invalidHTTPStatus(status, body):
@@ -442,12 +442,12 @@ public final class TranslationService: @unchecked Sendable {
             return modelBackendPath
         }
 
-        if let environmentPath = ProcessInfo.processInfo.environment["TRANSTOAST_LOCAL_BACKEND"],
+        if let environmentPath = ProcessInfo.processInfo.environment["CCTRANS_LOCAL_BACKEND"],
            !environmentPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return environmentPath
         }
 
-        if let environmentPath = ProcessInfo.processInfo.environment["TRANSTOAST_HYMT2_BACKEND"],
+        if let environmentPath = ProcessInfo.processInfo.environment["CCTRANS_HYMT2_BACKEND"],
            !environmentPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return environmentPath
         }

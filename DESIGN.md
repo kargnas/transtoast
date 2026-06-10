@@ -6,10 +6,10 @@
 - Primary product surfaces: macOS menu-bar translator, Tauri translation popover, settings window, permission helper, local model setup, request logs.
 - Evidence reviewed:
   - `design/image.png` and `design/guide.html`: component board for translation overlays, settings window, tokens, spacing, typography, color, radius, motion.
-  - `Sources/TransToast/SettingsWindowController.swift`: current AppKit settings behavior, groups, reset-to-default controls, diagnostics.
-  - `Sources/TransToastCore/TranslatorSettings.swift`: code defaults, persistence keys, legacy decode, override-only encoding.
-  - `Sources/TransToast/SettingsStore.swift`: current UserDefaults key and "remove when all defaults" behavior.
-  - `Sources/TransToast/AppDelegate.swift`: menu settings actions, shortcuts, permissions, diagnostics flows.
+  - `Sources/CCTrans/SettingsWindowController.swift`: current AppKit settings behavior, groups, reset-to-default controls, diagnostics.
+  - `Sources/CCTransCore/TranslatorSettings.swift`: code defaults, persistence keys, legacy decode, override-only encoding.
+  - `Sources/CCTrans/SettingsStore.swift`: current UserDefaults key and "remove when all defaults" behavior.
+  - `Sources/CCTrans/AppDelegate.swift`: menu settings actions, shortcuts, permissions, diagnostics flows.
   - `README.md`: user-facing feature set, permissions, run/test commands.
 
 ## Brand
@@ -83,7 +83,7 @@
 - Framework/styling system: Tauri 2 + Rust backend + Svelte 5 frontend.
 - Design-token constraints: follow `design/` colors, radii, grouped rows, sidebar navigation, and compact typography; do not use CSS `box-shadow` for platform-native window features.
 - Performance constraints: load settings synchronously from small override JSON; avoid unnecessary model-catalog network calls in settings render. OpenRouter model pricing/modality metadata may use a static fallback catalog unless a live refresh is explicitly implemented.
-- Compatibility constraints: macOS 15+, bundle identifier `as.kargn.transtoast`, default target language Korean, default translation model local Hy-MT2, OpenRouter for non-local and screenshot translation, Tauri `macos-private-api` enabled for transparent translation popover windows.
+- Compatibility constraints: macOS 15+, bundle identifier `as.kargn.cctrans`, default target language Korean, default translation model local Hy-MT2, OpenRouter for non-local and screenshot translation, Tauri `macos-private-api` enabled for transparent translation popover windows.
 - Test/screenshot expectations: run build/check/tests; run UI, capture screenshot, crop settings and translation surfaces, compare against `design/image.png` references and generated mockup/reference.
 
 ## Open questions

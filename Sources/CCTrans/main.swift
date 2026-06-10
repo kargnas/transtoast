@@ -1,5 +1,9 @@
 import AppKit
-import TransToastCore
+import CCTransCore
+
+// Must run before SettingsStore/CredentialsProvider touch disk, including the
+// one-shot CLI paths below.
+LegacyBrandMigration.run()
 
 func argumentValue(after flag: String) -> String? {
     guard let index = CommandLine.arguments.firstIndex(of: flag) else {

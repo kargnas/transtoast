@@ -1,22 +1,22 @@
-# TransToast Agent Guide
+# CCTrans Agent Guide
 
 ## Mission
 
-TransToast is a macOS menu-bar translator. Keep the app native-feeling, fast, and operationally clear. Preserve existing translation behavior while migrating UI surfaces to Tauri 2 + Rust + Svelte.
+CCTrans is a macOS menu-bar translator. Keep the app native-feeling, fast, and operationally clear. Preserve existing translation behavior while migrating UI surfaces to Tauri 2 + Rust + Svelte.
 
 ## Project Shape
 
 - SwiftPM app remains the macOS menu-bar shell until the Tauri shell fully replaces it.
-- Bundle identifier must stay `as.kargn.transtoast`.
+- Bundle identifier must stay `as.kargn.cctrans`.
 - macOS target: macOS 15+, Swift 6.2 tools.
 - Tauri surfaces are the product UI layer. Do not add new AppKit auxiliary windows.
 - Keep secrets out of Git. Never commit `.env.local`, token caches, or credential-bearing logs.
 
 ## Layout
 
-- `Sources/TransToastCore/`: platform-light translation logic, settings defaults, model registry, language handling.
-- `Sources/TransToast/`: macOS shell, menu bar app, monitors, and platform adapters.
-- `Tests/TransToastTests/`: Swift tests.
+- `Sources/CCTransCore/`: platform-light translation logic, settings defaults, model registry, language handling.
+- `Sources/CCTrans/`: macOS shell, menu bar app, monitors, and platform adapters.
+- `Tests/CCTransTests/`: Swift tests.
 - `scripts/`: build/install/package helpers and local model runtimes.
 - `src/`: Svelte settings UI for the Tauri migration.
 - `src-tauri/`: Rust/Tauri backend and app configuration.
@@ -42,14 +42,14 @@ VS Code's `🚀 Run Dev App Bundle` launch configuration runs:
 ./scripts/run-dev.zsh
 ```
 
-After completed development or documentation work is verified and committed, run this launch path before reporting completion so the user's currently running `dist/TransToast.app` is replaced with the latest build.
+After completed development or documentation work is verified and committed, run this launch path before reporting completion so the user's currently running `dist/CCTrans.app` is replaced with the latest build.
 
 ## Release And Auto Update
 
-- Sparkle 2 (SPM) drives auto update. `scripts/build-app.zsh` embeds `Sparkle.framework`, adds the `@executable_path/../Frameworks` rpath, and injects `SUFeedURL`/`SUPublicEDKey` plus `TRANSTOAST_VERSION` into Info.plist.
+- Sparkle 2 (SPM) drives auto update. `scripts/build-app.zsh` embeds `Sparkle.framework`, adds the `@executable_path/../Frameworks` rpath, and injects `SUFeedURL`/`SUPublicEDKey` plus `CCTRANS_VERSION` into Info.plist.
 - Pushing a `v*` tag runs `.github/workflows/build-release.yml`: build → Developer ID sign (hardened runtime, inside-out, no ad-hoc fallback) → notarize app and DMG → Sparkle-sign DMG → publish DMG + `appcast.xml` to GitHub Releases.
 - Code pushes to `main` auto-release via `.github/workflows/auto-release.yml`: 10-minute cooldown (newer push cancels and restarts), patch bump from the latest tag, then dispatches `build-release.yml`. `[skip release]` in the head commit message opts out; manual dispatch chooses patch/minor/major.
-- The Sparkle EdDSA private key lives in the login keychain (account `TransToast`) and as the `SPARKLE_PRIVATE_KEY` repo secret. Never commit it. The release tag version must exceed the last released version.
+- The Sparkle EdDSA private key lives in the login keychain (account `TransToast` — pre-rename label, same key) and as the `SPARKLE_PRIVATE_KEY` repo secret. Never commit it. The release tag version must exceed the last released version.
 - Dev runs outside an `.app` bundle skip updater startup on purpose (`startUpdaterIfBundled`).
 
 ## Defaults And Behavior
@@ -79,11 +79,11 @@ The settings UI must cover current AppKit behavior before adding new behavior:
 - Local Backend Path: blank means automatic backend selection.
 - Custom Models JSON: blank means default config lookup.
 - OpenRouter Text Model and Vision Model: show popular models, pricing, free status, and modality support.
-- OpenRouter API Key: settings may save or clear `OPENROUTER_API_KEY` in `~/.config/transtoast/.env`; never expose the stored key value back to the UI.
+- OpenRouter API Key: settings may save or clear `OPENROUTER_API_KEY` in `~/.config/cctrans/.env`; never expose the stored key value back to the UI.
 - Permission status for keyboard and screen recording.
 - Diagnostics/actions: model setup, permission panes, text test, screenshot translation, request logs, stacked toast preview.
 
-Do not edit other credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/transtoast/.env`.
+Do not edit other credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/cctrans/.env`.
 
 ## Platform And Surface Rules
 

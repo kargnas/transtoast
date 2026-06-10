@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 
-DEFAULT_PATH = Path.home() / ".config" / "transtoast" / "local-models.json"
+DEFAULT_PATH = Path.home() / ".config" / "cctrans" / "local-models.json"
 
 
 TEMPLATE = [

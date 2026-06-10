@@ -35,7 +35,7 @@ final class LocalModelWarmupNotifier {
         content.body = body
 
         let request = UNNotificationRequest(
-            identifier: "transtoast.local-model-warmup.\(UUID().uuidString)",
+            identifier: "cctrans.local-model-warmup.\(UUID().uuidString)",
             content: content,
             trigger: nil
         )

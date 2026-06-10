@@ -30,11 +30,11 @@
       "type": "swift",
       "request": "launch",
       "name": "Run Release",
-      "target": "TransToast",
+      "target": "CCTrans",
       "configuration": "release",
       "args": [],
       "cwd": "${workspaceFolder:copy-translator}",
-      "preLaunchTask": "swift: Build Release TransToast",
+      "preLaunchTask": "swift: Build Release CCTrans",
       "presentation": {
         "group": "2_release",
         "order": 1
@@ -44,14 +44,14 @@
       "type": "swift",
       "request": "launch",
       "name": "Translate Text Once (Debug)",
-      "target": "TransToast",
+      "target": "CCTrans",
       "configuration": "debug",
       "args": [
         "--translate-text-once",
         "${input:textToTranslate}"
       ],
       "cwd": "${workspaceFolder:copy-translator}",
-      "preLaunchTask": "swift: Build Debug TransToast",
+      "preLaunchTask": "swift: Build Debug CCTrans",
       "presentation": {
         "group": "3_oneshot",
         "order": 1
@@ -61,13 +61,13 @@
       "type": "swift",
       "request": "launch",
       "name": "Screenshot Translate Once (Debug)",
-      "target": "TransToast",
+      "target": "CCTrans",
       "configuration": "debug",
       "args": [
         "--screenshot-once"
       ],
       "cwd": "${workspaceFolder:copy-translator}",
-      "preLaunchTask": "swift: Build Debug TransToast",
+      "preLaunchTask": "swift: Build Debug CCTrans",
       "presentation": {
         "group": "3_oneshot",
         "order": 2
@@ -77,21 +77,21 @@
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:copy-translator}",
-      "name": "Debug TransToast",
-      "target": "TransToast",
+      "cwd": "${workspaceFolder:cctrans}",
+      "name": "Debug CCTrans",
+      "target": "CCTrans",
       "configuration": "debug",
-      "preLaunchTask": "swift: Build Debug TransToast"
+      "preLaunchTask": "swift: Build Debug CCTrans"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:copy-translator}",
-      "name": "Release TransToast",
-      "target": "TransToast",
+      "cwd": "${workspaceFolder:cctrans}",
+      "name": "Release CCTrans",
+      "target": "CCTrans",
       "configuration": "release",
-      "preLaunchTask": "swift: Build Release TransToast"
+      "preLaunchTask": "swift: Build Release CCTrans"
     }
   ],
   "inputs": [

@@ -237,7 +237,7 @@ public enum LocalModelRegistry {
         }
 
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return ["\(home)/.config/transtoast/local-models.json"]
+        return ["\(home)/.config/cctrans/local-models.json"]
     }
 
     private static func expandedHomePath(_ path: String) -> String {

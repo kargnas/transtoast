@@ -2,30 +2,30 @@
 set -euo pipefail
 
 ROOT="${0:A:h}/.."
-APP_NAME="TransToast"
-BUNDLE_ID="as.kargn.transtoast"
+APP_NAME="CCTrans"
+BUNDLE_ID="as.kargn.cctrans"
 DIST_DIR="$ROOT/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
-SIGN_IDENTITY="${TRANSTOAST_CODE_SIGN_IDENTITY:-}"
+SIGN_IDENTITY="${CCTRANS_CODE_SIGN_IDENTITY:-}"
 # CI injects the release version from the git tag; local builds fall back to 0.1.0.
-APP_VERSION="${TRANSTOAST_VERSION:-0.1.0}"
+APP_VERSION="${CCTRANS_VERSION:-0.1.0}"
 # Sparkle EdDSA public key. The matching private key lives in the login keychain
-# (account "TransToast") and as the SPARKLE_PRIVATE_KEY GitHub secret.
+# (account "TransToast" — pre-rename label, key itself is unchanged) and as the SPARKLE_PRIVATE_KEY GitHub secret.
 SPARKLE_PUBLIC_ED_KEY="I/4kuK5XwH6K5pV0Bu+Y1DM99U4SfRO3ZTZdiZXhfgM="
-SPARKLE_FEED_URL="https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml"
+SPARKLE_FEED_URL="https://github.com/kargnas/cctrans/releases/latest/download/appcast.xml"
 # Local dev builds reuse version 0.1.0, so automatic checks would keep replacing
 # the dev bundle with the latest release on quit. Release builds (CI) enable them.
-if [[ "${TRANSTOAST_HARDENED_RUNTIME:-0}" == "1" ]]; then
+if [[ "${CCTRANS_HARDENED_RUNTIME:-0}" == "1" ]]; then
   SPARKLE_AUTO_CHECKS="true"
 else
   SPARKLE_AUTO_CHECKS="false"
 fi
-TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/TransToast.app"
-TAURI_HELPER_DEST="$RESOURCES_DIR/TransToastTauri.app"
+TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/CCTrans.app"
+TAURI_HELPER_DEST="$RESOURCES_DIR/CCTransTauri.app"
 
 cd "$ROOT"
 swift build -c release
@@ -40,8 +40,8 @@ ditto ".build/release/Sparkle.framework" "$FRAMEWORKS_DIR/Sparkle.framework"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS_DIR/$APP_NAME"
 ditto "$TAURI_HELPER_SOURCE" "$TAURI_HELPER_DEST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID.tauri-helper" "$TAURI_HELPER_DEST/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName TransToastTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName TransToastTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName CCTransTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName CCTransTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$TAURI_HELPER_DEST/Contents/Info.plist" >/dev/null 2>&1 || true
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
@@ -117,9 +117,9 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
 fi
 
 # Notarization requires hardened runtime + secure timestamp on every nested
-# executable. CI sets TRANSTOAST_HARDENED_RUNTIME=1; local dev builds skip it.
+# executable. CI sets CCTRANS_HARDENED_RUNTIME=1; local dev builds skip it.
 SIGN_OPTS=()
-if [[ "${TRANSTOAST_HARDENED_RUNTIME:-0}" == "1" ]]; then
+if [[ "${CCTRANS_HARDENED_RUNTIME:-0}" == "1" ]]; then
   SIGN_OPTS=(--options runtime --timestamp)
 fi
 
@@ -141,7 +141,7 @@ sign_bundle_tree() {
 }
 
 if ! sign_bundle_tree "$SIGN_IDENTITY" >/dev/null 2>&1; then
-  if [[ "${TRANSTOAST_HARDENED_RUNTIME:-0}" == "1" ]]; then
+  if [[ "${CCTRANS_HARDENED_RUNTIME:-0}" == "1" ]]; then
     # Release builds must never ship ad-hoc signed; surface the failure loudly.
     echo "Release signing failed with identity: $SIGN_IDENTITY" >&2
     sign_bundle_tree "$SIGN_IDENTITY"

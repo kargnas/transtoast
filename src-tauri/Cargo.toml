@@ -1,11 +1,11 @@
 [package]
-name = "transtoast-tauri"
+name = "cctrans-tauri"
 version = "0.1.0"
-description = "TransToast Tauri settings shell"
+description = "CCTrans Tauri settings shell"
 edition = "2021"
 
 [lib]
-name = "transtoast_tauri"
+name = "cctrans_tauri"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

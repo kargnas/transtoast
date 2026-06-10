@@ -1,3 +1,3 @@
 fn main() {
-    transtoast_tauri::run()
+    cctrans_tauri::run()
 }

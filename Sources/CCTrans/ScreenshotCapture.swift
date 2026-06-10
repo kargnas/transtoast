@@ -101,7 +101,7 @@ enum ScreenshotCapture {
 
     private static func captureWithSystemScreencapture(outputScale: OutputScale) throws -> Data {
         let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("transtoast-\(UUID().uuidString).png")
+            .appendingPathComponent("cctrans-\(UUID().uuidString).png")
         defer {
             try? FileManager.default.removeItem(at: fileURL)
         }

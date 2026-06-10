@@ -1,5 +1,5 @@
 import AppKit
-import TransToastCore
+import CCTransCore
 import CoreGraphics
 import Sparkle
 import UserNotifications
@@ -62,9 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
         lifetimeActivity = ProcessInfo.processInfo.beginActivity(
             options: [.automaticTerminationDisabled, .suddenTerminationDisabled],
-            reason: "TransToast must keep monitoring clipboard and shortcuts without a regular window."
+            reason: "CCTrans must keep monitoring clipboard and shortcuts without a regular window."
         )
-        ProcessInfo.processInfo.disableAutomaticTermination("TransToast must keep monitoring clipboard and shortcuts without a regular window.")
+        ProcessInfo.processInfo.disableAutomaticTermination("CCTrans must keep monitoring clipboard and shortcuts without a regular window.")
         NSApp.setActivationPolicy(.accessory)
         startUpdaterIfBundled()
         configureMainMenu()
@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         startPasteboardMonitor()
         resetPersistedToastSequence()
         startPersistentToastProcess()
-        print("TransToast ready. Press Cmd+C twice to translate clipboard text.")
+        print("CCTrans ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
         let runsPopoverSmoke = CommandLine.arguments.contains("--show-popover-smoke")
         if CommandLine.arguments.contains("--show-settings") {
@@ -149,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         item.button?.image = Self.makeStatusIcon()
         item.button?.title = "CT"
         item.button?.imagePosition = .imageLeft
-        item.button?.toolTip = "TransToast"
+        item.button?.toolTip = "CCTrans"
         statusItem = item
         rebuildMenu()
     }
@@ -158,8 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let mainMenu = NSMenu()
 
         let appItem = NSMenuItem()
-        let appMenu = NSMenu(title: "TransToast")
-        appMenu.addItem(menuItem(title: "Quit TransToast", action: #selector(quit), key: "q", target: self))
+        let appMenu = NSMenu(title: "CCTrans")
+        appMenu.addItem(menuItem(title: "Quit CCTrans", action: #selector(quit), key: "q", target: self))
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
 
@@ -177,7 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     private static func makeStatusIcon() -> NSImage {
-        if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "TransToast") {
+        if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "CCTrans") {
             image.isTemplate = true
             return image
         }
@@ -291,7 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        menu.addItem(disabledTitle("TransToast"))
+        menu.addItem(disabledTitle("CCTrans"))
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(submenuItem(title: "Translation Model", submenu: translationModelMenu()))
@@ -904,7 +904,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     private func terminateTauriHelper(appURL: URL, matching match: String) {
         let executablePath = appURL
-            .appendingPathComponent("Contents/MacOS/transtoast-tauri")
+            .appendingPathComponent("Contents/MacOS/cctrans-tauri")
             .path
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
@@ -919,17 +919,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             candidates.append(URL(fileURLWithPath: explicitAppPath))
         }
         if let resourceURL = Bundle.main.resourceURL {
-            candidates.append(resourceURL.appendingPathComponent("TransToastTauri.app", isDirectory: true))
-            candidates.append(resourceURL.appendingPathComponent("TransToast.app", isDirectory: true))
+            candidates.append(resourceURL.appendingPathComponent("CCTransTauri.app", isDirectory: true))
+            candidates.append(resourceURL.appendingPathComponent("CCTrans.app", isDirectory: true))
         }
         if let workspaceRootURL = resolveWorkspaceRootURL() {
-            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/bundle/macos/TransToast.app", isDirectory: true))
-            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/bundle/macos/TransToast.app", isDirectory: true))
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/bundle/macos/CCTrans.app", isDirectory: true))
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/bundle/macos/CCTrans.app", isDirectory: true))
         }
 
         return candidates.first { candidate in
             FileManager.default.isExecutableFile(
-                atPath: candidate.appendingPathComponent("Contents/MacOS/transtoast-tauri").path
+                atPath: candidate.appendingPathComponent("Contents/MacOS/cctrans-tauri").path
             )
         }
     }
@@ -940,7 +940,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
            !workspaceRootPath.isEmpty {
             candidates.append(URL(fileURLWithPath: workspaceRootPath))
         }
-        if let workspaceRootPath = ProcessInfo.processInfo.environment["TRANSTOAST_WORKSPACE_ROOT"],
+        if let workspaceRootPath = ProcessInfo.processInfo.environment["CCTRANS_WORKSPACE_ROOT"],
            !workspaceRootPath.isEmpty {
             candidates.append(URL(fileURLWithPath: workspaceRootPath))
         }
@@ -1028,7 +1028,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             _ = AXIsProcessTrustedWithOptions(options)
         }
 
-        print("Keyboard permission needed. Enable Input Monitoring or Accessibility for TransToast, then relaunch the app.")
+        print("Keyboard permission needed. Enable Input Monitoring or Accessibility for CCTrans, then relaunch the app.")
     }
 
     @objc private func quit() {

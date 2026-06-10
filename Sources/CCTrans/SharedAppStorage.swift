@@ -1,7 +1,7 @@
 import Foundation
 
 enum SharedAppStorage {
-    static let appIdentifier = "as.kargn.transtoast"
+    static let appIdentifier = "as.kargn.cctrans"
 
     static var directoryURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

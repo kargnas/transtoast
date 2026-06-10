@@ -99,7 +99,7 @@ Generic `mlx-lm` was the wrong runtime. Official route is `MADLADTranslation` in
 Retry command:
 
 ```bash
-swift run --package-path /tmp/transtoast-madlad-test speech translate "The deployment failed because the database URL was missing." --to ko
+swift run --package-path /tmp/cctrans-madlad-test speech translate "The deployment failed because the database URL was missing." --to ko
 ```
 
 Result:
@@ -150,22 +150,22 @@ public struct LocalModelSpec: Identifiable, Sendable {
 ### Proposed Files
 
 ```text
-Sources/TransToastCore/Translation/
+Sources/CCTransCore/Translation/
   TranslationRequest.swift
   TranslationResult.swift
   TranslationService.swift
 
-Sources/TransToastCore/OpenRouter/
+Sources/CCTransCore/OpenRouter/
   OpenRouterTranslationClient.swift
 
-Sources/TransToastCore/LocalTranslation/
+Sources/CCTransCore/LocalTranslation/
   LocalModelRegistry.swift
   LocalRuntimeTypes.swift
   LocalRuntimeProcessClient.swift
   LocalBackendResolver.swift
   LocalTranslationErrors.swift
 
-Sources/TransToastCore/Settings/
+Sources/CCTransCore/Settings/
   TranslatorSettings.swift
   TranslatorDefaults.swift
 

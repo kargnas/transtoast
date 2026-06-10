@@ -43,7 +43,7 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "APP_VERSION=${VERSION#v}" >> "$GITHUB_ENV"
-          echo "DMG_NAME=TransToast-${VERSION}.dmg" >> "$GITHUB_ENV"
+          echo "DMG_NAME=CCTrans-${VERSION}.dmg" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
@@ -78,9 +78,9 @@ jobs:
 
       - name: Build, bundle and sign app
         env:
-          TRANSTOAST_VERSION: ${{ env.APP_VERSION }}
-          TRANSTOAST_HARDENED_RUNTIME: '1'
-          TRANSTOAST_CODE_SIGN_IDENTITY: 'Developer ID Application'
+          CCTRANS_VERSION: ${{ env.APP_VERSION }}
+          CCTRANS_HARDENED_RUNTIME: '1'
+          CCTRANS_CODE_SIGN_IDENTITY: 'Developer ID Application'
         run: ./scripts/build-app.zsh
 
       - name: Notarize app
@@ -89,22 +89,22 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          ditto -c -k --keepParent dist/TransToast.app "$RUNNER_TEMP/TransToast-notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/TransToast-notarize.zip" \
+          ditto -c -k --keepParent dist/CCTrans.app "$RUNNER_TEMP/CCTrans-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/CCTrans-notarize.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait --timeout 30m
-          xcrun stapler staple dist/TransToast.app
+          xcrun stapler staple dist/CCTrans.app
 
       - name: Create DMG
         run: |
           # Stage only the app; the raw export dir would leak build artifacts into the DMG.
           DMG_STAGING="$RUNNER_TEMP/dmg_staging"
           mkdir -p "$DMG_STAGING"
-          cp -R dist/TransToast.app "$DMG_STAGING/"
+          cp -R dist/CCTrans.app "$DMG_STAGING/"
           ln -s /Applications "$DMG_STAGING/Applications"
-          hdiutil create -volname "TransToast" \
+          hdiutil create -volname "CCTrans" \
             -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG_NAME"
           codesign --force --sign "Developer ID Application" "$DMG_NAME"
           rm -rf "$DMG_STAGING"
@@ -131,7 +131,7 @@ jobs:
           tar -xf sparkle.tar.xz -C sparkle
           chmod +x sparkle/bin/*
 
-          DOWNLOAD_URL="https://github.com/kargnas/transtoast/releases/download/${VERSION}/${DMG_NAME}"
+          DOWNLOAD_URL="https://github.com/kargnas/cctrans/releases/download/${VERSION}/${DMG_NAME}"
 
           echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
           # sign_update prints: sparkle:edSignature="<SIG>" length="<LEN>" -- extract the signature only.
@@ -142,8 +142,8 @@ jobs:
           printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' \
             '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">' \
             '  <channel>' \
-            '    <title>TransToast Updates</title>' \
-            '    <link>https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml</link>' \
+            '    <title>CCTrans Updates</title>' \
+            '    <link>https://github.com/kargnas/cctrans/releases/latest/download/appcast.xml</link>' \
             '    <description>Most recent changes with links to updates.</description>' \
             '    <language>en</language>' \
             '    <item>' \
@@ -156,7 +156,7 @@ jobs:
             "                 sparkle:edSignature=\"${SIGNATURE}\"" \
             "                 length=\"${DMG_SIZE}\"" \
             '                 type="application/octet-stream"/>' \
-            "      <sparkle:releaseNotesLink>https://github.com/kargnas/transtoast/releases/tag/${VERSION}</sparkle:releaseNotesLink>" \
+            "      <sparkle:releaseNotesLink>https://github.com/kargnas/cctrans/releases/tag/${VERSION}</sparkle:releaseNotesLink>" \
             '    </item>' \
             '  </channel>' \
             '</rss>' > appcast.xml
@@ -172,6 +172,6 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           files: |
-            TransToast-*.dmg
+            CCTrans-*.dmg
             appcast.xml
           generate_release_notes: true
