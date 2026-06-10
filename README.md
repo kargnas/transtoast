@@ -6,6 +6,8 @@
 
 # CCTrans
 
+[![Local Model CI](https://github.com/kargnas/cctrans/actions/workflows/model-ci.yml/badge.svg)](https://github.com/kargnas/cctrans/actions/workflows/model-ci.yml)
+
 Press `Cmd+C` twice in any app — the copied text pops up as a translation toast, translated by a local model that never sends your text anywhere. A macOS menu-bar translator in the spirit of DeepL's quick-translate shortcut.
 
 - **Run it all locally if you want** — fast, accurate AI translation on your own machine, from a local model that takes just ~1.3 GB of memory (970 MB on disk).
@@ -60,6 +62,8 @@ Every built-in model was benchmarked on an Apple Silicon Mac before earning its 
 | MADLAD-400 Swift int4 | 🔌 planned | — | — | Swift runtime builds, MLX metallib loading still fails |
 
 Numbers are peak RSS and warm per-request latency from the standalone benchmark runs. First launch opens **Local Model Setup** with this comparison built in, and custom models drop into `~/.config/cctrans/local-models.json` ([protocol](docs/local-runtimes.md)).
+
+These are not one-off numbers: every PR and push runs the bundled models end to end on GitHub Actions ([Local Model CI](.github/workflows/model-ci.yml)) — the real binary translates fixed samples, and a backend error, non-Korean output, or latency budget overrun fails the build. Even on GitHub's virtualized arm64 runner the default MLX model answers in 5–6 s warm; the Transformers fallback takes 50–70 s.
 
 ## Stack at a Glance
 
