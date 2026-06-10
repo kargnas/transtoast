@@ -46,6 +46,7 @@ ditto "$TAURI_HELPER_SOURCE" "$TAURI_HELPER_DEST"
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$TAURI_HELPER_DEST" >/dev/null 2>&1 || true
+cp "$ROOT/assets/icon/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$ROOT/scripts/hy_mt2_translate.py" "$RESOURCES_DIR/hy_mt2_translate.py"
 mkdir -p "$RESOURCES_DIR/runtimes"
 cp "$ROOT"/scripts/runtimes/*.py "$RESOURCES_DIR/runtimes/"
@@ -65,6 +66,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleShortVersionString</key>
   <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
