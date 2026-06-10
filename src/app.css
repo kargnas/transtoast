@@ -213,20 +213,35 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* No bottom padding: macOS-native scroll views run to the window edge and let
-     content clip there (System Settings does the same). A gap below the sliced
-     rows is what made the pane read as a web page. */
-  padding: 20px 16px 0;
-  overflow: hidden;
+  /* The content column itself is the scroll container, so the overlay scrollbar
+     spans the full window height flush against the right window edge, exactly like
+     System Settings. Insets live on the header and pane content, never out here. */
+  overflow: hidden auto;
 }
 
 .content-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
+  /* The header is a flex item of the scrolling column; without this it gets
+     crushed once the pane content overflows. */
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 24px;
-  margin-bottom: 12px;
+  padding: 20px 16px 12px;
+}
+
+/* System Settings-style toolbar: transparent at rest, gains material + hairline
+   only while content is actually scrolled beneath the title. The hairline is a
+   box-shadow so its appearance never shifts layout. */
+.content-header.scrolled {
+  background: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+  box-shadow: 0 1px 0 var(--border);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
 }
 
 h1,
@@ -256,12 +271,9 @@ h2 {
 }
 
 .pane {
-  min-height: 0;
-  overflow: auto;
-  padding-right: 2px;
-  /* The trailing .setting-group margin no longer reaches the window edge, so give
-     the scroll content its own end inset for the fully-scrolled resting state. */
-  padding-bottom: 16px;
+  /* Scrolling moved up to .content; the pane only carries the content insets.
+     The bottom inset is the end-of-scroll breathing room. */
+  padding: 0 16px 16px;
 }
 
 .setting-group {

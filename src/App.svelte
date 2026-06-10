@@ -44,6 +44,10 @@
 
   let settingsState = $state<SettingsState | null>(null);
   let activeSection = $state<Section>("general");
+  let contentElement = $state<HTMLElement | null>(null);
+  // Drives the System Settings-style toolbar material: the sticky header stays
+  // transparent until content actually scrolls beneath it.
+  let contentScrolled = $state(false);
   let isSaving = $state(false);
   let isTauri = $state(false);
   let lastResult = $state("No translation yet.");
@@ -55,6 +59,14 @@
   let openRouterSort = $state<{ key: OpenRouterSortKey; direction: SortDirection }>({
     key: "inputPrice",
     direction: "asc"
+  });
+
+  $effect(() => {
+    void activeSection;
+    // Each section is a fresh page: restore the top scroll position the old
+    // per-pane scroll containers gave us for free.
+    contentElement?.scrollTo({ top: 0 });
+    contentScrolled = false;
   });
 
   const sectionTitles: Record<Section, string> = {
@@ -594,8 +606,12 @@
       </button>
     </aside>
 
-    <main class="content">
-      <header class="content-header">
+    <main
+      class="content"
+      bind:this={contentElement}
+      onscroll={() => (contentScrolled = (contentElement?.scrollTop ?? 0) > 0)}
+    >
+      <header class="content-header" class:scrolled={contentScrolled}>
         <h1>{sectionTitles[activeSection]}</h1>
         <span class:muted={isSaving} class="save-state">{isSaving ? "Saving..." : "Saved"}</span>
       </header>
