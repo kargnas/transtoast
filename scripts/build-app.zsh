@@ -9,7 +9,14 @@ APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
 SIGN_IDENTITY="${TRANSTOAST_CODE_SIGN_IDENTITY:-}"
+# CI injects the release version from the git tag; local builds fall back to 0.1.0.
+APP_VERSION="${TRANSTOAST_VERSION:-0.1.0}"
+# Sparkle EdDSA public key. The matching private key lives in the login keychain
+# (account "TransToast") and as the SPARKLE_PRIVATE_KEY GitHub secret.
+SPARKLE_PUBLIC_ED_KEY="I/4kuK5XwH6K5pV0Bu+Y1DM99U4SfRO3ZTZdiZXhfgM="
+SPARKLE_FEED_URL="https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml"
 TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/TransToast.app"
 TAURI_HELPER_DEST="$RESOURCES_DIR/TransToastTauri.app"
 
@@ -18,8 +25,12 @@ swift build -c release
 npm run tauri -- build --bundles app >/dev/null
 
 rm -rf "$APP_DIR"
-mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 cp ".build/release/$APP_NAME" "$MACOS_DIR/$APP_NAME"
+# SwiftPM links Sparkle as @rpath/Sparkle.framework but does not embed it, so the
+# bundle must carry the framework and the executable needs a matching rpath.
+ditto ".build/release/Sparkle.framework" "$FRAMEWORKS_DIR/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS_DIR/$APP_NAME"
 ditto "$TAURI_HELPER_SOURCE" "$TAURI_HELPER_DEST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID.tauri-helper" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName TransToastTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
@@ -48,9 +59,19 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$APP_VERSION</string>
+  <key>SUFeedURL</key>
+  <string>$SPARKLE_FEED_URL</string>
+  <key>SUPublicEDKey</key>
+  <string>$SPARKLE_PUBLIC_ED_KEY</string>
+  <key>SUEnableAutomaticChecks</key>
+  <true/>
+  <key>SUAutomaticallyUpdate</key>
+  <true/>
+  <key>SUScheduledCheckInterval</key>
+  <integer>86400</integer>
   <key>LSMinimumSystemVersion</key>
   <string>15.0</string>
   <key>LSUIElement</key>
@@ -85,14 +106,44 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
   SIGN_IDENTITY="-"
 fi
 
-if ! codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_DIR" >/dev/null; then
+# Notarization requires hardened runtime + secure timestamp on every nested
+# executable. CI sets TRANSTOAST_HARDENED_RUNTIME=1; local dev builds skip it.
+SIGN_OPTS=()
+if [[ "${TRANSTOAST_HARDENED_RUNTIME:-0}" == "1" ]]; then
+  SIGN_OPTS=(--options runtime --timestamp)
+fi
+
+sign_bundle_tree() {
+  local identity="$1"
+  local sparkle_b="$FRAMEWORKS_DIR/Sparkle.framework/Versions/B"
+  # Sparkle ships its own helper executables; sign inside-out so the outer
+  # signatures seal already-valid inner ones. --deep would strip the
+  # Downloader.xpc sandbox entitlement, so each piece is signed explicitly.
+  codesign --force "${SIGN_OPTS[@]}" --sign "$identity" "$sparkle_b/Autoupdate"
+  codesign --force "${SIGN_OPTS[@]}" --sign "$identity" "$sparkle_b/Updater.app"
+  codesign --force "${SIGN_OPTS[@]}" --preserve-metadata=entitlements --sign "$identity" "$sparkle_b/XPCServices/Downloader.xpc"
+  codesign --force "${SIGN_OPTS[@]}" --sign "$identity" "$sparkle_b/XPCServices/Installer.xpc"
+  codesign --force "${SIGN_OPTS[@]}" --sign "$identity" "$FRAMEWORKS_DIR/Sparkle.framework"
+  # The Tauri helper is a standard bundle without third-party entitlements,
+  # so --deep is safe and covers its nested WebView resources.
+  codesign --force --deep "${SIGN_OPTS[@]}" --sign "$identity" "$TAURI_HELPER_DEST"
+  codesign --force "${SIGN_OPTS[@]}" --sign "$identity" "$APP_DIR"
+}
+
+if ! sign_bundle_tree "$SIGN_IDENTITY" >/dev/null 2>&1; then
+  if [[ "${TRANSTOAST_HARDENED_RUNTIME:-0}" == "1" ]]; then
+    # Release builds must never ship ad-hoc signed; surface the failure loudly.
+    echo "Release signing failed with identity: $SIGN_IDENTITY" >&2
+    sign_bundle_tree "$SIGN_IDENTITY"
+    exit 1
+  fi
   if [[ "$SIGN_IDENTITY" != "-" ]]; then
     echo "codesign with detected identity failed; falling back to ad-hoc signing." >&2
     SIGN_IDENTITY="-"
   else
     sleep 0.5
   fi
-  codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_DIR" >/dev/null
+  sign_bundle_tree "$SIGN_IDENTITY" >/dev/null
 fi
 codesign --verify --deep --strict "$APP_DIR"
 echo "Signed with: $SIGN_IDENTITY"

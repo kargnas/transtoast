@@ -1,6 +1,7 @@
 import AppKit
 import TransToastCore
 import CoreGraphics
+import Sparkle
 import UserNotifications
 
 struct TranslationPreviewPayload: Encodable {
@@ -45,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isUserQuitting = false
     private var hasStarted = false
     private var lifetimeActivity: NSObjectProtocol?
+    // Sparkle needs a strong reference for the whole app lifetime; menu-bar apps
+    // must keep this in AppDelegate, not in a transient controller.
+    private var updaterController: SPUStandardUpdaterController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         start()
@@ -62,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         ProcessInfo.processInfo.disableAutomaticTermination("TransToast must keep monitoring clipboard and shortcuts without a regular window.")
         NSApp.setActivationPolicy(.accessory)
+        startUpdaterIfBundled()
         configureMainMenu()
         createKeepAliveWindow()
         // The Tauri toast writes the global target language to the shared override
@@ -108,6 +113,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let appURL = resolveTauriHelperAppURL() {
             terminateTauriHelper(appURL: appURL, matching: "--translation-preview")
         }
+    }
+
+    private func startUpdaterIfBundled() {
+        // Dev runs execute the bare SwiftPM binary outside an .app bundle, where
+        // Sparkle cannot resolve the host bundle and would surface error alerts.
+        guard Bundle.main.bundlePath.hasSuffix(".app") else {
+            return
+        }
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+    }
+
+    @objc private func checkForUpdates() {
+        // LSUIElement apps are background apps, so Sparkle's update window can
+        // open behind other windows unless the app is activated first.
+        NSApp.activate(ignoringOtherApps: true)
+        updaterController?.checkForUpdates(self)
     }
 
     private func configureStatusItem() {
@@ -297,6 +322,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionItem(title: "Settings...", action: #selector(showSettingsWindow)))
+        if updaterController != nil {
+            menu.addItem(actionItem(title: "Check for Updates...", action: #selector(checkForUpdates)))
+        }
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionItem(title: "Quit", action: #selector(quit)))
 

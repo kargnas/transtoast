@@ -1,0 +1,167 @@
+# Release pipeline: build (SwiftPM + Tauri) -> Developer ID sign -> notarize ->
+# DMG -> Sparkle EdDSA sign -> appcast.xml -> GitHub Release.
+# The Sparkle feed URL baked into Info.plist points at
+# releases/latest/download/appcast.xml, so every release must upload appcast.xml.
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v0.2.0). The tag must already exist or will be created by the release step.'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Swift tools-version 6.2 requires the Xcode 26 toolchain, only present on macos-26 images.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${VERSION#v}" >> "$GITHUB_ENV"
+          echo "DMG_NAME=TransToast-${VERSION}.dmg" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Import Developer ID certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      - name: Build, bundle and sign app
+        env:
+          TRANSTOAST_VERSION: ${{ env.APP_VERSION }}
+          TRANSTOAST_HARDENED_RUNTIME: '1'
+          TRANSTOAST_CODE_SIGN_IDENTITY: 'Developer ID Application'
+        run: ./scripts/build-app.zsh
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent dist/TransToast.app "$RUNNER_TEMP/TransToast-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/TransToast-notarize.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple dist/TransToast.app
+
+      - name: Create DMG
+        run: |
+          # Stage only the app; the raw export dir would leak build artifacts into the DMG.
+          DMG_STAGING="$RUNNER_TEMP/dmg_staging"
+          mkdir -p "$DMG_STAGING"
+          cp -R dist/TransToast.app "$DMG_STAGING/"
+          ln -s /Applications "$DMG_STAGING/Applications"
+          hdiutil create -volname "TransToast" \
+            -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG_NAME"
+          codesign --force --sign "Developer ID Application" "$DMG_NAME"
+          rm -rf "$DMG_STAGING"
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "$DMG_NAME" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple "$DMG_NAME"
+
+      - name: Generate Sparkle signature and appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          curl -sL -o sparkle.tar.xz https://github.com/sparkle-project/Sparkle/releases/download/2.8.1/Sparkle-2.8.1.tar.xz
+          mkdir -p sparkle
+          tar -xf sparkle.tar.xz -C sparkle
+          chmod +x sparkle/bin/*
+
+          DOWNLOAD_URL="https://github.com/kargnas/transtoast/releases/download/${VERSION}/${DMG_NAME}"
+
+          echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
+          # sign_update prints: sparkle:edSignature="<SIG>" length="<LEN>" -- extract the signature only.
+          FULL_OUTPUT=$(./sparkle/bin/sign_update "$DMG_NAME" --ed-key-file "$RUNNER_TEMP/sparkle_key")
+          SIGNATURE=$(echo "$FULL_OUTPUT" | awk -F '"' '{print $2}')
+          DMG_SIZE=$(stat -f%z "$DMG_NAME")
+
+          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' \
+            '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">' \
+            '  <channel>' \
+            '    <title>TransToast Updates</title>' \
+            '    <link>https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml</link>' \
+            '    <description>Most recent changes with links to updates.</description>' \
+            '    <language>en</language>' \
+            '    <item>' \
+            "      <title>Version ${APP_VERSION}</title>" \
+            "      <pubDate>$(date -R)</pubDate>" \
+            "      <sparkle:version>${APP_VERSION}</sparkle:version>" \
+            "      <sparkle:shortVersionString>${APP_VERSION}</sparkle:shortVersionString>" \
+            '      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>' \
+            "      <enclosure url=\"${DOWNLOAD_URL}\"" \
+            "                 sparkle:edSignature=\"${SIGNATURE}\"" \
+            "                 length=\"${DMG_SIZE}\"" \
+            '                 type="application/octet-stream"/>' \
+            "      <sparkle:releaseNotesLink>https://github.com/kargnas/transtoast/releases/tag/${VERSION}</sparkle:releaseNotesLink>" \
+            '    </item>' \
+            '  </channel>' \
+            '</rss>' > appcast.xml
+
+          rm -f "$RUNNER_TEMP/sparkle_key"
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          files: |
+            TransToast-*.dmg
+            appcast.xml
+          generate_release_notes: true
