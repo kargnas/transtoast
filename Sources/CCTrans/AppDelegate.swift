@@ -145,10 +145,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: 48)
-        item.button?.image = Self.makeStatusIcon()
-        item.button?.title = "CT"
-        item.button?.imagePosition = .imageLeft
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // The app triggers on Cmd+C double press, so the menu bar shows the
+        // shortcut itself. The ⌘ text glyph matches macOS menu shortcut
+        // rendering exactly, so no symbol image is needed.
+        item.button?.title = "⌘C"
         item.button?.toolTip = "CCTrans"
         statusItem = item
         rebuildMenu()
@@ -174,35 +175,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         mainMenu.addItem(editItem)
 
         NSApp.mainMenu = mainMenu
-    }
-
-    private static func makeStatusIcon() -> NSImage {
-        if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "CCTrans") {
-            image.isTemplate = true
-            return image
-        }
-
-        let image = NSImage(size: NSSize(width: 18, height: 18))
-        image.lockFocus()
-
-        NSColor.black.setStroke()
-        let backBubble = NSBezierPath(roundedRect: NSRect(x: 3, y: 7, width: 9, height: 7), xRadius: 2, yRadius: 2)
-        backBubble.lineWidth = 1.4
-        backBubble.stroke()
-
-        let frontBubble = NSBezierPath(roundedRect: NSRect(x: 6, y: 3, width: 9, height: 8), xRadius: 2, yRadius: 2)
-        frontBubble.lineWidth = 1.6
-        frontBubble.stroke()
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 8, weight: .bold),
-            .foregroundColor: NSColor.black,
-        ]
-        "T".draw(in: NSRect(x: 8.1, y: 3.5, width: 7, height: 8), withAttributes: attributes)
-
-        image.unlockFocus()
-        image.isTemplate = true
-        return image
     }
 
     private static func imageInfo(for data: Data?) -> String? {
