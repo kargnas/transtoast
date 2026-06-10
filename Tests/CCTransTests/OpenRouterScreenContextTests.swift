@@ -15,7 +15,7 @@ struct OpenRouterScreenContextTests {
             #expect(body["model"] == nil)
             let models = try #require(body["models"] as? [String])
             #expect(models.first == "openrouter/vision-model")
-            #expect(models.contains("~google/gemini-flash-latest"))
+            #expect(models.contains("~google/gemini-flash-lite-latest"))
             #expect(models.contains("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"))
 
             let provider = try #require(body["provider"] as? [String: Any])
