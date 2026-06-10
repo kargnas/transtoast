@@ -291,7 +291,11 @@ h2 {
 
 .setting-row.model-picker-row {
   position: relative;
-  grid-template-columns: minmax(146px, 0.8fr) minmax(300px, 1.2fr) 26px;
+  /* Keep the picker column floor at the shared 170px: a 300px floor exceeded the
+     pane width on narrow windows (classic scrollbars shave another 15px) and
+     leaked a horizontal scrollbar through the overflow-visible menu group.
+     The trigger spans already ellipsize, so the column can shrink safely. */
+  grid-template-columns: minmax(146px, 0.8fr) minmax(170px, 1.2fr) 26px;
 }
 
 .setting-copy {
