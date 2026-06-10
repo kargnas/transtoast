@@ -152,6 +152,14 @@ button {
   color: inherit;
 }
 
+/* Keyboard focus keeps the platform-drawn ring even on custom-styled controls;
+   `auto` lets WebKit render the system accent ring instead of a CSS imitation. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: auto;
+}
+
 .app-frame {
   position: relative;
   display: grid;
@@ -817,14 +825,13 @@ kbd {
   color: var(--green-text);
 }
 
+/* Failure notices sit inline under the header like native settings errors,
+   not as a floating overlay stack (a web idiom). */
 .toast-stack {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
   display: grid;
+  flex-shrink: 0;
   gap: 8px;
-  width: min(280px, calc(100% - 32px));
-  pointer-events: none;
+  margin: 0 16px 14px;
 }
 
 .toast {
@@ -836,10 +843,6 @@ kbd {
   background: var(--toast-bg);
   color: var(--secondary);
   font-size: 11px;
-}
-
-.toast.ok {
-  border-color: rgba(52, 199, 89, 0.28);
 }
 
 .toast strong {

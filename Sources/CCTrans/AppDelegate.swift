@@ -302,7 +302,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         menu.addItem(submenuItem(title: "Toast Position", submenu: positionMenu))
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(actionItem(title: "Settings...", action: #selector(showSettingsWindow)))
+        // Cmd+, is the platform-standard settings shortcut; surfacing it in the menu
+        // also teaches the binding even though status menus only fire it while open.
+        menu.addItem(menuItem(title: "Settings...", action: #selector(showSettingsWindow), key: ",", target: self))
         if updaterController != nil {
             menu.addItem(actionItem(title: "Check for Updates...", action: #selector(checkForUpdates)))
         }

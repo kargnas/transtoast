@@ -19,6 +19,15 @@ const surface = currentSurface();
 document.documentElement.dataset.surface = surface;
 document.body.dataset.surface = surface;
 
+// Native windows never show the browser context menu on chrome. Editable fields
+// and selectable content keep it for the system text actions (Copy, Look Up...).
+document.addEventListener("contextmenu", (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target?.closest("input, textarea, [contenteditable='true'], .translation-text, pre")) {
+    event.preventDefault();
+  }
+});
+
 const Component = surfaceComponents[surface];
 
 const app = mount(Component, {

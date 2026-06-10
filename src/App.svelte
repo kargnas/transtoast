@@ -170,6 +170,56 @@
     openTranslationModelMenu = null;
   }
 
+  let modelTypeAheadBuffer = "";
+  let modelTypeAheadLastInput = 0;
+
+  // Native list behavior (NSMenu/NSTableView): arrows walk the items and typing
+  // letters jumps to the first item whose label matches the typed prefix.
+  function handleModelPickerKeydown(event: KeyboardEvent) {
+    if (!openTranslationModelMenu) return;
+    const picker = event.currentTarget as HTMLElement;
+    const options = [...picker.querySelectorAll<HTMLButtonElement>(".nested-model-options button")];
+    if (options.length === 0) return;
+    const activeIndex = options.indexOf(document.activeElement as HTMLButtonElement);
+
+    const focusOption = (index: number) => {
+      const option = options[Math.max(0, Math.min(options.length - 1, index))];
+      option.focus();
+      option.scrollIntoView({ block: "nearest" });
+    };
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusOption(activeIndex + 1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusOption(activeIndex === -1 ? options.length - 1 : activeIndex - 1);
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      focusOption(event.key === "Home" ? 0 : options.length - 1);
+      return;
+    }
+
+    if (/^[\p{L}\p{N}]$/u.test(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      const now = performance.now();
+      if (now - modelTypeAheadLastInput > 700) modelTypeAheadBuffer = "";
+      modelTypeAheadLastInput = now;
+      modelTypeAheadBuffer += event.key.toLowerCase();
+      const match = options.find((option) =>
+        (option.querySelector("strong")?.textContent ?? "").trim().toLowerCase().startsWith(modelTypeAheadBuffer)
+      );
+      if (match) {
+        event.preventDefault();
+        match.focus();
+        match.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }
+
   function handleSettingsKeydown(event: KeyboardEvent) {
     const isClose = event.key === "Escape" || (event.metaKey && event.key.toLowerCase() === "w");
     if (!isClose) return;
@@ -316,6 +366,9 @@
   }
 
   function pushNotice(result: ActionResult) {
+    // Success feedback already lives inline (Saved state, status pills, Last Result);
+    // only failures earn a banner. Floating success toasts are a web idiom.
+    if (result.ok) return;
     notices = [result, ...notices].slice(0, 3);
   }
 
@@ -468,7 +521,12 @@
 </script>
 
 {#snippet translationModelPicker(scope: "general" | "models", state: SettingsState)}
-  <div class="nested-model-picker" class:open={openTranslationModelMenu === scope}>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="nested-model-picker"
+    class:open={openTranslationModelMenu === scope}
+    onkeydown={handleModelPickerKeydown}
+  >
     <button
       class="nested-model-trigger"
       type="button"
@@ -615,6 +673,17 @@
         <h1>{sectionTitles[activeSection]}</h1>
         <span class:muted={isSaving} class="save-state">{isSaving ? "Saving..." : "Saved"}</span>
       </header>
+
+      {#if notices.length > 0}
+        <div class="toast-stack" aria-live="polite">
+          {#each notices as notice}
+            <article class="toast">
+              <strong>{notice.title}</strong>
+              <span>{notice.message}</span>
+            </article>
+          {/each}
+        </div>
+      {/if}
 
       {#if activeSection === "general"}
         <section class="pane">
@@ -1005,6 +1074,7 @@
               </span>
               <input
                 placeholder="Automatic"
+                spellcheck={false}
                 value={settingsState.settings.localHyMT2BackendPath ?? ""}
                 onblur={(event) => updateNullableField("localHyMT2BackendPath", event.currentTarget.value)}
               />
@@ -1025,6 +1095,7 @@
               </span>
               <input
                 placeholder="~/.config/cctrans/local-models.json"
+                spellcheck={false}
                 value={settingsState.settings.customLocalModelsPath ?? ""}
                 onblur={(event) => updateNullableField("customLocalModelsPath", event.currentTarget.value)}
               />
@@ -1068,16 +1139,6 @@
       {/if}
     </main>
 
-    {#if notices.length > 0}
-      <div class="toast-stack" aria-live="polite">
-        {#each notices as notice}
-          <article class:ok={notice.ok} class="toast">
-            <strong>{notice.title}</strong>
-            <span>{notice.message}</span>
-          </article>
-        {/each}
-      </div>
-    {/if}
   </div>
 {:else}
   <div class="loading">Loading settings...</div>
