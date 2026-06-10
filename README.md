@@ -1,13 +1,8 @@
-<table align="center">
-  <tr>
-    <td align="center" valign="middle">
-      <img src="assets/icon/app-icon-rounded-1024.png" width="128" alt="CCTrans icon">
-    </td>
-    <td align="center" valign="middle">
-      <img src="docs/images/toast.png" width="360" alt="Translation toast: copied text translated to English by the local model, with language badge and copy/settings actions">
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="assets/icon/app-icon-rounded-1024.png" width="128" alt="CCTrans icon">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/toast.png" width="360" alt="Translation toast: copied text translated to English by the local model, with language badge and copy/settings actions">
+</p>
 
 # CCTrans
 
