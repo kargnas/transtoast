@@ -1783,7 +1783,27 @@ fn write_settings(app: &AppHandle, settings: Settings) -> Result<(), String> {
 
     let data = serde_json::to_string_pretty(&stored)
         .map_err(|error| format!("Could not encode settings: {error}"))?;
-    fs::write(&path, data).map_err(|error| format!("Could not write {}: {error}", path.display()))
+    replace_file_contents(&path, &data)
+}
+
+// The Swift menu-bar app watches the shared app-data directory with a kqueue
+// source, which only fires on directory-entry changes (create/rename/delete).
+// An in-place fs::write leaves the directory entry untouched, so the menu-bar
+// app kept translating with stale settings until an unrelated file in the
+// directory changed. Writing a sibling temp file and renaming it into place
+// emits that event and keeps readers from ever seeing a half-written file.
+fn replace_file_contents(path: &Path, data: &str) -> Result<(), String> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("Could not resolve file name for {}", path.display()))?;
+    // The settings window and the persistent toast process both write this file;
+    // a pid suffix keeps their temp files from clobbering each other.
+    let temp_path = path.with_file_name(format!("{file_name}.tmp-{}", std::process::id()));
+    fs::write(&temp_path, data)
+        .map_err(|error| format!("Could not write {}: {error}", temp_path.display()))?;
+    fs::rename(&temp_path, path)
+        .map_err(|error| format!("Could not replace {}: {error}", path.display()))
 }
 
 impl StoredSettings {
@@ -2984,6 +3004,30 @@ mod tests {
         let defaults = default_settings();
         let stored = StoredSettings::from_effective(&defaults, &defaults);
         assert!(stored.is_empty());
+    }
+
+    #[test]
+    fn replace_file_contents_swaps_directory_entry() {
+        use std::os::unix::fs::MetadataExt;
+
+        let dir = std::env::temp_dir().join(format!("cctrans-replace-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings-overrides.json");
+
+        replace_file_contents(&path, "{\"a\":1}").unwrap();
+        let first_inode = fs::metadata(&path).unwrap().ino();
+
+        replace_file_contents(&path, "{\"a\":2}").unwrap();
+        let second_inode = fs::metadata(&path).unwrap().ino();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"a\":2}");
+        // The menu-bar app's directory watcher only sees entry changes, so the
+        // replace must go through rename (new inode), not an in-place write.
+        assert_ne!(first_inode, second_inode);
+        // The temp file must not survive the swap.
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
