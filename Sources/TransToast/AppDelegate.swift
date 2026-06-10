@@ -23,7 +23,7 @@ struct TranslationPreviewPayload: Encodable {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
     private let translationService = TranslationService()
@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: self,
             userDriverDelegate: nil
         )
     }
@@ -133,6 +133,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // open behind other windows unless the app is activated first.
         NSApp.activate(ignoringOtherApps: true)
         updaterController?.checkForUpdates(self)
+    }
+
+    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        // Sparkle terminates the app to install an update ("Install and Relaunch").
+        // applicationShouldTerminate cancels termination unless the user chose Quit,
+        // which would silently abort the install; treat Sparkle's relaunch as a quit.
+        MainActor.assumeIsolated {
+            isUserQuitting = true
+        }
     }
 
     private func configureStatusItem() {
