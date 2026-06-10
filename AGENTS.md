@@ -124,6 +124,7 @@ Before claiming UI work complete:
 
 - Run targeted unit tests for changed behavior.
 - Run Swift checks when Swift behavior changes.
+- For local translation path changes, run `./scripts/ci/local-model-smoke.zsh <local-model-id>` against the built binary. CI (`.github/workflows/model-ci.yml`) runs the same script for bundled models on translation-path pushes/PRs and weekly.
 - Run `npm run check`, `npm run build`, and `cd src-tauri && cargo test` for Tauri/Svelte/Rust changes.
 - Run the UI, capture a screenshot, crop the implemented settings surface, and compare it against `design/image.png` plus the generated mockup/reference.
 - Check generated CSS for forbidden custom platform shadows (`box-shadow`) in the settings shell.
