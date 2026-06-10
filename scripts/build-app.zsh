@@ -14,7 +14,7 @@ SIGN_IDENTITY="${CCTRANS_CODE_SIGN_IDENTITY:-}"
 # CI injects the release version from the git tag; local builds fall back to 0.1.0.
 APP_VERSION="${CCTRANS_VERSION:-0.1.0}"
 # Sparkle EdDSA public key. The matching private key lives in the login keychain
-# (account "TransToast" — pre-rename label, key itself is unchanged) and as the SPARKLE_PRIVATE_KEY GitHub secret.
+# (account "CCTrans") and as the SPARKLE_PRIVATE_KEY GitHub secret.
 SPARKLE_PUBLIC_ED_KEY="I/4kuK5XwH6K5pV0Bu+Y1DM99U4SfRO3ZTZdiZXhfgM="
 SPARKLE_FEED_URL="https://github.com/kargnas/cctrans/releases/latest/download/appcast.xml"
 # Local dev builds reuse version 0.1.0, so automatic checks would keep replacing

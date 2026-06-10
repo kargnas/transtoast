@@ -101,7 +101,7 @@ Pushing a `v*` tag by hand still triggers `Build and Release` directly. Either w
 
 Signing material lives in two places:
 
-- Sparkle EdDSA private key: login keychain item (account `TransToast` — pre-rename label, same key) and the `SPARKLE_PRIVATE_KEY` repository secret. The public key is pinned in `scripts/build-app.zsh`.
+- Sparkle EdDSA private key: login keychain item (account `CCTrans`) and the `SPARKLE_PRIVATE_KEY` repository secret. The public key is pinned in `scripts/build-app.zsh`.
 - Apple signing: `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` repository secrets.
 
 When the selected **Translation Model** is an **OpenRouter LLM**, CCTrans automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.

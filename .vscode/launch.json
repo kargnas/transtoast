@@ -9,7 +9,7 @@
       "request": "launch",
       "name": "🚀 Run Dev App Bundle",
       "command": "./scripts/run-dev.zsh",
-      "cwd": "${workspaceFolder:copy-translator}",
+      "cwd": "${workspaceFolder}",
       "presentation": {
         "group": "1_app",
         "order": 1
@@ -20,7 +20,7 @@
       "request": "launch",
       "name": "⚙️ Settings Window App Bundle",
       "command": "./scripts/run-dev.zsh --show-settings",
-      "cwd": "${workspaceFolder:copy-translator}",
+      "cwd": "${workspaceFolder}",
       "presentation": {
         "group": "1_app",
         "order": 2
@@ -33,7 +33,7 @@
       "target": "CCTrans",
       "configuration": "release",
       "args": [],
-      "cwd": "${workspaceFolder:copy-translator}",
+      "cwd": "${workspaceFolder}",
       "preLaunchTask": "swift: Build Release CCTrans",
       "presentation": {
         "group": "2_release",
@@ -50,7 +50,7 @@
         "--translate-text-once",
         "${input:textToTranslate}"
       ],
-      "cwd": "${workspaceFolder:copy-translator}",
+      "cwd": "${workspaceFolder}",
       "preLaunchTask": "swift: Build Debug CCTrans",
       "presentation": {
         "group": "3_oneshot",
@@ -66,7 +66,7 @@
       "args": [
         "--screenshot-once"
       ],
-      "cwd": "${workspaceFolder:copy-translator}",
+      "cwd": "${workspaceFolder}",
       "preLaunchTask": "swift: Build Debug CCTrans",
       "presentation": {
         "group": "3_oneshot",
