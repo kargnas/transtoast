@@ -1,0 +1,110 @@
+# Runs the bundled local translation models end to end whenever something that
+# can affect them changes: build the real binary, download the model, translate
+# fixed samples, and fail on backend errors, non-Korean output, or budget
+# overruns. Budgets are intentionally generous because hosted arm64 runners are
+# far slower than a physical Mac; this catches breakage and pathological
+# slowdowns, not small performance drift.
+#
+# Excluded on purpose: Hy-MT2 30B-A3B (exceeds the 7 GB hosted runner),
+# GGUF/CTranslate2/MADLAD entries (their adapters are not bundled yet), and
+# Kanana LoRA (disabled by default for license reasons).
+name: Local Model CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/CCTransCore/**'
+      - 'Sources/CCTrans/main.swift'
+      - 'scripts/runtimes/**'
+      - 'scripts/hy_mt2_translate.py'
+      - 'scripts/ci/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - '.github/workflows/model-ci.yml'
+  pull_request:
+    paths:
+      - 'Sources/CCTransCore/**'
+      - 'Sources/CCTrans/main.swift'
+      - 'scripts/runtimes/**'
+      - 'scripts/hy_mt2_translate.py'
+      - 'scripts/ci/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - '.github/workflows/model-ci.yml'
+  schedule:
+    # Weekly canary: catches Hugging Face hosting changes or Python dependency
+    # rot even when the repo is quiet.
+    - cron: '0 18 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pin the uv cache to a predictable absolute path so actions/cache can
+  # capture the per-script PEP 723 environments across runs. A literal `~`
+  # would not be expanded when uv reads the variable, so spell out the hosted
+  # macOS runner home.
+  UV_CACHE_DIR: /Users/runner/.cache/uv
+
+jobs:
+  smoke:
+    name: ${{ matrix.model }}
+    # Swift tools-version 6.2 requires Xcode 26, and MLX needs an arm64 host.
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: hymt2-mlx-1.8b-4bit
+            backend-script: scripts/runtimes/mlx_lm_translate.py
+            cold-budget: 900
+            warm-budget: 120
+          - model: hymt2-transformers-1.8b
+            backend-script: scripts/hy_mt2_translate.py
+            cold-budget: 1800
+            warm-budget: 900
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: model-ci-swiftpm-${{ hashFiles('Package.resolved') }}
+          restore-keys: model-ci-swiftpm-
+
+      - name: Build CCTrans binary
+        run: swift build --product CCTrans
+
+      - name: Cache uv environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: model-ci-uv-${{ matrix.model }}-${{ hashFiles(matrix.backend-script) }}
+          restore-keys: model-ci-uv-${{ matrix.model }}-
+
+      - name: Cache Hugging Face model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: model-ci-hf-${{ matrix.model }}-v1
+
+      - name: Pre-install backend Python dependencies
+        # An empty payload makes the backend exit after uv resolves its PEP 723
+        # dependencies, keeping pip-install time out of the latency budgets.
+        run: |
+          uv --version
+          echo '{}' | uv run ${{ matrix.backend-script }} || true
+
+      - name: Run smoke test
+        env:
+          MODEL_CI_COLD_BUDGET: ${{ matrix.cold-budget }}
+          MODEL_CI_WARM_BUDGET: ${{ matrix.warm-budget }}
+        run: ./scripts/ci/local-model-smoke.zsh ${{ matrix.model }}
