@@ -17,6 +17,10 @@ on:
 permissions:
   contents: write
 
+# Serialize release builds so two auto-release dispatches cannot interleave.
+concurrency:
+  group: build-release
+
 jobs:
   release:
     # Swift tools-version 6.2 requires the Xcode 26 toolchain, only present on macos-26 images.
@@ -28,6 +32,12 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             VERSION="${{ inputs.version }}"
+            # A queued dispatch may carry a version another run already released;
+            # fail fast instead of silently overwriting that release's assets.
+            if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+              echo "Tag $VERSION already exists; refusing to overwrite. Re-run with a new version." >&2
+              exit 1
+            fi
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi

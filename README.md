@@ -91,14 +91,13 @@ For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
 
 TransToast updates itself through [Sparkle 2](https://sparkle-project.org/). The app checks `https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml` once a day and installs updates automatically; **Check for Updates...** in the menu-bar icon triggers a manual check.
 
-To ship a release, push a version tag:
+Releases ship automatically: pushing code changes (`Sources/`, `src/`, `src-tauri/`, `scripts/`, package manifests) to `main` starts the `Auto Release` workflow, which waits 10 minutes for follow-up commits (a newer push restarts the timer), bumps the patch version from the latest tag, and dispatches `Build and Release`. Add `[skip release]` to the commit message to opt out. For a minor/major bump, run the `Auto Release` workflow manually and pick the bump type:
 
 ```sh
-git tag v0.3.0
-git push origin v0.3.0
+gh workflow run auto-release.yml -f bump=minor
 ```
 
-The `Build and Release` GitHub Actions workflow then builds the app, signs it with the Developer ID certificate, notarizes both the app and the DMG, signs the DMG with the Sparkle EdDSA key, and publishes `TransToast-vX.Y.Z.dmg` plus `appcast.xml` to GitHub Releases. The tag version must be higher than the previously released `CFBundleShortVersionString`, or installed apps will report "You're up to date".
+Pushing a `v*` tag by hand still triggers `Build and Release` directly. Either way the workflow builds the app, signs it with the Developer ID certificate, notarizes both the app and the DMG, signs the DMG with the Sparkle EdDSA key, and publishes `TransToast-vX.Y.Z.dmg` plus `appcast.xml` to GitHub Releases.
 
 Signing material lives in two places:
 
