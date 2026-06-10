@@ -25,10 +25,13 @@ jobs:
   release:
     # Swift tools-version 6.2 requires the Xcode 26 toolchain, only present on macos-26 images.
     runs-on: macos-26
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Resolve version
+        id: resolve
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             VERSION="${{ inputs.version }}"
@@ -44,6 +47,7 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "APP_VERSION=${VERSION#v}" >> "$GITHUB_ENV"
           echo "DMG_NAME=CCTrans-${VERSION}.dmg" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -175,3 +179,46 @@ jobs:
             CCTrans-*.dmg
             appcast.xml
           generate_release_notes: true
+
+  # Bump the Homebrew cask in kargnas/homebrew-tap so `brew install --cask
+  # kargnas/tap/cctrans` always resolves to the DMG this run just published.
+  # Uses a write deploy key (TAP_SSH_KEY) because GITHUB_TOKEN cannot push to
+  # another repository.
+  update-tap:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Homebrew tap cask
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          TAP_SSH_KEY: ${{ secrets.TAP_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          APP_VERSION="${VERSION#v}"
+
+          curl -fsSL -o cctrans.dmg \
+            "https://github.com/kargnas/cctrans/releases/download/${VERSION}/CCTrans-${VERSION}.dmg"
+          SHA256=$(sha256sum cctrans.dmg | cut -d' ' -f1)
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$TAP_SSH_KEY" > ~/.ssh/tap_key
+          chmod 600 ~/.ssh/tap_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes"
+
+          git clone --depth 1 git@github.com:kargnas/homebrew-tap.git tap
+          # The cask structure lives in the tap repo; this job only bumps the
+          # version and sha256 lines so the two repos do not drift.
+          sed -i -E "s|^  version \".*\"$|  version \"${APP_VERSION}\"|" tap/Casks/cctrans.rb
+          sed -i -E "s|^  sha256 \".*\"$|  sha256 \"${SHA256}\"|" tap/Casks/cctrans.rb
+
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/cctrans.rb
+          # A re-run of an already-published version produces no diff; skip the
+          # empty commit instead of failing the job.
+          git diff --cached --quiet || {
+            git commit -m "cctrans ${APP_VERSION}"
+            git push origin HEAD:main
+          }
