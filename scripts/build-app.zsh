@@ -17,6 +17,13 @@ APP_VERSION="${TRANSTOAST_VERSION:-0.1.0}"
 # (account "TransToast") and as the SPARKLE_PRIVATE_KEY GitHub secret.
 SPARKLE_PUBLIC_ED_KEY="I/4kuK5XwH6K5pV0Bu+Y1DM99U4SfRO3ZTZdiZXhfgM="
 SPARKLE_FEED_URL="https://github.com/kargnas/transtoast/releases/latest/download/appcast.xml"
+# Local dev builds reuse version 0.1.0, so automatic checks would keep replacing
+# the dev bundle with the latest release on quit. Release builds (CI) enable them.
+if [[ "${TRANSTOAST_HARDENED_RUNTIME:-0}" == "1" ]]; then
+  SPARKLE_AUTO_CHECKS="true"
+else
+  SPARKLE_AUTO_CHECKS="false"
+fi
 TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/TransToast.app"
 TAURI_HELPER_DEST="$RESOURCES_DIR/TransToastTauri.app"
 
@@ -67,9 +74,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <key>SUPublicEDKey</key>
   <string>$SPARKLE_PUBLIC_ED_KEY</string>
   <key>SUEnableAutomaticChecks</key>
-  <true/>
+  <$SPARKLE_AUTO_CHECKS/>
   <key>SUAutomaticallyUpdate</key>
-  <true/>
+  <$SPARKLE_AUTO_CHECKS/>
   <key>SUScheduledCheckInterval</key>
   <integer>86400</integer>
   <key>LSMinimumSystemVersion</key>
