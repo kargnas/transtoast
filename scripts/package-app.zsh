@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="${0:A:h}/.."
-APP_NAME="CopyTranslator"
+APP_NAME="TransToast"
 ZIP_PATH="$ROOT/dist/$APP_NAME.zip"
 
 while [[ $# -gt 0 ]]; do
@@ -15,8 +15,8 @@ while [[ $# -gt 0 ]]; do
       cat <<HELP
 Usage: scripts/package-app.zsh [--output PATH]
 
-Builds CopyTranslator.app and writes a zip archive.
-Default output: dist/CopyTranslator.zip
+Builds TransToast.app and writes a zip archive.
+Default output: dist/TransToast.zip
 HELP
       exit 0
       ;;

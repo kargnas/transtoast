@@ -1,22 +1,22 @@
-# CopyTranslator Agent Guide
+# TransToast Agent Guide
 
 ## Mission
 
-CopyTranslator is a macOS menu-bar translator. Keep the app native-feeling, fast, and operationally clear. Preserve existing translation behavior while migrating UI surfaces to Tauri 2 + Rust + Svelte.
+TransToast is a macOS menu-bar translator. Keep the app native-feeling, fast, and operationally clear. Preserve existing translation behavior while migrating UI surfaces to Tauri 2 + Rust + Svelte.
 
 ## Project Shape
 
 - SwiftPM app remains the macOS menu-bar shell until the Tauri shell fully replaces it.
-- Bundle identifier must stay `as.kargn.copy-translator`.
+- Bundle identifier must stay `as.kargn.transtoast`.
 - macOS target: macOS 15+, Swift 6.2 tools.
 - Tauri surfaces are the product UI layer. Do not add new AppKit auxiliary windows.
 - Keep secrets out of Git. Never commit `.env.local`, token caches, or credential-bearing logs.
 
 ## Layout
 
-- `Sources/CopyTranslatorCore/`: platform-light translation logic, settings defaults, model registry, language handling.
-- `Sources/CopyTranslator/`: macOS shell, menu bar app, monitors, and platform adapters.
-- `Tests/CopyTranslatorTests/`: Swift tests.
+- `Sources/TransToastCore/`: platform-light translation logic, settings defaults, model registry, language handling.
+- `Sources/TransToast/`: macOS shell, menu bar app, monitors, and platform adapters.
+- `Tests/TransToastTests/`: Swift tests.
 - `scripts/`: build/install/package helpers and local model runtimes.
 - `src/`: Svelte settings UI for the Tauri migration.
 - `src-tauri/`: Rust/Tauri backend and app configuration.
@@ -42,7 +42,7 @@ VS Code's `🚀 Run Dev App Bundle` launch configuration runs:
 ./scripts/run-dev.zsh
 ```
 
-After completed development or documentation work is verified and committed, run this launch path before reporting completion so the user's currently running `dist/CopyTranslator.app` is replaced with the latest build.
+After completed development or documentation work is verified and committed, run this launch path before reporting completion so the user's currently running `dist/TransToast.app` is replaced with the latest build.
 
 ## Defaults And Behavior
 
@@ -71,11 +71,11 @@ The settings UI must cover current AppKit behavior before adding new behavior:
 - Local Backend Path: blank means automatic backend selection.
 - Custom Models JSON: blank means default config lookup.
 - OpenRouter Text Model and Vision Model: show popular models, pricing, free status, and modality support.
-- OpenRouter API Key: settings may save or clear `OPENROUTER_API_KEY` in `~/.config/copy-translator/.env`; never expose the stored key value back to the UI.
+- OpenRouter API Key: settings may save or clear `OPENROUTER_API_KEY` in `~/.config/transtoast/.env`; never expose the stored key value back to the UI.
 - Permission status for keyboard and screen recording.
 - Diagnostics/actions: model setup, permission panes, text test, screenshot translation, request logs, stacked toast preview.
 
-Do not edit other credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/copy-translator/.env`.
+Do not edit other credentials in the settings UI. `CredentialsProvider` owns `.env.local`, app-adjacent env files, and `~/.config/transtoast/.env`.
 
 ## Platform And Surface Rules
 

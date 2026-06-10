@@ -1,3 +1,3 @@
 fn main() {
-    copy_translator_tauri::run()
+    transtoast_tauri::run()
 }

@@ -1,4 +1,4 @@
-import CopyTranslatorCore
+import TransToastCore
 import Testing
 
 struct PopoverPlacementTests {

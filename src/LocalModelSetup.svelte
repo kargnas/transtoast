@@ -69,7 +69,7 @@
   async function addCustomModel() {
     settingsState = await invoke<SettingsState>("prepare_custom_local_models");
     output = `Custom model JSON path:
-${settingsState.settings.customLocalModelsPath ?? "~/.config/copy-translator/local-models.json"}
+${settingsState.settings.customLocalModelsPath ?? "~/.config/transtoast/local-models.json"}
 
 Create a template with:
 uv run scripts/local_model_setup.py --write-template

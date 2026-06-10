@@ -1,6 +1,6 @@
 # Other Mac Setup
 
-Use this checklist to set up CopyTranslator on another Mac.
+Use this checklist to set up TransToast on another Mac.
 
 ## Requirements
 
@@ -13,8 +13,8 @@ Use this checklist to set up CopyTranslator on another Mac.
 ## Clone
 
 ```zsh
-gh repo clone kargnas/copy-translator
-cd copy-translator
+gh repo clone kargnas/transtoast
+cd transtoast
 ```
 
 ## Configure Secrets
@@ -47,7 +47,7 @@ To install somewhere other than `/Applications`:
 
 ## Permissions
 
-Open these panes after the first install, then relaunch CopyTranslator:
+Open these panes after the first install, then relaunch TransToast:
 
 ```zsh
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
@@ -55,7 +55,7 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 ```
 
-CopyTranslator needs Input Monitoring or Accessibility for `Cmd+C` twice, and Screen Recording for screenshot context and screenshot translation.
+TransToast needs Input Monitoring or Accessibility for `Cmd+C` twice, and Screen Recording for screenshot context and screenshot translation.
 
 ## Package For Manual Transfer
 
@@ -63,4 +63,4 @@ CopyTranslator needs Input Monitoring or Accessibility for `Cmd+C` twice, and Sc
 ./scripts/package-app.zsh
 ```
 
-This writes `dist/CopyTranslator.zip`.
+This writes `dist/TransToast.zip`.

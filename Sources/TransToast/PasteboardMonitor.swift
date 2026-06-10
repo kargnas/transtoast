@@ -1,5 +1,5 @@
 import AppKit
-import CopyTranslatorCore
+import TransToastCore
 
 @MainActor
 final class PasteboardMonitor {

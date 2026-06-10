@@ -33,7 +33,7 @@ mod macos_drag {
     define_class!(
         #[unsafe(super(NSObject))]
         #[derive(Debug, PartialEq, Eq, Hash)]
-        #[name = "CopyTranslatorPermissionDragSource"]
+        #[name = "TransToastPermissionDragSource"]
         #[thread_kind = MainThreadOnly]
         struct PermissionDragSource;
 
@@ -644,7 +644,7 @@ fn permission_app_target(app: AppHandle) -> Result<PermissionAppTarget, String> 
         bundle_name: bundle_path
             .file_name()
             .and_then(|name| name.to_str())
-            .unwrap_or("CopyTranslator.app")
+            .unwrap_or("TransToast.app")
             .to_string(),
         bundle_file_url: file_url_for_path(&bundle_path),
         bundle_path: bundle_path.display().to_string(),
@@ -670,7 +670,7 @@ fn start_permission_app_drag(
         macos_drag::start_app_drag(&bundle_path, ns_window)?;
         return Ok(ActionResult {
             title: "Drag started".to_string(),
-            message: "Drop CopyTranslator.app into the open macOS Privacy list.".to_string(),
+            message: "Drop TransToast.app into the open macOS Privacy list.".to_string(),
             ok: true,
         });
     }
@@ -978,7 +978,7 @@ fn prepare_custom_local_models(app: AppHandle) -> Result<SettingsState, String> 
     let mut settings = load_effective_settings(&app)?;
     if settings.custom_local_models_path.is_none() {
         settings.custom_local_models_path =
-            Some("~/.config/copy-translator/local-models.json".to_string());
+            Some("~/.config/transtoast/local-models.json".to_string());
         write_settings(&app, settings)?;
     }
     state_from_disk(&app)
@@ -1079,7 +1079,7 @@ pub fn run() {
                     let url = persistent_translation_url(request.debug);
                     let window =
                         WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
-                            .title("CopyTranslator Translation")
+                            .title("TransToast Translation")
                             .inner_size(TRANSLATION_WINDOW_WIDTH, height)
                             .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
                             .resizable(false)
@@ -1120,7 +1120,7 @@ pub fn run() {
                         if anchor_bottom { "bottom" } else { "top" }
                     );
                     WebviewWindowBuilder::new(app, "translation", WebviewUrl::App(url.into()))
-                        .title("CopyTranslator Translation")
+                        .title("TransToast Translation")
                         .inner_size(TRANSLATION_WINDOW_WIDTH, height)
                         .min_inner_size(TRANSLATION_WINDOW_WIDTH, height)
                         .resizable(false)
@@ -1196,7 +1196,7 @@ pub fn run() {
             close_settings_window
         ])
         .build(tauri::generate_context!())
-        .expect("error while building CopyTranslator Tauri app")
+        .expect("error while building TransToast Tauri app")
         .run(|_app, event| {
             // The persistent toast must survive dismissing its only window so the next translation
             // reuses the warm WebView; legacy throwaway processes are unaffected and exit normally.
@@ -2415,14 +2415,14 @@ fn legacy_binary_path(app: &AppHandle) -> Result<PathBuf, String> {
     let roots = candidate_roots(app);
     for root in roots {
         let candidates = [
-            root.join(".build/debug/CopyTranslator"),
-            root.join("dist/CopyTranslator.app/Contents/MacOS/CopyTranslator"),
+            root.join(".build/debug/TransToast"),
+            root.join("dist/TransToast.app/Contents/MacOS/TransToast"),
         ];
         if let Some(path) = candidates.into_iter().find(|path| path.exists()) {
             return Ok(path);
         }
     }
-    Err("CopyTranslator CLI binary not found. Build the Swift app first.".to_string())
+    Err("TransToast CLI binary not found. Build the Swift app first.".to_string())
 }
 
 fn legacy_working_dir(app: &AppHandle) -> Option<PathBuf> {
@@ -2441,16 +2441,16 @@ fn resolve_permission_app_bundle(app: &AppHandle) -> Result<PathBuf, String> {
     let roots = candidate_roots(app);
     for root in roots {
         let candidates = [
-            root.join("dist/CopyTranslator.app"),
-            root.join("src-tauri/target/release/bundle/macos/CopyTranslator.app"),
-            root.join("src-tauri/target/debug/bundle/macos/CopyTranslator.app"),
+            root.join("dist/TransToast.app"),
+            root.join("src-tauri/target/release/bundle/macos/TransToast.app"),
+            root.join("src-tauri/target/debug/bundle/macos/TransToast.app"),
         ];
         if let Some(path) = candidates.into_iter().find(|path| path.exists()) {
             return Ok(existing_path(path));
         }
     }
 
-    Err("CopyTranslator.app bundle not found. Build and launch the app bundle first.".to_string())
+    Err("TransToast.app bundle not found. Build and launch the app bundle first.".to_string())
 }
 
 fn app_bundle_ancestor(path: &Path) -> Option<PathBuf> {
@@ -2499,7 +2499,7 @@ fn reveal_permission_app_impl(app: &AppHandle) -> Result<ActionResult, String> {
             .spawn()
             .map_err(|error| format!("Could not reveal {}: {error}", bundle_path.display()))?;
         return Ok(action_result(
-            "CopyTranslator.app",
+            "TransToast.app",
             "Revealed in Finder. Drag the selected app into the open Privacy list.",
             true,
         ));
@@ -2508,7 +2508,7 @@ fn reveal_permission_app_impl(app: &AppHandle) -> Result<ActionResult, String> {
     #[cfg(not(target_os = "macos"))]
     {
         Ok(action_result(
-            "CopyTranslator.app",
+            "TransToast.app",
             "Revealing the app bundle is macOS-only.",
             false,
         ))
@@ -2530,7 +2530,7 @@ fn candidate_roots(app: &AppHandle) -> Vec<PathBuf> {
 }
 
 fn workspace_root_env() -> Option<PathBuf> {
-    std::env::var("COPY_TRANSLATOR_WORKSPACE_ROOT")
+    std::env::var("TRANSTOAST_WORKSPACE_ROOT")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .map(PathBuf::from)
@@ -2643,7 +2643,7 @@ fn openrouter_api_key_state() -> Result<OpenRouterAPIKeyState, String> {
 
 fn credential_env_path() -> Result<PathBuf, String> {
     let home = std::env::var("HOME").map_err(|_| "HOME is not set.".to_string())?;
-    Ok(PathBuf::from(home).join(".config/copy-translator/.env"))
+    Ok(PathBuf::from(home).join(".config/transtoast/.env"))
 }
 
 fn read_env_key(path: &Path, key: &str) -> Result<Option<String>, String> {
@@ -3190,17 +3190,17 @@ mod tests {
 
     #[test]
     fn app_bundle_ancestor_finds_containing_bundle() {
-        let path = PathBuf::from("/Applications/CopyTranslator.app/Contents/MacOS/CopyTranslator");
+        let path = PathBuf::from("/Applications/TransToast.app/Contents/MacOS/TransToast");
 
         assert_eq!(
             app_bundle_ancestor(&path).as_deref(),
-            Some(Path::new("/Applications/CopyTranslator.app"))
+            Some(Path::new("/Applications/TransToast.app"))
         );
     }
 
     #[test]
     fn file_url_escapes_spaces_for_drag_payload() {
-        let path = Path::new("/Applications/Copy Translator.app");
+        let path = Path::new("/Applications/TransToast.app");
 
         assert_eq!(
             file_url_for_path(path),

@@ -1,8 +1,8 @@
-import CopyTranslatorCore
+import TransToastCore
 import Foundation
 
 final class SettingsStore {
-    private let key = "as.kargn.copy-translator.settings"
+    private let key = "as.kargn.transtoast.settings"
     private let defaults: UserDefaults
     private let settingsURL = SharedAppStorage.fileURL("settings-overrides.json")
     private var directoryWatcher: DispatchSourceFileSystemObject?

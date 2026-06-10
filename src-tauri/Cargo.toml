@@ -1,11 +1,11 @@
 [package]
-name = "copy-translator-tauri"
+name = "transtoast-tauri"
 version = "0.1.0"
-description = "CopyTranslator Tauri settings shell"
+description = "TransToast Tauri settings shell"
 edition = "2021"
 
 [lib]
-name = "copy_translator_tauri"
+name = "transtoast_tauri"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

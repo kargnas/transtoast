@@ -3,19 +3,19 @@
 import PackageDescription
 
 let package = Package(
-    name: "CopyTranslator",
+    name: "TransToast",
     platforms: [
         .macOS(.v15),
     ],
     products: [
-        .library(name: "CopyTranslatorCore", targets: ["CopyTranslatorCore"]),
-        .executable(name: "CopyTranslator", targets: ["CopyTranslator"]),
+        .library(name: "TransToastCore", targets: ["TransToastCore"]),
+        .executable(name: "TransToast", targets: ["TransToast"]),
     ],
     targets: [
-        .target(name: "CopyTranslatorCore"),
+        .target(name: "TransToastCore"),
         .executableTarget(
-            name: "CopyTranslator",
-            dependencies: ["CopyTranslatorCore"],
+            name: "TransToast",
+            dependencies: ["TransToastCore"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("Carbon"),
@@ -25,8 +25,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "CopyTranslatorTests",
-            dependencies: ["CopyTranslatorCore"]
+            name: "TransToastTests",
+            dependencies: ["TransToastCore"]
         ),
     ]
 )

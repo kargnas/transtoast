@@ -1,5 +1,5 @@
 import AppKit
-import CopyTranslatorCore
+import TransToastCore
 
 func argumentValue(after flag: String) -> String? {
     guard let index = CommandLine.arguments.firstIndex(of: flag) else {

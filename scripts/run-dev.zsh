@@ -3,12 +3,12 @@ set -euo pipefail
 
 ROOT="${0:A:h}/.."
 ROOT="${ROOT:A}"
-APP_NAME="CopyTranslator"
+APP_NAME="TransToast"
 APP_DIR="$ROOT/dist/$APP_NAME.app"
-BUNDLE_ID="as.kargn.copy-translator"
+BUNDLE_ID="as.kargn.transtoast"
 APP_EXEC="$APP_DIR/Contents/MacOS/$APP_NAME"
 DEBUG_EXEC="$ROOT/.build/arm64-apple-macosx/debug/$APP_NAME"
-TAURI_HELPER_EXEC="$APP_DIR/Contents/Resources/CopyTranslatorTauri.app/Contents/MacOS/copy-translator-tauri"
+TAURI_HELPER_EXEC="$APP_DIR/Contents/Resources/TransToastTauri.app/Contents/MacOS/transtoast-tauri"
 
 cd "$ROOT"
 

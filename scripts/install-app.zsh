@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="${0:A:h}/.."
-APP_NAME="CopyTranslator"
+APP_NAME="TransToast"
 INSTALL_DIR="/Applications"
 OPEN_AFTER_INSTALL=0
 
@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
       cat <<HELP
 Usage: scripts/install-app.zsh [--install-dir PATH] [--open]
 
-Builds CopyTranslator.app and installs it to PATH.
+Builds TransToast.app and installs it to PATH.
 Default install directory: /Applications
 HELP
       exit 0

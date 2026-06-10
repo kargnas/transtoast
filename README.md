@@ -1,6 +1,6 @@
-# Copy Translator
+# TransToast
 
-Copy Translator is a macOS menu-bar app that translates copied text after pressing `Cmd+C` twice, similar to DeepL's quick translation workflow. It also captures the screen with `Shift+Cmd+2` and sends the image to an OpenRouter vision model for translation.
+TransToast is a macOS menu-bar app that translates copied text after pressing `Cmd+C` twice, similar to DeepL's quick translation workflow. It also captures the screen with `Shift+Cmd+2` and sends the image to an OpenRouter vision model for translation.
 
 ## Features
 
@@ -46,12 +46,12 @@ The `.env.local` file is ignored by Git.
 
 ## macOS Permissions
 
-Copy Translator needs these macOS privacy permissions for the global shortcuts:
+TransToast needs these macOS privacy permissions for the global shortcuts:
 
 - **Input Monitoring** or **Accessibility** for `Cmd+C` twice from other apps.
 - **Screen Recording** for `Shift+Cmd+2` screenshot translation.
 
-Open the settings window and use **Permission Helper**. It opens the privacy pane and shows a draggable `CopyTranslator.app` icon. Drag that icon into the permission list, turn the toggle on if macOS adds it disabled, then relaunch Copy Translator.
+Open the settings window and use **Permission Helper**. It opens the privacy pane and shows a draggable `TransToast.app` icon. Drag that icon into the permission list, turn the toggle on if macOS adds it disabled, then relaunch TransToast.
 
 You can also open System Settings manually:
 
@@ -61,9 +61,9 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 ```
 
-After changing either keyboard or screen permissions, quit and relaunch Copy Translator so macOS applies the new trust state.
+After changing either keyboard or screen permissions, quit and relaunch TransToast so macOS applies the new trust state.
 
-Development builds are signed with a stable local Apple Development identity when one is available. If a previous ad-hoc build was already listed in Screen Recording, remove that old `CopyTranslator` entry or toggle it off and on once after rebuilding. macOS can show the same app name for a stale code identity, but Copy Translator will report **Screen ready** only when the current signed bundle is actually trusted.
+Development builds are signed with a stable local Apple Development identity when one is available. If a previous ad-hoc build was already listed in Screen Recording, remove that old `TransToast` entry or toggle it off and on once after rebuilding. macOS can show the same app name for a stale code identity, but TransToast will report **Screen ready** only when the current signed bundle is actually trusted.
 
 ## Run
 
@@ -77,7 +77,7 @@ Use the menu-bar icon to open options, request logs, the **Translation Model** s
 ./scripts/run-dev.zsh --show-settings
 ```
 
-Development app runs intentionally use the signed `dist/CopyTranslator.app` bundle. This keeps Screen Recording, Accessibility, and Input Monitoring permissions tied to the stable `as.kargn.copy-translator` bundle id instead of SwiftPM's ad-hoc debug executable identity.
+Development app runs intentionally use the signed `dist/TransToast.app` bundle. This keeps Screen Recording, Accessibility, and Input Monitoring permissions tied to the stable `as.kargn.transtoast` bundle id instead of SwiftPM's ad-hoc debug executable identity.
 
 To build and install the app on this Mac:
 
@@ -87,9 +87,9 @@ To build and install the app on this Mac:
 
 For another Mac, follow [docs/other-mac-setup.md](docs/other-mac-setup.md).
 
-When the selected **Translation Model** is an **OpenRouter LLM**, Copy Translator automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
+When the selected **Translation Model** is an **OpenRouter LLM**, TransToast automatically attaches the current screen as downscaled 1x visual context if macOS already reports Screen Recording as trusted. This context capture does not open a Screen Recording prompt during `Cmd+C` double-copy. Local model translation remains text-only. Explicit screenshot translation through `Shift+Cmd+2`, the settings window's **Translate Screenshot** button, or `--screenshot-once` can still request Screen Recording when it is missing.
 
-In Settings, **General** shows the active **Translation Model** directly. **Models** manages favorite local/OpenRouter models, default model selections, OpenRouter text/vision models, model pricing, free model status, modality support, and the local OpenRouter API key entry stored in `~/.config/copy-translator/.env`.
+In Settings, **General** shows the active **Translation Model** directly. **Models** manages favorite local/OpenRouter models, default model selections, OpenRouter text/vision models, model pricing, free model status, modality support, and the local OpenRouter API key entry stored in `~/.config/transtoast/.env`.
 
 Open **Request Logs...** from the menu-bar icon to inspect recent translation requests. The log keeps the last 200 requests and shows whether token usage came from the provider response or an app-side estimate. OpenRouter requests report provider token usage when the response includes it; local model requests use an estimate.
 
@@ -140,11 +140,11 @@ printf '{"text":"Hello world","source_language":"English","target_language":"Kor
 ./scripts/build-app.zsh
 ./scripts/install-app.zsh --install-dir "$HOME/Applications"
 ./scripts/package-app.zsh
-dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world"
-dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --local-model hymt2-mlx-1.8b-4bit
-dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --list-local-models
-dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --translate-text-once "Hello world" --provider openrouter
-dist/CopyTranslator.app/Contents/MacOS/CopyTranslator --screenshot-once
+dist/TransToast.app/Contents/MacOS/TransToast --translate-text-once "Hello world"
+dist/TransToast.app/Contents/MacOS/TransToast --translate-text-once "Hello world" --local-model hymt2-mlx-1.8b-4bit
+dist/TransToast.app/Contents/MacOS/TransToast --list-local-models
+dist/TransToast.app/Contents/MacOS/TransToast --translate-text-once "Hello world" --provider openrouter
+dist/TransToast.app/Contents/MacOS/TransToast --screenshot-once
 node scripts/openrouter_prompt_probe.mjs --capture
 ```
 

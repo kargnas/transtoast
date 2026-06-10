@@ -2,16 +2,16 @@
 set -euo pipefail
 
 ROOT="${0:A:h}/.."
-APP_NAME="CopyTranslator"
-BUNDLE_ID="as.kargn.copy-translator"
+APP_NAME="TransToast"
+BUNDLE_ID="as.kargn.transtoast"
 DIST_DIR="$ROOT/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-SIGN_IDENTITY="${COPY_TRANSLATOR_CODE_SIGN_IDENTITY:-}"
-TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/CopyTranslator.app"
-TAURI_HELPER_DEST="$RESOURCES_DIR/CopyTranslatorTauri.app"
+SIGN_IDENTITY="${TRANSTOAST_CODE_SIGN_IDENTITY:-}"
+TAURI_HELPER_SOURCE="$ROOT/src-tauri/target/release/bundle/macos/TransToast.app"
+TAURI_HELPER_DEST="$RESOURCES_DIR/TransToastTauri.app"
 
 cd "$ROOT"
 swift build -c release
@@ -22,8 +22,8 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp ".build/release/$APP_NAME" "$MACOS_DIR/$APP_NAME"
 ditto "$TAURI_HELPER_SOURCE" "$TAURI_HELPER_DEST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID.tauri-helper" "$TAURI_HELPER_DEST/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName CopyTranslatorTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName CopyTranslatorTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName TransToastTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName TransToastTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$TAURI_HELPER_DEST/Contents/Info.plist" >/dev/null 2>&1 || true
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \

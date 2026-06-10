@@ -1,4 +1,4 @@
-import CopyTranslatorCore
+import TransToastCore
 import Foundation
 import Testing
 
@@ -54,7 +54,7 @@ import Testing
 
 @Test func registryLoadsCustomModelJSON() throws {
     let path = FileManager.default.temporaryDirectory
-        .appendingPathComponent("copy-translator-custom-model-\(UUID().uuidString).json")
+        .appendingPathComponent("transtoast-custom-model-\(UUID().uuidString).json")
     let json = """
     [
       {

@@ -1,5 +1,5 @@
 import AppKit
-import CopyTranslatorCore
+import TransToastCore
 import CoreGraphics
 import UserNotifications
 
@@ -58,9 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         lifetimeActivity = ProcessInfo.processInfo.beginActivity(
             options: [.automaticTerminationDisabled, .suddenTerminationDisabled],
-            reason: "CopyTranslator must keep monitoring clipboard and shortcuts without a regular window."
+            reason: "TransToast must keep monitoring clipboard and shortcuts without a regular window."
         )
-        ProcessInfo.processInfo.disableAutomaticTermination("CopyTranslator must keep monitoring clipboard and shortcuts without a regular window.")
+        ProcessInfo.processInfo.disableAutomaticTermination("TransToast must keep monitoring clipboard and shortcuts without a regular window.")
         NSApp.setActivationPolicy(.accessory)
         configureMainMenu()
         createKeepAliveWindow()
@@ -76,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startPasteboardMonitor()
         resetPersistedToastSequence()
         startPersistentToastProcess()
-        print("CopyTranslator ready. Press Cmd+C twice to translate clipboard text.")
+        print("TransToast ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
         let runsPopoverSmoke = CommandLine.arguments.contains("--show-popover-smoke")
         if CommandLine.arguments.contains("--show-settings") {
@@ -115,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = Self.makeStatusIcon()
         item.button?.title = "CT"
         item.button?.imagePosition = .imageLeft
-        item.button?.toolTip = "CopyTranslator"
+        item.button?.toolTip = "TransToast"
         statusItem = item
         rebuildMenu()
     }
@@ -124,8 +124,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mainMenu = NSMenu()
 
         let appItem = NSMenuItem()
-        let appMenu = NSMenu(title: "CopyTranslator")
-        appMenu.addItem(menuItem(title: "Quit CopyTranslator", action: #selector(quit), key: "q", target: self))
+        let appMenu = NSMenu(title: "TransToast")
+        appMenu.addItem(menuItem(title: "Quit TransToast", action: #selector(quit), key: "q", target: self))
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
 
@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func makeStatusIcon() -> NSImage {
-        if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "CopyTranslator") {
+        if let image = NSImage(systemSymbolName: "translate", accessibilityDescription: "TransToast") {
             image.isTemplate = true
             return image
         }
@@ -257,7 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        menu.addItem(disabledTitle("CopyTranslator"))
+        menu.addItem(disabledTitle("TransToast"))
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(submenuItem(title: "Translation Model", submenu: translationModelMenu()))
@@ -867,7 +867,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func terminateTauriHelper(appURL: URL, matching match: String) {
         let executablePath = appURL
-            .appendingPathComponent("Contents/MacOS/copy-translator-tauri")
+            .appendingPathComponent("Contents/MacOS/transtoast-tauri")
             .path
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
@@ -882,17 +882,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             candidates.append(URL(fileURLWithPath: explicitAppPath))
         }
         if let resourceURL = Bundle.main.resourceURL {
-            candidates.append(resourceURL.appendingPathComponent("CopyTranslatorTauri.app", isDirectory: true))
-            candidates.append(resourceURL.appendingPathComponent("CopyTranslator.app", isDirectory: true))
+            candidates.append(resourceURL.appendingPathComponent("TransToastTauri.app", isDirectory: true))
+            candidates.append(resourceURL.appendingPathComponent("TransToast.app", isDirectory: true))
         }
         if let workspaceRootURL = resolveWorkspaceRootURL() {
-            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/bundle/macos/CopyTranslator.app", isDirectory: true))
-            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/bundle/macos/CopyTranslator.app", isDirectory: true))
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/debug/bundle/macos/TransToast.app", isDirectory: true))
+            candidates.append(workspaceRootURL.appendingPathComponent("src-tauri/target/release/bundle/macos/TransToast.app", isDirectory: true))
         }
 
         return candidates.first { candidate in
             FileManager.default.isExecutableFile(
-                atPath: candidate.appendingPathComponent("Contents/MacOS/copy-translator-tauri").path
+                atPath: candidate.appendingPathComponent("Contents/MacOS/transtoast-tauri").path
             )
         }
     }
@@ -903,7 +903,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            !workspaceRootPath.isEmpty {
             candidates.append(URL(fileURLWithPath: workspaceRootPath))
         }
-        if let workspaceRootPath = ProcessInfo.processInfo.environment["COPY_TRANSLATOR_WORKSPACE_ROOT"],
+        if let workspaceRootPath = ProcessInfo.processInfo.environment["TRANSTOAST_WORKSPACE_ROOT"],
            !workspaceRootPath.isEmpty {
             candidates.append(URL(fileURLWithPath: workspaceRootPath))
         }
@@ -991,7 +991,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = AXIsProcessTrustedWithOptions(options)
         }
 
-        print("Keyboard permission needed. Enable Input Monitoring or Accessibility for CopyTranslator, then relaunch the app.")
+        print("Keyboard permission needed. Enable Input Monitoring or Accessibility for TransToast, then relaunch the app.")
     }
 
     @objc private func quit() {

@@ -43,7 +43,7 @@ impl AppSurface {
             Self::Settings => SurfaceSpec {
                 key: "settings",
                 label: "main",
-                title: "CopyTranslator Settings",
+                title: "TransToast Settings",
                 width: 860.0,
                 height: 640.0,
                 min_width: 760.0,
@@ -56,7 +56,7 @@ impl AppSurface {
             Self::LocalModelSetup => SurfaceSpec {
                 key: "local-model-setup",
                 label: "local-model-setup",
-                title: "CopyTranslator Local Model Setup",
+                title: "TransToast Local Model Setup",
                 width: 1120.0,
                 height: 760.0,
                 min_width: 820.0,
@@ -69,7 +69,7 @@ impl AppSurface {
             Self::RequestLogs => SurfaceSpec {
                 key: "request-logs",
                 label: "request-logs",
-                title: "CopyTranslator Request Logs",
+                title: "TransToast Request Logs",
                 width: 760.0,
                 height: 520.0,
                 min_width: 700.0,
@@ -82,7 +82,7 @@ impl AppSurface {
             Self::PermissionHelper => SurfaceSpec {
                 key: "permission-helper",
                 label: "permission-helper",
-                title: "CopyTranslator Permission Helper",
+                title: "TransToast Permission Helper",
                 width: 680.0,
                 height: 500.0,
                 min_width: 620.0,

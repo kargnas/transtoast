@@ -52,7 +52,7 @@
       "problemMatcher": ["$swiftc"]
     },
     {
-      // Produces dist/CopyTranslator.zip for sharing with another Mac.
+      // Produces dist/TransToast.zip for sharing with another Mac.
       "label": "📮 Package App (.zip)",
       "type": "shell",
       "command": "./scripts/package-app.zsh",

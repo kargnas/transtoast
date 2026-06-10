@@ -1,17 +1,17 @@
-import CopyTranslatorCore
+import TransToastCore
 import Foundation
 
 struct CredentialsProvider {
     func credentials() -> TranslatorCredentials {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let bundleURL = Bundle.main.bundleURL
-        // `open CopyTranslator.app` does not preserve the project root as cwd, so dev builds also
+        // `open TransToast.app` does not preserve the project root as cwd, so dev builds also
         // check paths around the app bundle before falling back to the user config file.
         let paths = [
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".env.local"),
             bundleURL.deletingLastPathComponent().appendingPathComponent(".env.local"),
             bundleURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(".env.local"),
-            home.appendingPathComponent(".config/copy-translator/.env"),
+            home.appendingPathComponent(".config/transtoast/.env"),
         ]
         let environment = EnvLoader.mergedEnvironment(dotenv: EnvLoader.load(paths: paths))
         return TranslatorCredentials(

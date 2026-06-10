@@ -136,7 +136,7 @@ function loadEnvFile(filePath) {
 
 function loadImageInput() {
   if (args.has("--capture")) {
-    const directory = mkdtempSync(join(tmpdir(), "copy-translator-probe-"));
+    const directory = mkdtempSync(join(tmpdir(), "transtoast-probe-"));
     const path = join(directory, "screen.png");
     execFileSync("/usr/sbin/screencapture", ["-x", path], { stdio: "ignore" });
     return imageFromPath(path);

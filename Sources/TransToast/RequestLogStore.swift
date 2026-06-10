@@ -1,4 +1,4 @@
-import CopyTranslatorCore
+import TransToastCore
 import Foundation
 
 struct RequestLogEntry: Identifiable {

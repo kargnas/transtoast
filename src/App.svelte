@@ -48,7 +48,7 @@
   let isTauri = $state(false);
   let lastResult = $state("No translation yet.");
   let notices = $state<ActionResult[]>([]);
-  let openRouterAPIKeyState = $state<OpenRouterAPIKeyState>({ configured: false, path: "~/.config/copy-translator/.env" });
+  let openRouterAPIKeyState = $state<OpenRouterAPIKeyState>({ configured: false, path: "~/.config/transtoast/.env" });
   let openRouterAPIKeyInput = $state("");
   let openTranslationModelMenu = $state<"general" | "models" | null>(null);
   let activeTranslationModelProvider = $state<TranslationProvider>("localHyMT2");
@@ -197,7 +197,7 @@
 
   async function loadOpenRouterAPIKeyState() {
     if (!isTauri) {
-      openRouterAPIKeyState = { configured: false, path: "~/.config/copy-translator/.env" };
+      openRouterAPIKeyState = { configured: false, path: "~/.config/transtoast/.env" };
       return;
     }
     try {
@@ -215,7 +215,7 @@
     try {
       openRouterAPIKeyState = isTauri
         ? await invoke<OpenRouterAPIKeyState>("save_openrouter_api_key", { value: openRouterAPIKeyInput })
-        : { configured: true, path: "~/.config/copy-translator/.env" };
+        : { configured: true, path: "~/.config/transtoast/.env" };
       openRouterAPIKeyInput = "";
       pushNotice({ title: "OpenRouter API Key", message: "Saved.", ok: true });
     } catch (error) {
@@ -227,7 +227,7 @@
     try {
       openRouterAPIKeyState = isTauri
         ? await invoke<OpenRouterAPIKeyState>("clear_openrouter_api_key")
-        : { configured: false, path: "~/.config/copy-translator/.env" };
+        : { configured: false, path: "~/.config/transtoast/.env" };
       openRouterAPIKeyInput = "";
       pushNotice({ title: "OpenRouter API Key", message: "Cleared.", ok: true });
     } catch (error) {
@@ -1005,10 +1005,10 @@
             <label class="setting-row">
               <span class="setting-copy">
                 <strong>Custom Model Catalog</strong>
-                <span class="setting-note">JSON file that adds local model choices. Blank uses ~/.config/copy-translator/local-models.json when present.</span>
+                <span class="setting-note">JSON file that adds local model choices. Blank uses ~/.config/transtoast/local-models.json when present.</span>
               </span>
               <input
-                placeholder="~/.config/copy-translator/local-models.json"
+                placeholder="~/.config/transtoast/local-models.json"
                 value={settingsState.settings.customLocalModelsPath ?? ""}
                 onblur={(event) => updateNullableField("customLocalModelsPath", event.currentTarget.value)}
               />
