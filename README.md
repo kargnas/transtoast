@@ -13,11 +13,13 @@ Press `Cmd+C` twice in any app — the copied text pops up as a translation toas
 - **Run it all locally if you want** — fast, accurate AI translation on your own machine, from a local model that takes just ~1.3 GB of memory (970 MB on disk).
 - **Or run it all on the smartest LLMs** — CCTrans captures your screen along with the copied text, so the model sees the surrounding context and translates what you actually mean.
 
+## Install
+
 ```sh
 brew install --cask kargnas/tap/cctrans
 ```
 
-…or [download the DMG →](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
+…or [download the DMG →](https://github.com/kargnas/cctrans/releases/latest). macOS 15+, and the app updates itself either way.
 
 ## What it does
 
