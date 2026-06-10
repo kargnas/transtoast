@@ -54,7 +54,11 @@ jobs:
       - name: Compute next version
         id: version
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "v0.0.0")
+          # A release published during the sleep window tags a commit newer than
+          # the one that triggered this run, so reachability-based `git describe`
+          # from HEAD undercounts. Take the highest v* tag repo-wide instead.
+          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          LATEST_TAG="${LATEST_TAG:-v0.0.0}"
           echo "Latest tag: $LATEST_TAG"
 
           # HEAD already released -> nothing to do (e.g. re-run after a release commit).
