@@ -1,5 +1,5 @@
-# Runs the bundled local translation models end to end whenever something that
-# can affect them changes: build the real binary, download the model, translate
+# Runs the bundled local translation models end to end on every PR and every
+# push to main: build the real binary, download the model, translate
 # fixed samples, and fail on backend errors, non-Korean output, or budget
 # overruns. Budgets are intentionally generous because hosted arm64 runners are
 # far slower than a physical Mac; this catches breakage and pathological
@@ -11,27 +11,12 @@
 name: Local Model CI
 
 on:
+  # Runs on every PR and every push to main as a consistency gate, not only on
+  # translation-path changes. Caches keep repeat runs cheap, and the
+  # cancel-in-progress concurrency group below stops superseded runs.
   push:
     branches: [main]
-    paths:
-      - 'Sources/CCTransCore/**'
-      - 'Sources/CCTrans/main.swift'
-      - 'scripts/runtimes/**'
-      - 'scripts/hy_mt2_translate.py'
-      - 'scripts/ci/**'
-      - 'Package.swift'
-      - 'Package.resolved'
-      - '.github/workflows/model-ci.yml'
   pull_request:
-    paths:
-      - 'Sources/CCTransCore/**'
-      - 'Sources/CCTrans/main.swift'
-      - 'scripts/runtimes/**'
-      - 'scripts/hy_mt2_translate.py'
-      - 'scripts/ci/**'
-      - 'Package.swift'
-      - 'Package.resolved'
-      - '.github/workflows/model-ci.yml'
   schedule:
     # Weekly canary: catches Hugging Face hosting changes or Python dependency
     # rot even when the repo is quiet.
