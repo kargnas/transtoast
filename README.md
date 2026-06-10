@@ -1,16 +1,19 @@
-<p align="center">
-  <img src="assets/icon/app-icon-rounded-1024.png" width="128" alt="CCTrans icon">
-</p>
+<table align="center">
+  <tr>
+    <td align="center" valign="middle">
+      <img src="assets/icon/app-icon-rounded-1024.png" width="128" alt="CCTrans icon">
+    </td>
+    <td align="center" valign="middle">
+      <img src="docs/images/toast.png" width="360" alt="Translation toast: copied text translated to English by the local model, with language badge and copy/settings actions">
+    </td>
+  </tr>
+</table>
 
 # CCTrans
 
 Press `Cmd+C` twice in any app — the copied text pops up as a translation toast, translated by a local model that never sends your text anywhere. A macOS menu-bar translator in the spirit of DeepL's quick-translate shortcut.
 
 [**Download for macOS →**](https://github.com/kargnas/cctrans/releases/latest) · macOS 15+ · auto-updates itself
-
-<p align="center">
-  <img src="docs/images/toast.png" width="442" alt="Translation toast: copied text translated to English by the local model, with language badge and copy/settings actions">
-</p>
 
 ## What it does
 
