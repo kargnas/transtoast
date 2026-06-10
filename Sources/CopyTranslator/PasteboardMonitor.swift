@@ -4,7 +4,9 @@ import CopyTranslatorCore
 @MainActor
 final class PasteboardMonitor {
     private let onDoubleCopy: () -> Void
-    private var detector = DoublePressDetector()
+    // Content-aware detector: timing-only detection fired on any two clipboard
+    // mutations within the interval (e.g. repeated Cmd+X cuts of different lines).
+    private var detector = ClipboardDoubleCopyDetector()
     private var lastChangeCount: Int
     private var timer: DispatchSourceTimer?
 
@@ -48,7 +50,7 @@ final class PasteboardMonitor {
         }
 
         // Pasteboard polling keeps double-copy translation usable before macOS grants Input Monitoring.
-        if detector.registerPress(at: Date.timeIntervalSinceReferenceDate) {
+        if detector.registerCopy(of: text, at: Date.timeIntervalSinceReferenceDate) {
             onDoubleCopy()
         }
     }
