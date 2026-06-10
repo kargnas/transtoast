@@ -1,6 +1,6 @@
 # Other Mac Setup
 
-Use this checklist on another Mac after the private GitHub repository is available to your account.
+Use this checklist to set up CopyTranslator on another Mac.
 
 ## Requirements
 
@@ -8,7 +8,7 @@ Use this checklist on another Mac after the private GitHub repository is availab
 - Xcode 26 or later.
 - Swift 6.2 or later.
 - `uv` for the local Hy-MT2 backend.
-- GitHub CLI signed in to an account that can read the private repository.
+- GitHub CLI or plain `git` to clone the repository.
 
 ## Clone
 
