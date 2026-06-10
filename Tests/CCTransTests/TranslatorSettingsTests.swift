@@ -8,10 +8,10 @@ import Testing
     #expect(settings.provider == .localHyMT2)
     #expect(settings.hyMT2Model == .hyMT2_30B)
     #expect(settings.localModelID == LocalModelRegistry.defaultModelID)
-    #expect(settings.openRouterTextModel == "~google/gemini-flash-latest")
-    #expect(settings.openRouterVisionModel == "~google/gemini-flash-latest")
+    #expect(settings.openRouterTextModel == "deepseek/deepseek-v4-flash")
+    #expect(settings.openRouterVisionModel == "~google/gemini-flash-lite-latest")
     #expect(settings.favoriteLocalModelIDs == [LocalModelRegistry.defaultModelID])
-    #expect(settings.favoriteOpenRouterModels == ["~google/gemini-flash-latest"])
+    #expect(settings.favoriteOpenRouterModels == ["deepseek/deepseek-v4-flash"])
     #expect(settings.includeScreenContextForLLM == false)
     #expect(settings.sourceLanguage == TranslationLanguage.auto)
     #expect(settings.targetLanguage == "Korean")
@@ -82,11 +82,11 @@ import Testing
     let json = """
     {
       "openRouterTextModel": "~google/gemini-flash-latest",
-      "openRouterVisionModel": "google/gemini-3.1-flash-lite"
+      "openRouterVisionModel": "custom/vision-model"
     }
     """
     let settings = try JSONDecoder().decode(TranslatorSettings.self, from: Data(json.utf8))
 
     #expect(settings.openRouterTextModel == "~google/gemini-flash-latest")
-    #expect(settings.openRouterVisionModel == "google/gemini-3.1-flash-lite")
+    #expect(settings.openRouterVisionModel == "custom/vision-model")
 }

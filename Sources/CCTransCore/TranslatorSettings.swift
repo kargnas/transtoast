@@ -69,7 +69,9 @@ public struct ToastCustomPosition: Codable, Equatable, Sendable {
 }
 
 public struct TranslatorSettings: Codable, Equatable, Sendable {
-    public static let defaultOpenRouterModel = "~google/gemini-flash-latest"
+    public static let defaultOpenRouterTextModel = "deepseek/deepseek-v4-flash"
+    public static let defaultOpenRouterVisionModel = "~google/gemini-flash-lite-latest"
+    public static let defaultOpenRouterModel = defaultOpenRouterTextModel
 
     public var provider: TranslationProvider
     public var hyMT2Model: HyMT2Model
@@ -95,10 +97,10 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
         localModelID: String = LocalModelRegistry.defaultModelID,
         localHyMT2BackendPath: String? = nil,
         customLocalModelsPath: String? = nil,
-        openRouterTextModel: String = Self.defaultOpenRouterModel,
-        openRouterVisionModel: String = Self.defaultOpenRouterModel,
+        openRouterTextModel: String = Self.defaultOpenRouterTextModel,
+        openRouterVisionModel: String = Self.defaultOpenRouterVisionModel,
         favoriteLocalModelIDs: [String] = [LocalModelRegistry.defaultModelID],
-        favoriteOpenRouterModels: [String] = [Self.defaultOpenRouterModel],
+        favoriteOpenRouterModels: [String] = [Self.defaultOpenRouterTextModel],
         includeScreenContextForLLM: Bool = false,
         sourceLanguage: String = TranslationLanguage.auto,
         targetLanguage: String = "Korean",
@@ -154,10 +156,10 @@ public struct TranslatorSettings: Codable, Equatable, Sendable {
             ?? LocalModelRegistry.defaultModelID
         localHyMT2BackendPath = try container.decodeIfPresent(String.self, forKey: .localHyMT2BackendPath)
         customLocalModelsPath = try container.decodeIfPresent(String.self, forKey: .customLocalModelsPath)
-        openRouterTextModel = try container.decodeIfPresent(String.self, forKey: .openRouterTextModel) ?? Self.defaultOpenRouterModel
-        openRouterVisionModel = try container.decodeIfPresent(String.self, forKey: .openRouterVisionModel) ?? Self.defaultOpenRouterModel
+        openRouterTextModel = try container.decodeIfPresent(String.self, forKey: .openRouterTextModel) ?? Self.defaultOpenRouterTextModel
+        openRouterVisionModel = try container.decodeIfPresent(String.self, forKey: .openRouterVisionModel) ?? Self.defaultOpenRouterVisionModel
         favoriteLocalModelIDs = try container.decodeIfPresent([String].self, forKey: .favoriteLocalModelIDs) ?? [LocalModelRegistry.defaultModelID]
-        favoriteOpenRouterModels = try container.decodeIfPresent([String].self, forKey: .favoriteOpenRouterModels) ?? [Self.defaultOpenRouterModel]
+        favoriteOpenRouterModels = try container.decodeIfPresent([String].self, forKey: .favoriteOpenRouterModels) ?? [Self.defaultOpenRouterTextModel]
         includeScreenContextForLLM = try container.decodeIfPresent(Bool.self, forKey: .includeScreenContextForLLM) ?? false
         sourceLanguage = try container.decodeIfPresent(String.self, forKey: .sourceLanguage) ?? TranslationLanguage.auto
         targetLanguage = try container.decodeIfPresent(String.self, forKey: .targetLanguage) ?? "Korean"
