@@ -115,9 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         // The persistent toast process has no Dock icon and survives window hide, so it would
         // linger as a zombie unless the menu-bar app kills it explicitly on quit.
-        if let appURL = resolveTauriHelperAppURL() {
-            terminateTauriHelper(appURL: appURL, matching: "--translation-preview")
-        }
+        terminateTauriHelper(matching: "--translation-preview")
     }
 
     private func startUpdaterIfBundled() {
@@ -862,7 +860,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return false
         }
 
-        terminateTauriHelper(appURL: appURL, matching: match)
+        terminateTauriHelper(matching: match)
 
         var launchArguments = arguments
         if let workspaceRootURL = resolveWorkspaceRootURL() {
@@ -881,13 +879,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         return true
     }
 
-    private func terminateTauriHelper(appURL: URL, matching match: String) {
-        let executablePath = appURL
-            .appendingPathComponent("Contents/MacOS/cctrans-tauri")
-            .path
+    private func terminateTauriHelper(matching match: String) {
+        // Match the helper binary name, not this bundle's absolute path: a helper left over
+        // from another checkout or an old install path (e.g. the pre-rebrand transtoast
+        // workspace) watches the same shared state file, so a path-scoped pkill would let it
+        // survive and render a second toast window for every translation.
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        process.arguments = ["-f", "\(executablePath).*\(match)"]
+        process.arguments = ["-f", "cctrans-tauri.*\(match)"]
         try? process.run()
     }
 
