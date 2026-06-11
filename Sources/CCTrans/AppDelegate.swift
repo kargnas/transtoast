@@ -31,7 +31,7 @@ struct TranslationPreviewPayload: Encodable {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
-    private let translationService = TranslationService()
+    private let translationService = TranslationService(appleBackend: AppleTranslationHost.shared)
     private let requestLogStore = RequestLogStore()
     private let localModelWarmupNotifier = LocalModelWarmupNotifier()
     private var statusItem: NSStatusItem?
@@ -71,9 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if MAS_BUILD
         // The sandbox cannot run the external Python/uv local-model backend
         // (child processes inherit the sandbox and lose the venv/HF caches),
-        // so the MAS build pins translation to OpenRouter.
+        // so the MAS build maps it to Apple Translation: also local/offline,
+        // and it works with zero setup.
         if settingsStore.settings.provider == .localHyMT2 {
-            settingsStore.settings.provider = .openRouter
+            settingsStore.settings.provider = .appleTranslation
         }
         #endif
 
@@ -257,6 +258,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = .clear
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces]
+        // The Apple Translation host must live in an ordered-front window for
+        // SwiftUI to run its .translationTask; the keep-alive window is the
+        // app's only permanent window, so it doubles as that host.
+        window.contentView = AppleTranslationHost.shared.makeHostingView()
         // LSUIElement apps with only transient toast windows can be auto-terminated after the toast closes.
         window.orderFront(nil)
         keepAliveWindow = window
@@ -532,7 +537,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ))
         }
 
+        #if !MAS_BUILD
         menu.addItem(submenuItem(title: "Local Model", submenu: localMenu))
+        #endif
+        menu.addItem(checkableItem(
+            title: "Apple Translation · On-device",
+            checked: settings.provider == .appleTranslation,
+            action: #selector(setTranslationModel(_:)),
+            representedObject: "appleTranslation:"
+        ))
         menu.addItem(submenuItem(title: "OpenRouter LLM", submenu: openRouterMenu))
         return menu
     }
@@ -569,7 +582,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let value = sender.representedObject as? String else {
             return
         }
-        let parts = value.split(separator: ":", maxSplits: 1).map(String.init)
+        // omittingEmptySubsequences keeps the trailing empty model id of
+        // model-less providers ("appleTranslation:") so the count guard holds.
+        let parts = value.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 2,
               let provider = TranslationProvider(rawValue: parts[0]) else {
             return
@@ -582,6 +597,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.localModelID = parts[1]
         case .openRouter:
             settings.openRouterTextModel = parts[1]
+        case .appleTranslation:
+            break
         }
         settingsStore.settings = settings
         rebuildMenu()
@@ -860,6 +877,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )?.title ?? settings.localModelID
         case .openRouter:
             OpenRouterModelCatalog.title(for: settings.openRouterTextModel)
+        case .appleTranslation:
+            "Apple Translation"
         }
     }
 
@@ -896,6 +915,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let workspaceRootURL = resolveWorkspaceRootURL() {
             launchArguments.append(contentsOf: ["--workspace-root", workspaceRootURL.path])
         }
+        #if MAS_BUILD
+        // The Svelte settings/permission surfaces hide sandbox-incompatible
+        // options (Python local models, Accessibility) based on this flag.
+        launchArguments.append(contentsOf: ["--app-variant", "mas"])
+        #endif
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = activate

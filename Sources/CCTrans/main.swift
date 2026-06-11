@@ -25,6 +25,8 @@ func oneShotSettings(defaultProvider: TranslationProvider) -> TranslatorSettings
             settings.provider = .localHyMT2
         case "openrouter":
             settings.provider = .openRouter
+        case "apple", "apple-translation":
+            settings.provider = .appleTranslation
         default:
             break
         }
@@ -120,9 +122,48 @@ if CommandLine.arguments.contains("--benchmark-local-models") {
     exit(0)
 }
 
+// Apple Translation sessions only exist inside a hosted SwiftUI view, so the
+// one-shot path cannot stay a plain top-level await: it boots a minimal,
+// invisible NSApplication around AppleTranslationHost, translates, prints, and
+// exits. Used by the Tauri toast's retranslate path and as the E2E smoke.
+@MainActor
+func runAppleTranslationOneShot(text: String, settings: TranslatorSettings) -> Never {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
+        styleMask: [.borderless],
+        backing: .buffered,
+        defer: false
+    )
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    window.ignoresMouseEvents = true
+    window.contentView = AppleTranslationHost.shared.makeHostingView()
+    window.orderFrontRegardless()
+
+    let service = TranslationService(appleBackend: AppleTranslationHost.shared)
+    let credentials = CredentialsProvider().credentials()
+    Task { @MainActor in
+        do {
+            let result = try await service.translateText(text, settings: settings, credentials: credentials)
+            print(result.text)
+            exit(0)
+        } catch {
+            FileHandle.standardError.write(Data("ERROR: \(error.localizedDescription)\n".utf8))
+            exit(1)
+        }
+    }
+    app.run()
+    fatalError("NSApplication.run returned unexpectedly")
+}
+
 if CommandLine.arguments.contains("--translate-text-once") {
     let text = argumentValue(after: "--translate-text-once") ?? ""
     let settings = oneShotSettings(defaultProvider: .localHyMT2)
+    if settings.provider == .appleTranslation {
+        runAppleTranslationOneShot(text: text, settings: settings)
+    }
     let credentials = CredentialsProvider().credentials()
     let contextImagePNGData: Data? = if CommandLine.arguments.contains("--with-screen-context") {
         try await ScreenshotCapture.captureMainDisplayContextPNG()
