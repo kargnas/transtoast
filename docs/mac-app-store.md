@@ -7,15 +7,17 @@ Sparkle) stays the primary channel; MAS would be a second, reduced variant.
 
 ## TL;DR
 
-The current app cannot ship to MAS as-is. Four things must change, in order of
-pain:
+The current app cannot ship to MAS as-is. Five things must change, in order of
+pain — but research (see §8) shrank the damage: Cmd+C detection and local
+translation both survive on MAS with API swaps instead of feature cuts:
 
 | # | Today | MAS requirement | Plan |
 |---|---|---|---|
 | 1 | Sparkle self-update | Self-updating is forbidden; the store owns updates | Strip Sparkle from the MAS build (`MAS_BUILD` compile flag) |
-| 2 | `NSEvent.addGlobalMonitorForEvents(.keyDown)` watches Cmd+C in other apps | Sandboxed apps do not receive global keyDown events; Input Monitoring is effectively unavailable to MAS apps | Use the existing `PasteboardMonitor` (polling, sandbox-safe) as the only double-copy trigger in the MAS build |
-| 3 | Local Hy-MT2 models run through an external Python/uv backend process | Spawned processes inherit the sandbox; the backend, its venv, and HF caches live outside the container and die | MAS v1 ships OpenRouter-only; embedding a runtime inside the bundle is a separate, later project |
+| 2 | `NSEvent.addGlobalMonitorForEvents(.keyDown)` watches Cmd+C in other apps | The `NSEvent` global monitor rides the Accessibility privilege, which App Sandbox blocks. Per Apple DTS (Quinn), keyboard monitoring *does* work sandboxed through `CGEventTap` + the Input Monitoring privilege instead | Port `KeyboardMonitor` to a listen-only `CGEventTap` gated by `CGPreflightListenEventAccess`/`CGRequestListenEventAccess` (the preflight call is already in `AppDelegate`). Works in both builds, so the direct build can adopt it too. `PasteboardMonitor` stays as the no-permission fallback |
+| 3 | Local Hy-MT2 models run through an external Python/uv backend process | Spawned processes inherit the sandbox; the backend, its venv, and HF caches live outside the container and die | Keep local translation via Apple's on-device **Translation framework** (`TranslationSession`, macOS 15+, free, sandbox-safe) as the MAS local provider; Python-backed Hy-MT2 stays direct-build-only. In-process MLX/llama.cpp is the long-term option if Hy-MT2 quality is required on MAS |
 | 4 | No sandbox at all (Developer ID + hardened runtime only) | `com.apple.security.app-sandbox` entitlement is mandatory, on the main app and every nested binary (Tauri helper included) | New entitlements files + `build-mas.zsh` signing path |
+| 5 | `KeyboardCaretLocator` positions the toast at the text caret via `AXUIElement` | Accessibility APIs are blocked under App Sandbox, full stop (DTS) | MAS build skips caret anchoring and falls back to the existing `toastPosition` setting (bottom-right etc.) |
 
 Already MAS-compatible, no change needed:
 
@@ -68,7 +70,11 @@ Notes:
 - Tauri helper gets its own copy of the same two entitlements. It is launched
   via `NSWorkspace` as a separate app, so it cannot use
   `com.apple.security.inherit`; it must be a fully sandboxed app itself.
-  Tauri 2 documents this path officially (App Store distribution guide).
+  Tauri 2 documents this path officially:
+  <https://v2.tauri.app/distribute/app-store/> — note it additionally requires
+  `com.apple.application-identifier` (TEAMID.bundle-id) and
+  `com.apple.developer.team-identifier` keys in the MAS entitlements, matching
+  the embedded provisioning profile.
 - The WKWebView/Tauri runtime may additionally need
   `com.apple.security.files.user-selected.read-only` only if a file picker is
   ever exposed; today it is not.
@@ -82,15 +88,27 @@ Notes:
    the package; the framework simply must not be embedded or referenced at
    runtime in the MAS bundle (build script omits `Sparkle.framework` and the
    `SUFeedURL`/`SUPublicEDKey` Info.plist keys).
-2. **KeyboardMonitor**: do not start it; rely on `PasteboardMonitor`'s
-   same-text-copied-twice detection (already implemented and tested) as the
-   double-copy trigger. Menu copy still works, which the keyboard path never
-   covered anyway.
-3. **Local model provider**: hide `localHyMT2` from the provider/model UI and
-   default to OpenRouter. Reuse `hasCompletedLocalModelSelection` semantics so
-   the first-run local-model setup window never appears.
-4. **Permission helper**: the Input Monitoring / Accessibility sections do not
-   apply; only Screen Recording remains.
+2. **KeyboardMonitor → CGEventTap port** (not MAS-specific; do it for both
+   builds): replace `NSEvent.addGlobalMonitorForEvents(.keyDown)` with a
+   listen-only `CGEventTap`. Quinn (Apple DTS): "you need to use an API that
+   relies on … Input Monitoring rather than … Accessibility. That means
+   `CGEventTap` rather than the `NSEvent` monitor" — and that combination is
+   explicitly fine in a sandboxed app. `PasteboardMonitor`'s
+   same-text-copied-twice detection (already implemented and tested) remains
+   the fallback when the user declines Input Monitoring.
+3. **Local model provider**: in the MAS build, swap the Python-backed
+   `localHyMT2` provider for Apple's Translation framework
+   (`TranslationSession`). Session acquisition is SwiftUI-only, so host an
+   offscreen `NSHostingView` carrying the `.translationTask` modifier from the
+   keep-alive window. Language-pack downloads are one-time, Apple-managed, and
+   on-device. Hy-MT2 stays a direct-build feature; revisit in-process
+   MLX-swift (weights download = data, allowed; spawning external binaries =
+   what actually breaks) only if Hy-MT2 parity on MAS becomes worth it.
+4. **KeyboardCaretLocator**: `#if MAS_BUILD` skip — `AXUIElement` is blocked
+   under the sandbox. Toast placement falls back to the `toastPosition`
+   user setting.
+5. **Permission helper**: Accessibility section does not apply; Input
+   Monitoring (for the event tap) and Screen Recording remain.
 
 ## 4. Build + package pipeline (`scripts/build-mas.zsh`, new)
 
@@ -122,9 +140,11 @@ Mirror `build-app.zsh`, with these differences:
 
 ## 5. Upload and review
 
-1. Upload the .pkg with the **Transporter** app (or `xcrun altool`'s
-   replacement, the App Store Connect API / `fastlane deliver`; classic
-   `altool --upload-app` is discontinued).
+1. Upload the .pkg with the **Transporter** app, or in CI with
+   `xcrun altool --upload-package` using an App Store Connect API key
+   (`--upload-app` still works but is deprecated; `notarytool` is for
+   Developer ID notarization and plays no role here). `fastlane deliver` /
+   the App Store Connect API are equivalent automation routes.
 2. App Store Connect metadata:
    - Screenshots: 1280×800 / 1440×900 / 2560×1600 / 2880×1800 only.
    - Privacy policy URL (required) + privacy "nutrition label". CCTrans
@@ -149,15 +169,40 @@ Mirror `build-app.zsh`, with these differences:
 | Guideline | Risk | Mitigation |
 |---|---|---|
 | 2.4.5 App Sandbox | Any nested binary without the sandbox entitlement fails ingest automatically | Entitlements on app + helper + every executable |
-| 2.5.2 downloaded code | Local model runtime downloads and runs code | Excluded from MAS v1 entirely |
-| 2.1 minimum functionality | App is inert without an API key | Reviewer demo key in review notes |
-| 5.1.1 permission purpose | Screen Recording without clear reason | Purpose explained in-app before prompting + review notes |
+| 2.5.2 downloaded code | Python local-model runtime downloads and runs code | Python path excluded from MAS build; Translation framework models are Apple-managed |
+| 2.1 minimum functionality | App is inert without an API key | Translation framework provider works with zero setup; reviewer demo key for OpenRouter features in review notes |
+| 5.1.1 permission purpose | Input Monitoring + Screen Recording without clear reason | Purpose explained in-app before prompting + review notes; app stays functional (pasteboard fallback) if denied |
 | 4.x design / discoverability | Menu-bar-only app "looks broken" | Review notes + first-launch onboarding window already exists |
 
 ## 7. Open decisions before any submission
 
-1. MAS v1 feature cut confirmed as OpenRouter-only + pasteboard trigger only?
+1. MAS v1 feature set: Cmd+C double-press (CGEventTap) + Apple Translation
+   framework local provider + OpenRouter + screenshot translation, minus
+   Hy-MT2 and caret-anchored toasts. Confirm this cut.
 2. Free, or paid/IAP? (Free assumed throughout this plan.)
-3. Reviewer access: demo key vs. limited built-in demo quota.
+3. Reviewer access: demo key vs. limited built-in demo quota (less pressing
+   now that the Translation provider works without any key).
 4. Whether the MAS variant is worth maintaining at all next to the
    self-updating direct build — every release doubles QA surface.
+5. Whether the direct build also moves to CGEventTap + Translation framework
+   (shrinks the build-flag delta and the QA matrix).
+
+## 8. Research notes (2026-06)
+
+- Sandbox + keyboard: Quinn (Apple DTS) — Accessibility APIs are blocked
+  under App Sandbox, but `CGEventTap` behind Input Monitoring works, MAS
+  included: <https://developer.apple.com/forums/thread/789896>.
+- Translation framework (`TranslationSession`, on-device, free):
+  <https://developer.apple.com/documentation/translation/translationsession>,
+  intro: <https://developer.apple.com/videos/play/wwdc2024/10117/>. SwiftUI
+  session acquisition caveat:
+  <https://www.polpiella.dev/swift-translation-api/>.
+- Foundation Models (macOS 26+) is **not** a translation API — usable later
+  for auxiliary features only:
+  <https://developer.apple.com/documentation/FoundationModels>.
+- On-device LLM precedent for MAS: in-process inference (mlx-swift /
+  embedded llama.cpp) is the viable shape; spawning external binaries or
+  daemons is what breaks sandboxing (macMLX case, LocalLLMClient):
+  <https://github.com/ml-explore/mlx-swift>.
+- Tauri 2 official MAS guide (entitlements, provisioning, productbuild,
+  upload): <https://v2.tauri.app/distribute/app-store/>.
