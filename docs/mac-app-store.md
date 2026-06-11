@@ -1,9 +1,14 @@
 # Mac App Store Release Plan
 
-Status: **plan only — nothing submitted yet.** This documents what a Mac App
-Store (MAS) build of CCTrans requires, what breaks under the mandatory App
-Sandbox, and the exact submission pipeline. Direct distribution (DMG + brew +
-Sparkle) stays the primary channel; MAS would be a second, reduced variant.
+Status: **code prep landed on the `mas-prep` branch (2026-06); nothing
+submitted yet.** Done: CGEventTap port (§3.2, both builds), `MAS_BUILD` flag
+with Sparkle/caret/local-provider gates (§3.1/3.4), sandbox entitlements +
+`scripts/build-mas.zsh` (§2/§4, verified locally). Remaining: Translation
+framework provider (§3.3), permission-helper UI trim (§3.5), Tauri settings UI
+gating for the hidden local provider, and the account-side work in §1/§5
+(certificates, provisioning profile, App Store Connect) that only the account
+holder can do. Direct distribution (DMG + brew + Sparkle) stays the primary
+channel; MAS would be a second, reduced variant.
 
 ## TL;DR
 

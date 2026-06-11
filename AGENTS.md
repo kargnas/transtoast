@@ -29,12 +29,18 @@ CCTrans is a macOS menu-bar translator. Keep the app native-feeling, fast, and o
 swift test
 swift build
 ./scripts/run-dev.zsh --show-settings
+./scripts/build-mas.zsh
 npm install
 npm run check
 npm run build
 npm run tauri dev
 cd src-tauri && cargo test
 ```
+
+`build-mas.zsh` produces the sandboxed Mac App Store variant in `dist-mas/`
+(plan and signing env vars: `docs/mac-app-store.md`). It builds with
+`CCTRANS_MAS_BUILD=1` in the separate `.build-mas` scratch path so the
+Sparkle-free manifest never pollutes the normal `.build` cache.
 
 VS Code's `🚀 Run Dev App Bundle` launch configuration runs:
 
