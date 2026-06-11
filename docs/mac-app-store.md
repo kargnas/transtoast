@@ -1,14 +1,17 @@
 # Mac App Store Release Plan
 
-Status: **code prep landed on the `mas-prep` branch (2026-06); nothing
-submitted yet.** Done: CGEventTap port (§3.2, both builds), `MAS_BUILD` flag
-with Sparkle/caret/local-provider gates (§3.1/3.4), sandbox entitlements +
-`scripts/build-mas.zsh` (§2/§4, verified locally). Remaining: Translation
-framework provider (§3.3), permission-helper UI trim (§3.5), Tauri settings UI
-gating for the hidden local provider, and the account-side work in §1/§5
-(certificates, provisioning profile, App Store Connect) that only the account
-holder can do. Direct distribution (DMG + brew + Sparkle) stays the primary
-channel; MAS would be a second, reduced variant.
+Status: **all code prep is done on the `mas-prep` branch (2026-06); nothing
+submitted yet.** Done and verified: CGEventTap port (§3.2, both builds),
+`MAS_BUILD` flag with Sparkle/caret/local-provider gates (§3.1/3.4), sandbox
+entitlements + `scripts/build-mas.zsh` (§2/§4), the Apple Translation
+framework provider (§3.3 — sandboxed end-to-end translation confirmed from the
+`dist-mas` bundle), permission-helper trim and Tauri settings gating via
+`--app-variant mas` (§3.5). Remaining before submission: only the
+account-side work in §1/§5 (Apple Distribution + Mac Installer Distribution
+certificates, Mac App Store provisioning profile, App Store Connect record,
+metadata/review notes), which only the account holder can do, plus a TestFlight
+QA pass of the .pkg. Direct distribution (DMG + brew + Sparkle) stays the
+primary channel.
 
 ## TL;DR
 
