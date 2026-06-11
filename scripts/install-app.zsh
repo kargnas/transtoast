@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="${0:A:h}/.."
 APP_NAME="CCTrans"
+GITHUB_REPO="kargnas/cctrans"
 INSTALL_DIR="/Applications"
 OPEN_AFTER_INSTALL=0
 
@@ -49,4 +50,24 @@ echo '  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Sc
 
 if [[ "$OPEN_AFTER_INSTALL" == "1" ]]; then
   open "$DEST"
+fi
+
+# Best-effort GitHub star nudge for from-source installers. The install is
+# already done at this point, and `set -e` is active, so every gh call must
+# stay inside a condition to keep a gh/network hiccup from failing the script.
+if [[ -t 0 ]] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  # GET user/starred/<repo> exits 0 only when the repo is already starred
+  # (HTTP 204); 404 means not starred, so only then we prompt.
+  if ! gh api "user/starred/$GITHUB_REPO" >/dev/null 2>&1; then
+    if read -q "REPLY?Enjoying CCTrans? Star https://github.com/$GITHUB_REPO [y/N] "; then
+      echo ""
+      if gh api -X PUT "user/starred/$GITHUB_REPO" >/dev/null 2>&1; then
+        echo "Starred $GITHUB_REPO. Thanks!"
+      else
+        echo "Could not star $GITHUB_REPO (gh api PUT failed; check token scopes)." >&2
+      fi
+    else
+      echo ""
+    fi
+  fi
 fi
