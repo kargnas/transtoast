@@ -82,7 +82,12 @@
     <header class="surface-header">
       <div>
         <h1>Permission Helper</h1>
-        <p>Grant keyboard permissions for Cmd+C detection, Accessibility for caret popovers, and screen permissions for screenshot translation.</p>
+        {#if settingsState.appVariant === "mas"}
+          <!-- The sandboxed build cannot use Accessibility (caret popovers). -->
+          <p>Grant Input Monitoring for Cmd+C detection and screen permissions for screenshot translation.</p>
+        {:else}
+          <p>Grant keyboard permissions for Cmd+C detection, Accessibility for caret popovers, and screen permissions for screenshot translation.</p>
+        {/if}
       </div>
       <button onclick={load}><RefreshCw size={14} />Refresh</button>
     </header>
@@ -114,16 +119,18 @@
             </span>
             <span class="reset-row spacer"></span>
           </div>
-          <div class="setting-row">
-            <span class="setting-copy">
-              <strong>Keyboard Cursor</strong>
-              <span>Required for popovers near the text caret</span>
-            </span>
-            <span class:ready={settingsState.permissions.accessibility} class="status-pill">
-              {settingsState.permissions.accessibility ? "Ready" : "Not granted"}
-            </span>
-            <span class="reset-row spacer"></span>
-          </div>
+          {#if settingsState.appVariant !== "mas"}
+            <div class="setting-row">
+              <span class="setting-copy">
+                <strong>Keyboard Cursor</strong>
+                <span>Required for popovers near the text caret</span>
+              </span>
+              <span class:ready={settingsState.permissions.accessibility} class="status-pill">
+                {settingsState.permissions.accessibility ? "Ready" : "Not granted"}
+              </span>
+              <span class="reset-row spacer"></span>
+            </div>
+          {/if}
           <div class="setting-row">
             <span class="setting-copy"><strong>Screen Recording</strong></span>
             <span class:ready={settingsState.permissions.screen} class="status-pill">
@@ -135,7 +142,9 @@
 
         <section class="action-list">
           <button onclick={() => action("openInputMonitoring")}><Keyboard size={14} />Open Input Monitoring Settings</button>
-          <button onclick={() => action("openAccessibility")}><Accessibility size={14} />Open Accessibility Settings</button>
+          {#if settingsState.appVariant !== "mas"}
+            <button onclick={() => action("openAccessibility")}><Accessibility size={14} />Open Accessibility Settings</button>
+          {/if}
           <button onclick={() => action("openScreenRecording")}><Monitor size={14} />Open Screen Recording Settings</button>
           <button onclick={() => action("requestKeyboardPrompt")}><MousePointer2 size={14} />Request Keyboard Prompt</button>
           <button onclick={() => action("revealPermissionApp")}><FolderSearch size={14} />Reveal CCTrans.app</button>

@@ -213,6 +213,10 @@ enum TranslationProvider {
     LocalHyMT2,
     #[serde(rename = "openRouter")]
     OpenRouter,
+    // Apple's on-device Translation framework; the only local provider the
+    // sandboxed Mac App Store variant can offer.
+    #[serde(rename = "appleTranslation")]
+    AppleTranslation,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -280,6 +284,11 @@ struct StoredSettings {
 
 #[derive(Clone, Debug, Serialize)]
 struct SettingsState {
+    // "mas" for the sandboxed Mac App Store bundle (Swift shell passes
+    // --app-variant mas), "direct" otherwise. The UI hides the Python-backed
+    // local provider and the Accessibility permission section on "mas".
+    #[serde(rename = "appVariant")]
+    app_variant: String,
     settings: Settings,
     defaults: Settings,
     overrides: BTreeMap<String, bool>,
@@ -1620,6 +1629,8 @@ fn apply_preview_model_selection(
     match &settings.provider {
         TranslationProvider::LocalHyMT2 => settings.local_model_id = model_id.to_string(),
         TranslationProvider::OpenRouter => settings.open_router_text_model = model_id.to_string(),
+        // Single-model provider; there is no model id to store.
+        TranslationProvider::AppleTranslation => {}
     }
     Ok(normalize_settings(settings))
 }
@@ -1656,6 +1667,7 @@ fn provider_title(provider: &TranslationProvider) -> &'static str {
     match provider {
         TranslationProvider::LocalHyMT2 => "Local Model",
         TranslationProvider::OpenRouter => "OpenRouter LLM",
+        TranslationProvider::AppleTranslation => "Apple Translation",
     }
 }
 
@@ -1667,6 +1679,7 @@ fn selected_model_title(settings: &Settings) -> String {
         TranslationProvider::OpenRouter => {
             model_title(&settings.open_router_text_model, &settings.provider)
         }
+        TranslationProvider::AppleTranslation => "Apple Translation".to_string(),
     }
 }
 
@@ -1694,12 +1707,31 @@ fn state_from_disk(app: &AppHandle) -> Result<SettingsState, String> {
     let storage_path = settings_path(app)?.display().to_string();
 
     Ok(SettingsState {
+        app_variant: app_variant().to_string(),
         overrides: override_map(&settings, &defaults),
         settings,
         defaults,
         options: settings_options(),
         permissions: permission_status(),
         storage_path,
+    })
+}
+
+// Distribution variant of the host app. The Swift shell launches this helper
+// with `--app-variant mas` in Mac App Store bundles; everything else is the
+// direct (DMG/brew/dev) build.
+fn app_variant() -> &'static str {
+    static VARIANT: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+    VARIANT.get_or_init(|| {
+        let args: Vec<String> = std::env::args().collect();
+        let is_mas = args
+            .windows(2)
+            .any(|pair| pair[0] == "--app-variant" && pair[1] == "mas");
+        if is_mas {
+            "mas"
+        } else {
+            "direct"
+        }
     })
 }
 
@@ -2061,11 +2093,17 @@ fn override_map(settings: &Settings, defaults: &Settings) -> BTreeMap<String, bo
 }
 
 fn settings_options() -> SettingsOptions {
+    let mut providers = vec![
+        option("Local Model", "localHyMT2", None),
+        option("Apple Translation", "appleTranslation", Some("On-device")),
+        option("OpenRouter LLM", "openRouter", None),
+    ];
+    if app_variant() == "mas" {
+        // The sandbox cannot run the external Python local backend.
+        providers.retain(|provider| provider.value != "localHyMT2");
+    }
     SettingsOptions {
-        providers: vec![
-            option("Local Model", "localHyMT2", None),
-            option("OpenRouter LLM", "openRouter", None),
-        ],
+        providers,
         local_models: vec![
             option(
                 "Hy-MT2 1.8B 4-bit (MLX)",
@@ -2386,6 +2424,7 @@ fn provider_arg(provider: &TranslationProvider) -> &'static str {
     match provider {
         TranslationProvider::LocalHyMT2 => "local",
         TranslationProvider::OpenRouter => "openrouter",
+        TranslationProvider::AppleTranslation => "apple",
     }
 }
 

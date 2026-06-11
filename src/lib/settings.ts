@@ -1,4 +1,4 @@
-export type TranslationProvider = "localHyMT2" | "openRouter";
+export type TranslationProvider = "localHyMT2" | "openRouter" | "appleTranslation";
 export type ToastPosition = "bottomRight" | "bottomLeft" | "topRight" | "topLeft" | "custom";
 
 export type SettingField =
@@ -68,6 +68,9 @@ export type SettingsOptions = {
 };
 
 export type SettingsState = {
+  // "mas" for the sandboxed Mac App Store bundle, "direct" otherwise. The UI
+  // hides the Python-backed local provider and Accessibility items on "mas".
+  appVariant: "mas" | "direct";
   settings: Settings;
   defaults: Settings;
   overrides: Record<SettingField, boolean>;
@@ -83,6 +86,7 @@ export type ActionResult = {
 };
 
 export const fallbackState: SettingsState = {
+  appVariant: "direct",
   settings: {
     provider: "localHyMT2",
     localModelID: "hymt2-mlx-1.8b-4bit",
@@ -133,6 +137,7 @@ export const fallbackState: SettingsState = {
   options: {
     providers: [
       { label: "Local Model", value: "localHyMT2" },
+      { label: "Apple Translation", value: "appleTranslation", note: "On-device" },
       { label: "OpenRouter LLM", value: "openRouter" }
     ],
     localModels: [

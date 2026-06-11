@@ -140,14 +140,15 @@
   async function selectTranslationModel(value: string) {
     if (!settingsState) return;
     const [provider, model] = value.split(/:(.*)/s).filter(Boolean);
-    if (provider !== "localHyMT2" && provider !== "openRouter") return;
+    if (provider !== "localHyMT2" && provider !== "openRouter" && provider !== "appleTranslation") return;
 
     const next: Settings = { ...settingsState.settings, provider };
     if (provider === "localHyMT2") {
       next.localModelID = model === "default" ? settingsState.defaults.localModelID : model;
-    } else {
+    } else if (provider === "openRouter") {
       next.openRouterTextModel = model === "default" ? settingsState.defaults.openRouterTextModel : model;
     }
+    // appleTranslation is a single-model provider; only the provider changes.
     await saveSettings(next);
   }
 
@@ -418,6 +419,9 @@
     if (settings.provider === "localHyMT2") {
       return settings.localModelID === defaults.localModelID ? "localHyMT2:default" : `localHyMT2:${settings.localModelID}`;
     }
+    if (settings.provider === "appleTranslation") {
+      return "appleTranslation:apple";
+    }
     return settings.openRouterTextModel === defaults.openRouterTextModel
       ? "openRouter:default"
       : `openRouter:${settings.openRouterTextModel}`;
@@ -432,17 +436,21 @@
   }
 
   function translationModelProviderLabel(provider: TranslationProvider) {
-    return provider === "localHyMT2" ? "Local Model" : "OpenRouter LLM";
+    if (provider === "localHyMT2") return "Local Model";
+    if (provider === "appleTranslation") return "Apple Translation";
+    return "OpenRouter LLM";
   }
 
   function translationModelProviderDetail(settings: Settings) {
-    return settings.provider === "localHyMT2" ? "Local runtime active" : "OpenRouter API active";
+    if (settings.provider === "localHyMT2") return "Local runtime active";
+    if (settings.provider === "appleTranslation") return "On-device Apple model active";
+    return "OpenRouter API active";
   }
 
   function translationModelName(settings: Settings) {
-    return settings.provider === "localHyMT2"
-      ? localModelLabel(settings.localModelID)
-      : openRouterModelLabel(settings.openRouterTextModel);
+    if (settings.provider === "localHyMT2") return localModelLabel(settings.localModelID);
+    if (settings.provider === "appleTranslation") return "System (on-device)";
+    return openRouterModelLabel(settings.openRouterTextModel);
   }
 
   function formatPrice(model: OpenRouterModelOption) {
@@ -535,7 +543,7 @@
       onclick={() => toggleTranslationModelMenu(scope)}
     >
       <span class:open-router={state.settings.provider === "openRouter"} class="trigger-provider">
-        {#if state.settings.provider === "localHyMT2"}<Cpu size={13} />{:else}<Cloud size={13} />{/if}
+        {#if state.settings.provider === "localHyMT2"}<Cpu size={13} />{:else if state.settings.provider === "appleTranslation"}<Languages size={13} />{:else}<Cloud size={13} />{/if}
         {translationModelProviderLabel(state.settings.provider)}
       </span>
       <span class="trigger-model">{translationModelName(state.settings)}</span>
@@ -545,14 +553,27 @@
     {#if openTranslationModelMenu === scope}
       <div class="nested-model-menu" role="menu" aria-label="Translation Model">
         <div class="nested-model-providers" role="group" aria-label="Model providers">
+          {#if state.appVariant !== "mas"}
+            <!-- The Python local backend cannot run inside the MAS sandbox. -->
+            <button
+              type="button"
+              class:active={activeTranslationModelProvider === "localHyMT2"}
+              onmouseenter={() => (activeTranslationModelProvider = "localHyMT2")}
+              onclick={() => (activeTranslationModelProvider = "localHyMT2")}
+            >
+              <Cpu size={14} />
+              <span>Local Model</span>
+              <ChevronRight size={13} />
+            </button>
+          {/if}
           <button
             type="button"
-            class:active={activeTranslationModelProvider === "localHyMT2"}
-            onmouseenter={() => (activeTranslationModelProvider = "localHyMT2")}
-            onclick={() => (activeTranslationModelProvider = "localHyMT2")}
+            class:active={activeTranslationModelProvider === "appleTranslation"}
+            onmouseenter={() => (activeTranslationModelProvider = "appleTranslation")}
+            onclick={() => (activeTranslationModelProvider = "appleTranslation")}
           >
-            <Cpu size={14} />
-            <span>Local Model</span>
+            <Languages size={14} />
+            <span>Apple Translation</span>
             <ChevronRight size={13} />
           </button>
           <button
@@ -568,7 +589,19 @@
         </div>
 
         <div class="nested-model-options" role="group" aria-label="Models">
-          {#if activeTranslationModelProvider === "localHyMT2"}
+          {#if activeTranslationModelProvider === "appleTranslation"}
+            <button
+              type="button"
+              class:selected={translationModelValue(state.settings, state.defaults) === "appleTranslation:apple"}
+              onclick={() => chooseTranslationModel("appleTranslation:apple")}
+            >
+              <span>
+                <strong>System Translation</strong>
+                <small>Free · offline · languages download on first use</small>
+              </span>
+              {#if translationModelValue(state.settings, state.defaults) === "appleTranslation:apple"}<Check size={14} />{/if}
+            </button>
+          {:else if activeTranslationModelProvider === "localHyMT2"}
             <button
               type="button"
               class:selected={translationModelValue(state.settings, state.defaults) === "localHyMT2:default"}
