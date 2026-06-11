@@ -65,6 +65,7 @@ After completed development or documentation work is verified and committed, run
   - show reset control only when an override exists;
   - remove the stored override when value returns to default;
   - remove the full settings store when all values equal defaults.
+- GitHub star ask (`GitHubStarPrompter` + `GitHubStarPromptPolicy`) runs once per machine, only on standalone installs (brew cask / DMG / install-app.zsh copies), only after initial setup, and only when an authenticated `gh` CLI reports the repo unstarred. Mac App Store and workspace/dev builds never prompt; `scripts/install-app.zsh` pre-marks the `githubStarPromptHandled` default after its own terminal ask. Headless check: `--github-star-smoke`.
 
 ## Settings Contract
 

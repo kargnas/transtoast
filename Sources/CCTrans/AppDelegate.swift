@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     // Sparkle needs a strong reference for the whole app lifetime; menu-bar apps
     // must keep this in AppDelegate, not in a transient controller.
     private var updaterController: SPUStandardUpdaterController?
+    private let githubStarPrompter = GitHubStarPrompter()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         start()
@@ -83,6 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         startPersistentToastProcess()
         print("CCTrans ready. Press Cmd+C twice to translate clipboard text.")
         reportKeyboardPermissionStatus(requestIfMissing: false)
+        githubStarPrompter.scheduleIfEligible(
+            hasWorkspaceRoot: resolveWorkspaceRootURL() != nil,
+            hasCompletedInitialSetup: settingsStore.settings.hasCompletedLocalModelSelection
+        )
         let runsPopoverSmoke = CommandLine.arguments.contains("--show-popover-smoke")
         if CommandLine.arguments.contains("--show-settings") {
             showSettingsWindow()

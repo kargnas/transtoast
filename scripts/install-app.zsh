@@ -70,4 +70,8 @@ if [[ -t 0 ]] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1
       echo ""
     fi
   fi
+  # The installed app has its own one-time star prompt (GitHubStarPrompter).
+  # Mark it handled in the app's defaults domain so clone users who were just
+  # asked here (or are already starred) never get asked a second time in-app.
+  defaults write as.kargn.cctrans githubStarPromptHandled -bool true || true
 fi

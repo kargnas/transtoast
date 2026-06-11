@@ -142,6 +142,15 @@ if CommandLine.arguments.contains("--translate-text-once") {
     exit(0)
 }
 
+if CommandLine.arguments.contains("--github-star-smoke") {
+    // Headless check of the star-prompt pipeline (channel decision + gh CLI
+    // availability/auth/starred state) without showing any UI.
+    print(GitHubStarPrompter.smokeReport(
+        hasWorkspaceRoot: CommandLine.arguments.contains("--workspace-root")
+    ))
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--screenshot-once") {
     let settings = oneShotSettings(defaultProvider: .openRouter)
     let credentials = CredentialsProvider().credentials()
