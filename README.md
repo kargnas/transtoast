@@ -109,5 +109,6 @@ Every code push to `main` releases itself: a 10-minute cooldown collects follow-
 
 - [docs/local-runtimes.md](docs/local-runtimes.md) — local backend protocol, custom model JSON, benchmark results
 - [docs/other-mac-setup.md](docs/other-mac-setup.md) — installing on a second Mac
+- [docs/mac-app-store.md](docs/mac-app-store.md) — Mac App Store release plan (not submitted yet)
 - [AGENTS.md](AGENTS.md) — contract for coding agents working on this repo
 - **Request Logs...** in the menu bar — last 200 requests with token usage, model, attached image size, and duplicate suspects
