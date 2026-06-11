@@ -1,7 +1,12 @@
 import AppKit
 import CCTransCore
 import CoreGraphics
+#if !MAS_BUILD
+// The Mac App Store build must not contain Sparkle: the store owns updates and
+// App Review rejects bundled self-updaters. Package.swift drops the dependency
+// when CCTRANS_MAS_BUILD=1.
 import Sparkle
+#endif
 import UserNotifications
 
 struct TranslationPreviewPayload: Encodable {
@@ -23,7 +28,7 @@ struct TranslationPreviewPayload: Encodable {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
     private let translationService = TranslationService()
@@ -46,9 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private var isUserQuitting = false
     private var hasStarted = false
     private var lifetimeActivity: NSObjectProtocol?
+    #if !MAS_BUILD
     // Sparkle needs a strong reference for the whole app lifetime; menu-bar apps
     // must keep this in AppDelegate, not in a transient controller.
     private var updaterController: SPUStandardUpdaterController?
+    #endif
     private let githubStarPrompter = GitHubStarPrompter()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -60,6 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return
         }
         hasStarted = true
+
+        #if MAS_BUILD
+        // The sandbox cannot run the external Python/uv local-model backend
+        // (child processes inherit the sandbox and lose the venv/HF caches),
+        // so the MAS build pins translation to OpenRouter.
+        if settingsStore.settings.provider == .localHyMT2 {
+            settingsStore.settings.provider = .openRouter
+        }
+        #endif
 
         lifetimeActivity = ProcessInfo.processInfo.beginActivity(
             options: [.automaticTerminationDisabled, .suddenTerminationDisabled],
@@ -103,8 +119,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         }
         if runsPopoverSmoke {
             showTranslationPopoverSmoke()
-        } else if !settingsStore.settings.hasCompletedLocalModelSelection {
-            showLocalModelSetup()
+        } else {
+            #if !MAS_BUILD
+            // First-run local-model onboarding only applies where the local
+            // backend exists; the MAS build starts on OpenRouter directly.
+            if !settingsStore.settings.hasCompletedLocalModelSelection {
+                showLocalModelSetup()
+            }
+            #endif
         }
     }
 
@@ -119,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     private func startUpdaterIfBundled() {
+        #if !MAS_BUILD
         // Dev runs execute the bare SwiftPM binary outside an .app bundle, where
         // Sparkle cannot resolve the host bundle and would surface error alerts.
         guard Bundle.main.bundlePath.hasSuffix(".app") else {
@@ -129,23 +152,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             updaterDelegate: self,
             userDriverDelegate: nil
         )
+        #endif
     }
 
+    #if !MAS_BUILD
     @objc private func checkForUpdates() {
         // LSUIElement apps are background apps, so Sparkle's update window can
         // open behind other windows unless the app is activated first.
         NSApp.activate(ignoringOtherApps: true)
         updaterController?.checkForUpdates(self)
     }
-
-    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
-        // Sparkle terminates the app to install an update ("Install and Relaunch").
-        // applicationShouldTerminate cancels termination unless the user chose Quit,
-        // which would silently abort the install; treat Sparkle's relaunch as a quit.
-        MainActor.assumeIsolated {
-            isUserQuitting = true
-        }
-    }
+    #endif
 
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -308,9 +325,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Cmd+, is the platform-standard settings shortcut; surfacing it in the menu
         // also teaches the binding even though status menus only fire it while open.
         menu.addItem(menuItem(title: "Settings...", action: #selector(showSettingsWindow), key: ",", target: self))
+        #if !MAS_BUILD
         if updaterController != nil {
             menu.addItem(actionItem(title: "Check for Updates...", action: #selector(checkForUpdates)))
         }
+        #endif
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionItem(title: "Quit", action: #selector(quit)))
 
@@ -737,6 +756,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         settings displaySettings: TranslatorSettings? = nil
     ) {
         let caretBounds: CGRect?
+        #if MAS_BUILD
+        // App Sandbox blocks the AXUIElement API that caret location relies on,
+        // so the toast always falls back to the user's toastPosition setting.
+        caretBounds = nil
+        if payload.mode == "loading" {
+            // A new loading frame is a new user request; bumping the sequence tells the persistent
+            // toast window to reposition and show, instead of only updating its text in place.
+            translationRequestSequence += 1
+        }
+        #else
         if payload.mode == "loading" {
             caretBounds = KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
             lastTranslationCaretBounds = caretBounds
@@ -747,6 +776,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             caretBounds = lastTranslationCaretBounds
                 ?? KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
         }
+        #endif
 
         var payload = payload
         payload.requestSequence = translationRequestSequence
@@ -1051,3 +1081,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         return item
     }
 }
+
+#if !MAS_BUILD
+extension AppDelegate: SPUUpdaterDelegate {
+    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        // Sparkle terminates the app to install an update ("Install and Relaunch").
+        // applicationShouldTerminate cancels termination unless the user chose Quit,
+        // which would silently abort the install; treat Sparkle's relaunch as a quit.
+        MainActor.assumeIsolated {
+            isUserQuitting = true
+        }
+    }
+}
+#endif

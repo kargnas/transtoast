@@ -1,4 +1,5 @@
 .build/
+.build-mas/
 .swiftpm/
 DerivedData/
 dist/
