@@ -17,6 +17,14 @@
 - [x] 샌드박스 차단 버그 수정 — helper argv 소실/컨테이너 분리 → App Group 채널
       (docs/mac-app-store.md §3.6). §7의 토스트·설정 UI 항목은 로컬 샌드박스
       빌드에서 사전 검증 완료, TestFlight에서 재확인만 하면 됨.
+- [x] §2 App ID·§3 프로파일 — 발급 완료, 프로파일은 base64 시크릿으로 등록
+- [x] §4 ASC 앱 레코드 — "CCTrans" (Apple ID 6779669255, SKU cctrans-mas).
+      가격 무료 + 전 지역 175개 + 프라이버시 라벨 "Data Not Collected" 게시 완료
+- [x] ASC API 키 "CCTrans CI" (TGTYRP4Z36) — 시크릿 `ASC_API_KEY_ID`/`ASC_API_ISSUER_ID`/`ASC_API_KEY_P8`
+- [x] 메타데이터/스크린샷 ASC 반영 — fastlane deliver (0.3.0, 7로케일).
+      리뷰 연락처 전화는 `CCTRANS_REVIEW_PHONE` 시크릿 (Deliverfile이 ENV로 읽음)
+- [x] §5–6 첫 빌드 업로드 — release-mas.yml 디스패치로 0.3.0 .pkg 업로드 성공
+      (run 27424016336). 남은 것: TestFlight 처리 확인 → §7 QA → §8 제출 버튼
 
 ## 1. 인증서 발급 (developer.apple.com 또는 Xcode)
 
