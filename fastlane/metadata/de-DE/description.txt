@@ -1,26 +1,26 @@
-Drücke in einer beliebigen App zweimal Cmd+C, und der kopierte Text erscheint sofort als Übersetzungs-Toast – ohne App-Wechsel, ohne Einfügefeld, ohne Konto.
+Drücke in einer beliebigen App zweimal Cmd+C, und die Übersetzung erscheint direkt dort, wo du gerade arbeitest. Du musst weder die App wechseln noch irgendwo etwas einfügen.
 
 CCTrans sitzt in der Menüleiste und bleibt unsichtbar, bis du es brauchst.
 
 SO FUNKTIONIERT ES
-• Text zweimal kopieren (Cmd+C, Cmd+C) – der Übersetzungs-Toast erscheint sofort
-• Shift+Cmd+2 drücken – CCTrans erfasst den Bildschirm und übersetzt den sichtbaren Text
-• Über das Menüleisten-Symbol wählst du Sprachen, Toast-Position und Anfrageprotokolle
+• Text zweimal kopieren (Cmd+C, Cmd+C), und der Übersetzungs-Toast erscheint sofort
+• Mit Shift+Cmd+2 erfasst CCTrans den Bildschirm und übersetzt den sichtbaren Text
+• Sprachen, Toast-Position und Anfrageprotokoll findest du im Menüleisten-Symbol
 
 STANDARDMÄSSIG PRIVAT
-Die Übersetzung läuft vollständig auf deinem Mac über Apples On-Device-Übersetzung. Dein Text verlässt nie dein Gerät, und der Entwickler sammelt nichts – keine Analysen, keine Konten, keine Server.
+Übersetzt wird standardmäßig mit Apples On-Device-Übersetzung, also komplett auf deinem Mac. Dein Text verlässt das Gerät nicht, und auf Entwicklerseite gibt es weder Analytics noch Konten – nicht einmal einen Server, der deine Daten empfangen könnte.
 
-DIE BESTEN KI-MODELLE (OPTIONAL)
-Du willst modernste LLM-Übersetzungen? Hinterlege deinen eigenen OpenRouter-API-Schlüssel, und CCTrans übersetzt mit Spitzenmodellen – auf Wunsch mit einem Bildschirmkontext, damit kurze, mehrdeutige Sätze so übersetzt werden, wie die Seite sie meint.
+DEINE EIGENE KI (OPTIONAL)
+Wenn du lieber mit einem LLM übersetzt, hinterlege deinen eigenen OpenRouter-API-Schlüssel. Auf Wunsch hängt CCTrans eine Bildschirmaufnahme als Kontext an – gerade bei kurzen, mehrdeutigen Sätzen macht das einen deutlichen Unterschied.
 
 FÜR ECHTE ARBEIT GEMACHT
-• Funktioniert in jeder App – Browser, Editoren, Chats, PDFs
-• Der Toast erscheint an deiner Wunschposition und verschwindet von selbst
-• Sprachpaare werden einmal geladen und funktionieren dann offline (Apple-Übersetzung)
-• Schlanke Menüleisten-App: kein Dock-Symbol, kein Ballast
+• Funktioniert in jeder App: Browser, Editoren, Chats, PDFs
+• Der Toast erscheint an der Position, die du festlegst, und verschwindet von selbst
+• Sprachpaare lädst du einmal herunter, danach klappt die Übersetzung auch offline (Apple-Übersetzung)
+• Eine schlichte Menüleisten-App ohne Dock-Symbol
 
-BERECHTIGUNGEN, ERKLÄRT
-• Eingabeüberwachung (optional): erkennt das doppelte Cmd+C systemweit. Auch ohne sie löst zweimaliges Kopieren desselben Texts die Übersetzung aus.
+BERECHTIGUNGEN
+• Eingabeüberwachung (optional): erkennt das doppelte Cmd+C in anderen Apps. Auch ohne diese Berechtigung funktioniert es – denselben Text zweimal kopieren genügt.
 • Bildschirmaufnahme (optional): nur für die Screenshot-Übersetzung und den Bildschirmkontext.
 
 CCTrans ist kostenlos und Open Source.
