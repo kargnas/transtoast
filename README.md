@@ -112,3 +112,9 @@ Every code push to `main` releases itself: a 10-minute cooldown collects follow-
 - [docs/mac-app-store.md](docs/mac-app-store.md) — Mac App Store release plan (not submitted yet)
 - [AGENTS.md](AGENTS.md) — contract for coding agents working on this repo
 - **Request Logs...** in the menu bar — last 200 requests with token usage, model, attached image size, and duplicate suspects
+
+## License
+
+Copyright (C) 2026 Sangrak Choi.
+
+[AGPL-3.0](LICENSE). Forks and modified builds must stay AGPL and publish their full source. The official App Store and direct-download releases are published by the copyright holder, who is not bound by these terms; the "CCTrans" name and the store listing are not covered by the license.
