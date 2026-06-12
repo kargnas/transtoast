@@ -89,6 +89,10 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <false/>
   <key>NSHumanReadableCopyright</key>
   <string>Copyright © 2026 Sangrak</string>
+  <!-- Standard HTTPS only (ATS/URLSession), so the app is exempt from export
+       compliance; declaring it here suppresses the per-build ASC question. -->
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
 </dict>
 </plist>
 PLIST
