@@ -1,0 +1,26 @@
+Press Cmd+C twice in any app and the copied text instantly pops up as a translation toast — no app switching, no paste box, no account.
+
+CCTrans lives in your menu bar and stays out of the way until you need it.
+
+HOW IT WORKS
+• Copy any text twice (Cmd+C, Cmd+C) — a translation toast appears right away
+• Press Shift+Cmd+2 — CCTrans captures the screen and translates the text it sees
+• Click the menu bar icon to pick languages, move the toast, and review request logs
+
+PRIVATE BY DEFAULT
+Translation runs entirely on your Mac through Apple's on-device translation. Your text never leaves your machine, and the developer collects nothing — no analytics, no accounts, no servers.
+
+BRING THE SMARTEST MODELS (OPTIONAL)
+Prefer state-of-the-art AI translations? Add your own OpenRouter API key and CCTrans translates with frontier LLMs, optionally attaching an on-screen context capture so short, ambiguous snippets are translated the way the page around them means it.
+
+MADE FOR REAL WORK
+• Works in every app — browsers, editors, chat, PDFs
+• The toast appears where you choose and disappears on its own
+• Language pairs download once and then work offline (Apple Translation)
+• Lightweight menu-bar app: no Dock icon, no clutter
+
+PERMISSIONS, EXPLAINED
+• Input Monitoring (optional): detects the Cmd+C double-press globally. Without it, copying the same text twice still triggers translation via the clipboard.
+• Screen Recording (optional): only for screenshot translation and screen context.
+
+CCTrans is free and open source.

@@ -1,0 +1,26 @@
+Appuyez deux fois sur Cmd+C dans n'importe quelle app : le texte copié apparaît aussitôt dans une bulle de traduction — sans changer d'app, sans zone de collage, sans compte.
+
+CCTrans vit dans votre barre des menus et se fait oublier jusqu'à ce que vous en ayez besoin.
+
+COMMENT ÇA MARCHE
+• Copiez un texte deux fois (Cmd+C, Cmd+C) — la bulle de traduction apparaît immédiatement
+• Appuyez sur Shift+Cmd+2 — CCTrans capture l'écran et traduit le texte visible
+• L'icône de la barre des menus permet de choisir les langues, la position de la bulle et l'historique des requêtes
+
+PRIVÉ PAR DÉFAUT
+La traduction s'exécute entièrement sur votre Mac grâce à la traduction intégrée d'Apple. Votre texte ne quitte jamais votre machine et le développeur ne collecte rien : pas d'analyses, pas de comptes, pas de serveurs.
+
+LES MEILLEURS MODÈLES D'IA (FACULTATIF)
+Envie de traductions par les LLM les plus avancés ? Ajoutez votre propre clé API OpenRouter et CCTrans traduira avec des modèles de pointe, en joignant au besoin une capture de contexte pour que les phrases courtes et ambiguës soient traduites selon leur vrai sens.
+
+CONÇU POUR LE TRAVAIL RÉEL
+• Fonctionne dans toutes les apps : navigateurs, éditeurs, messageries, PDF
+• La bulle apparaît où vous voulez et disparaît toute seule
+• Les paires de langues se téléchargent une fois puis fonctionnent hors ligne (traduction Apple)
+• App légère de barre des menus : pas d'icône dans le Dock, pas d'encombrement
+
+AUTORISATIONS, EXPLIQUÉES
+• Surveillance de la saisie (facultatif) : détecte le double Cmd+C partout. Sans elle, copier deux fois le même texte déclenche quand même la traduction.
+• Enregistrement de l'écran (facultatif) : uniquement pour la traduction de captures et le contexte à l'écran.
+
+CCTrans est gratuit et open source.

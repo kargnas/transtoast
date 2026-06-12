@@ -1,0 +1,13 @@
+IMPORTANT: CCTrans is a menu-bar-only app (LSUIElement). After launch it does NOT appear in the Dock — look for the "Cmd C" icon in the macOS menu bar (top right).
+
+How to test the core feature (no account and no API key needed):
+1. Launch CCTrans. The "Cmd C" icon appears in the menu bar.
+2. In any app (e.g. Safari or Notes), select some text and press Cmd+C twice within about a second — a translation toast appears near the configured screen corner.
+3. The default provider is Apple's on-device Translation framework: no API key, no network, works out of the box. If the language pair is not installed yet, macOS shows Apple's one-time language download dialog — accept it and copy the text twice again.
+4. Screenshot translation: press Shift+Cmd+2. macOS will ask for the Screen Recording permission the first time; after granting and relaunching, the visible text on screen is translated.
+
+Permissions used and why:
+- Input Monitoring (optional): detects the Cmd+C double-press in other apps via a listen-only CGEventTap. If the permission is declined, the app still works — copying the same text twice in a row triggers the translation through a clipboard-only fallback.
+- Screen Recording (optional): used solely for the Shift+Cmd+2 screenshot translation feature.
+
+Optional cloud mode: Settings lets the user add their own OpenRouter API key to translate with large language models instead of the on-device provider. This is strictly optional; every core flow above works without any key or account. The developer collects no data and runs no servers.

@@ -1,0 +1,18 @@
+# fastlane deliver configuration for the Mac App Store listing.
+# Auth comes from --api_key_path at invocation time (release-mas.yml);
+# nothing credential-shaped belongs in this file.
+app_identifier "as.kargn.cctrans"
+platform "osx"
+
+# The store listing is source-controlled: metadata/ + screenshots/ are the
+# single source of truth, pushed with --force (skips the HTML preview).
+metadata_path "./fastlane/metadata"
+screenshots_path "./fastlane/screenshots"
+
+# Binary uploads are altool's job in release-mas.yml; deliver only manages
+# the listing. Submission stays manual until the listing stabilizes.
+skip_binary_upload true
+submit_for_review false
+automatic_release false
+
+price_tier 0
