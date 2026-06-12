@@ -4,6 +4,20 @@
 아래는 전부 **Apple Developer 계정 보유자만 할 수 있는 작업**과 그 이후의 제출 절차다.
 위에서 아래 순서대로 진행하면 된다.
 
+2026-06-12 진행 현황:
+
+- [x] 인증서 2종 발급 + CI 시크릿 등록 (`CCTRANS_MAS_APP_CERTIFICATE_BASE64`,
+      `CCTRANS_MAS_INSTALLER_CERTIFICATE_BASE64`, `CCTRANS_MAS_P12_PASSWORD`)
+- [x] 개인정보 정책 페이지 — kargnas/test-af PR #66 (`https://kargn.as/cctrans/privacy`,
+      지원 URL `https://kargn.as/cctrans`). 머지+Vapor 배포 후 활성화.
+- [x] CI 업로드 파이프라인 `.github/workflows/release-mas.yml` (§5–6 자동화;
+      프로파일 시크릿 2개와 업로드 자격증명만 채우면 동작)
+- [x] 스토어 메타데이터 `fastlane/metadata/` 7개 로케일 + 리뷰 노트, 스크린샷
+      `fastlane/screenshots/en-US/` 5장 (2880×1800)
+- [x] 샌드박스 차단 버그 수정 — helper argv 소실/컨테이너 분리 → App Group 채널
+      (docs/mac-app-store.md §3.6). §7의 토스트·설정 UI 항목은 로컬 샌드박스
+      빌드에서 사전 검증 완료, TestFlight에서 재확인만 하면 됨.
+
 ## 1. 인증서 발급 (developer.apple.com 또는 Xcode)
 
 기존 Developer ID 인증서는 MAS에 재사용 불가. 두 개 새로 필요하다.
@@ -56,8 +70,13 @@ CCTRANS_MAS_INSTALLER_IDENTITY="3rd Party Mac Developer Installer: Sangrak Choi 
 
 ## 6. 업로드
 
-- [ ] Transporter.app (Mac App Store에서 설치) 으로 .pkg 업로드
-  - CI 자동화가 필요해지면: `xcrun altool --upload-package` + App Store Connect API 키
+- [ ] CI로 업로드: Actions → **Mac App Store Release** 워크플로우 디스패치
+  (버전 입력 → 빌드·서명·검증·altool 업로드까지 자동).
+  - 필요 시크릿: `CCTRANS_MAS_PROFILE_BASE64`, `CCTRANS_MAS_HELPER_PROFILE_BASE64`
+    (§3에서 발급한 프로파일 base64) + `ASC_API_KEY_ID`/`ASC_API_ISSUER_ID`/`ASC_API_KEY_P8`
+    (없으면 `APPLE_ID`/`APPLE_APP_PASSWORD` 폴백)
+  - `upload_metadata=true`로 돌리면 fastlane/metadata + 스크린샷도 ASC에 반영 (API 키 필수)
+  - 수동 대안: Transporter.app으로 .pkg 업로드
 - [ ] ASC → TestFlight 탭에서 빌드 처리 완료 대기 (자동 ingest 검사에서 entitlements 문제가 여기서 걸러짐)
 
 ## 7. TestFlight QA (제출 전 실기기 확인)
