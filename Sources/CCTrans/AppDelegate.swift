@@ -919,6 +919,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The Svelte settings/permission surfaces hide sandbox-incompatible
         // options (Python local models, Accessibility) based on this flag.
         launchArguments.append(contentsOf: ["--app-variant", "mas"])
+        // Sandboxed callers cannot pass argv through NSWorkspace (macOS
+        // documents OpenConfiguration.arguments as ignored), so the helper
+        // claims a one-shot launch file from the App Group directory instead.
+        guard writeHelperLaunchFile(arguments: launchArguments) else {
+            print("Could not write helper launch file; not launching the Tauri helper.")
+            return false
+        }
         #endif
 
         let configuration = NSWorkspace.OpenConfiguration()
@@ -934,6 +941,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func terminateTauriHelper(matching match: String) {
+        #if MAS_BUILD
+        // The sandbox forbids signaling other processes (pkill is a no-op)
+        // and helper argv is empty anyway, so match against the claimed
+        // launch files instead. Deleting the file doubles as the shutdown
+        // signal: the persistent toast watcher exits when its lease vanishes,
+        // and terminate() politely closes window surfaces.
+        let launchesDir = SharedAppStorage.directoryURL
+            .appendingPathComponent("helper-launches", isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: launchesDir, includingPropertiesForKeys: nil
+        )) ?? []
+        for file in files where file.lastPathComponent.hasPrefix("claimed-") {
+            guard let data = try? Data(contentsOf: file),
+                  let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let arguments = object["arguments"] as? [String],
+                  arguments.joined(separator: " ").contains(match) else {
+                continue
+            }
+            try? FileManager.default.removeItem(at: file)
+            if let pid = object["pid"] as? Int32,
+               let running = NSRunningApplication(processIdentifier: pid),
+               running.bundleIdentifier == "\(SharedAppStorage.appIdentifier).helper"
+                || running.bundleIdentifier == SharedAppStorage.appIdentifier {
+                running.terminate()
+            }
+        }
+        #else
         // Match the helper binary name, not this bundle's absolute path: a helper left over
         // from another checkout or an old install path (e.g. the pre-rebrand transtoast
         // workspace) watches the same shared state file, so a path-scoped pkill would let it
@@ -942,7 +976,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
         process.arguments = ["-f", "cctrans-tauri.*\(match)"]
         try? process.run()
+        #endif
     }
+
+    #if MAS_BUILD
+    // One file per launch under <shared>/helper-launches; the helper claims it
+    // by an atomic rename, so concurrent launches (persistent toast + a
+    // settings window) cannot adopt each other's arguments. File names embed
+    // epoch milliseconds so the helper claims the oldest request first.
+    private func writeHelperLaunchFile(arguments: [String]) -> Bool {
+        let launchesDir = SharedAppStorage.directoryURL
+            .appendingPathComponent("helper-launches", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: launchesDir, withIntermediateDirectories: true)
+        } catch {
+            print("Could not create \(launchesDir.path): \(error.localizedDescription)")
+            return false
+        }
+
+        // Purge stale pending requests (launches that never booted) so a
+        // macOS window-restore ghost cannot adopt one much later.
+        let now = Date().timeIntervalSince1970
+        let existing = (try? FileManager.default.contentsOfDirectory(
+            at: launchesDir, includingPropertiesForKeys: nil
+        )) ?? []
+        for file in existing where file.lastPathComponent.hasPrefix("pending-") {
+            guard let data = try? Data(contentsOf: file),
+                  let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let createdAt = object["createdAt"] as? Double else {
+                try? FileManager.default.removeItem(at: file)
+                continue
+            }
+            if now - createdAt > 60 {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+
+        let payload: [String: Any] = [
+            "arguments": arguments,
+            "createdAt": now,
+        ]
+        let fileURL = launchesDir.appendingPathComponent(
+            "pending-\(Int(now * 1000))-\(UUID().uuidString).json", isDirectory: false
+        )
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            try data.write(to: fileURL, options: .atomic)
+            return true
+        } catch {
+            print("Could not write \(fileURL.path): \(error.localizedDescription)")
+            return false
+        }
+    }
+    #endif
 
     private func resolveTauriHelperAppURL() -> URL? {
         let explicitAppPath = argumentValue(after: "--tauri-helper-app")

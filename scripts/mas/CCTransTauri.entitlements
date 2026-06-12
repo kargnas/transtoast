@@ -11,5 +11,12 @@
        surface talks to OpenRouter for the model list. -->
   <key>com.apple.security.network.client</key>
   <true/>
+  <!-- Must match the main app: launch arguments arrive as one-shot files in
+       this App Group (NSWorkspace argv is dropped for sandboxed callers),
+       and all shared state lives there. -->
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>6YQH3QFFK8.as.kargn.cctrans</string>
+  </array>
 </dict>
 </plist>

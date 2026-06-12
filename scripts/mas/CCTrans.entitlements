@@ -9,6 +9,14 @@
   <!-- Outbound HTTPS only (OpenRouter). No server, so no network.server. -->
   <key>com.apple.security.network.client</key>
   <true/>
+  <!-- Shared state (settings, toast payload, request logs, helper launch
+       files) between the menu-bar app and the separately sandboxed Tauri
+       helper. Team-id-prefixed groups need no portal registration and no
+       provisioning-profile entry on macOS. -->
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>6YQH3QFFK8.as.kargn.cctrans</string>
+  </array>
   <!-- build-mas.zsh appends com.apple.application-identifier and
        com.apple.developer.team-identifier here (required to match the
        embedded provisioning profile) when CCTRANS_TEAM_ID is set. They are
