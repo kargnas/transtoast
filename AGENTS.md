@@ -59,6 +59,13 @@ After completed development or documentation work is verified and committed, run
 - After publishing, the `update-tap` job in `build-release.yml` bumps `Casks/cctrans.rb` (version + sha256 only) in [kargnas/homebrew-tap](https://github.com/kargnas/homebrew-tap) over a write deploy key stored as the `TAP_SSH_KEY` secret. The cask structure itself is owned by the tap repo; edit it there.
 - Dev runs outside an `.app` bundle skip updater startup on purpose (`startUpdaterIfBundled`).
 
+## Mac App Store Release
+
+- This repo builds and uploads the MAS binary only: dispatch **Mac App Store Release** (`.github/workflows/release-mas.yml`) with a version input. Sandbox/entitlement details live in `docs/mac-app-store.md`.
+- The store listing (fastlane metadata, screenshots, review contact/notes, privacy label) lives in the **private** [kargnas/cctrans-store](https://github.com/kargnas/cctrans-store) repo — see its AGENTS.md. Never add store metadata, reviewer demo credentials, or unreleased-feature copy to this public repo; its git history is permanent.
+- Binary and listing meet on the App Store Connect version record, so the two workflows can run in either order. The only thing to keep in sync is the version string.
+- For work spanning both repos, open `~/projects/cctrans-ws/cctrans.code-workspace` (multi-root) or run the agent from `~/projects/cctrans-ws/`; that directory's AGENTS.md describes the cross-repo flow.
+
 ## Defaults And Behavior
 
 - Default UI language: English.
