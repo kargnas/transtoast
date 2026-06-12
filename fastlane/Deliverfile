@@ -15,6 +15,11 @@ skip_binary_upload true
 submit_for_review false
 automatic_release false
 
+# Precheck aborts with "cannot check In-app purchases with the App Store
+# Connect API Key" even though this app has no IAP at all, and it runs AFTER
+# the metadata upload — so it only turns a successful run into exit 1.
+run_precheck_before_submit false
+
 # Pricing is NOT managed here: deliver's price_tier path uses legacy ASC
 # endpoints that Apple removed (availableInNewTerritories). The free price
 # schedule was set once through the App Store Connect API directly.
