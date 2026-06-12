@@ -49,7 +49,7 @@ in CI). Additionally needed, all from the same account:
      Connect. Neither exists in the current keychain/CI; Developer ID certs
      cannot be reused for MAS.
 2. **App ID**: register `as.kargn.cctrans` explicitly (and
-   `as.kargn.cctrans.tauri-helper` for the nested helper) with the App Sandbox
+   `as.kargn.cctrans.helper` for the nested helper) with the App Sandbox
    capability.
 3. **Provisioning profile**: type "Mac App Store", tied to the App ID and the
    Apple Distribution cert. Must be embedded as

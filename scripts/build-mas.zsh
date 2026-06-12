@@ -15,13 +15,16 @@ set -euo pipefail
 #     com.apple.security.app-sandbox lands on every executable.
 #   Submission: set CCTRANS_MAS_SIGN_IDENTITY ("Apple Distribution: ..."),
 #     CCTRANS_TEAM_ID, CCTRANS_MAS_PROFILE (Mac App Store provisioning profile
-#     for as.kargn.cctrans), and optionally CCTRANS_MAS_INSTALLER_IDENTITY
-#     ("3rd Party Mac Developer Installer: ...") to also produce the
-#     uploadable .pkg for Transporter / altool --upload-package.
+#     for as.kargn.cctrans), CCTRANS_MAS_HELPER_PROFILE (Mac App Store
+#     provisioning profile for the nested helper), and optionally
+#     CCTRANS_MAS_INSTALLER_IDENTITY ("3rd Party Mac Developer Installer: ...")
+#     to also produce the uploadable .pkg for Transporter / altool
+#     --upload-package.
 
 ROOT="${0:A:h}/.."
 APP_NAME="CCTrans"
 BUNDLE_ID="as.kargn.cctrans"
+HELPER_BUNDLE_ID="${CCTRANS_MAS_HELPER_BUNDLE_ID:-$BUNDLE_ID.helper}"
 DIST_DIR="$ROOT/dist-mas"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
@@ -31,6 +34,7 @@ APP_VERSION="${CCTRANS_VERSION:-0.1.0}"
 SIGN_IDENTITY="${CCTRANS_MAS_SIGN_IDENTITY:-}"
 TEAM_ID="${CCTRANS_TEAM_ID:-}"
 PROFILE_PATH="${CCTRANS_MAS_PROFILE:-}"
+HELPER_PROFILE_PATH="${CCTRANS_MAS_HELPER_PROFILE:-}"
 INSTALLER_IDENTITY="${CCTRANS_MAS_INSTALLER_IDENTITY:-}"
 ENTITLEMENTS_SRC="$ROOT/scripts/mas/CCTrans.entitlements"
 HELPER_ENTITLEMENTS_SRC="$ROOT/scripts/mas/CCTransTauri.entitlements"
@@ -45,7 +49,7 @@ rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp ".build-mas/release/$APP_NAME" "$MACOS_DIR/$APP_NAME"
 ditto "$TAURI_HELPER_SOURCE" "$TAURI_HELPER_DEST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID.tauri-helper" "$TAURI_HELPER_DEST/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $HELPER_BUNDLE_ID" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName CCTransTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName CCTransTauri" "$TAURI_HELPER_DEST/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$TAURI_HELPER_DEST/Contents/Info.plist" >/dev/null 2>&1 || true
@@ -92,6 +96,9 @@ PLIST
 if [[ -n "$PROFILE_PATH" ]]; then
   cp "$PROFILE_PATH" "$CONTENTS_DIR/embedded.provisionprofile"
 fi
+if [[ -n "$HELPER_PROFILE_PATH" ]]; then
+  cp "$HELPER_PROFILE_PATH" "$TAURI_HELPER_DEST/Contents/embedded.provisionprofile"
+fi
 
 # Working copies of the entitlements; identifier keys are appended only when a
 # team id is available because they must match the provisioning profile.
@@ -104,7 +111,7 @@ cp "$HELPER_ENTITLEMENTS_SRC" "$HELPER_ENTITLEMENTS"
 if [[ -n "$TEAM_ID" ]]; then
   /usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $TEAM_ID.$BUNDLE_ID" "$APP_ENTITLEMENTS"
   /usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $TEAM_ID" "$APP_ENTITLEMENTS"
-  /usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $TEAM_ID.$BUNDLE_ID.tauri-helper" "$HELPER_ENTITLEMENTS"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $TEAM_ID.$HELPER_BUNDLE_ID" "$HELPER_ENTITLEMENTS"
   /usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $TEAM_ID" "$HELPER_ENTITLEMENTS"
 fi
 

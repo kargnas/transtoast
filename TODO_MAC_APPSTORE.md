@@ -16,16 +16,16 @@
 ## 2. App ID 등록 (developer.apple.com → Identifiers)
 
 - [ ] `as.kargn.cctrans` (explicit) — App Sandbox capability 체크
-- [ ] `as.kargn.cctrans.tauri-helper` (explicit) — App Sandbox capability 체크
+- [ ] `as.kargn.cctrans.helper` (explicit) — App Sandbox capability 체크
   - 번들에 내장된 Tauri helper는 NSWorkspace로 별도 실행되는 독립 앱이라 자체 App ID가 필요하다
 
 ## 3. 프로비저닝 프로파일 (developer.apple.com → Profiles)
 
 - [ ] 타입 **Mac App Store**, App ID `as.kargn.cctrans`, 인증서 = 위의 Apple Distribution → 다운로드
-- [ ] 같은 방식으로 `as.kargn.cctrans.tauri-helper`용도 생성 → 다운로드
-  - 메인 프로파일은 `build-mas.zsh`가 `Contents/embedded.provisionprofile`로 임베드한다.
-    helper 프로파일 임베드는 스크립트에 아직 없음 → 첫 ingest에서 거부되면
-    `TAURI_HELPER_DEST/Contents/embedded.provisionprofile` 복사 단계를 build-mas.zsh에 추가할 것
+- [ ] 같은 방식으로 `as.kargn.cctrans.helper`용도 생성 → 다운로드
+  - 메인 프로파일은 `CCTRANS_MAS_PROFILE`, helper 프로파일은
+    `CCTRANS_MAS_HELPER_PROFILE`로 넘기면 `build-mas.zsh`가 각각
+    `Contents/embedded.provisionprofile`로 임베드한다.
 
 ## 4. App Store Connect 앱 레코드
 
@@ -45,6 +45,7 @@ CCTRANS_VERSION=<버전> \
 CCTRANS_MAS_SIGN_IDENTITY="Apple Distribution: Sangrak Choi (<TEAM_ID>)" \
 CCTRANS_TEAM_ID=<TEAM_ID> \
 CCTRANS_MAS_PROFILE=<다운로드한 메인 프로파일 경로> \
+CCTRANS_MAS_HELPER_PROFILE=<다운로드한 helper 프로파일 경로> \
 CCTRANS_MAS_INSTALLER_IDENTITY="3rd Party Mac Developer Installer: Sangrak Choi (<TEAM_ID>)" \
 ./scripts/build-mas.zsh
 ```
