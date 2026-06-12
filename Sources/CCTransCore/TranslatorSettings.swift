@@ -3,11 +3,16 @@ import Foundation
 public enum TranslationProvider: String, CaseIterable, Codable, Sendable {
     case localHyMT2
     case openRouter
+    // Apple's on-device Translation framework. Free, offline, and the only
+    // local provider that survives App Sandbox, so it is the Mac App Store
+    // build's local option (the Python-backed localHyMT2 cannot run there).
+    case appleTranslation
 
     public var title: String {
         switch self {
         case .localHyMT2: "Local Model"
         case .openRouter: "OpenRouter LLM"
+        case .appleTranslation: "Apple Translation"
         }
     }
 }

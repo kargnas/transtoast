@@ -1,7 +1,10 @@
 # Mac App Store pipeline: build sandboxed variant (build-mas.zsh) -> sign with
 # Apple Distribution -> productbuild .pkg with the installer identity ->
-# upload to App Store Connect -> (optional) push metadata/screenshots with
-# fastlane deliver.
+# upload to App Store Connect.
+#
+# The store listing (metadata, screenshots, review info) lives in the private
+# kargnas/cctrans-store repo and deploys through its own deliver.yml; both
+# sides meet on the ASC version record, so their order does not matter.
 #
 # Manual-only on purpose: MAS releases go through App Review, so they follow a
 # slower cadence than the auto-released direct channel and the version must be
@@ -26,10 +29,6 @@ on:
       version:
         description: 'Marketing version to submit (e.g. 0.3.0, no leading v). Must be higher than any version previously uploaded to App Store Connect.'
         required: true
-      upload_metadata:
-        description: 'Also push fastlane/metadata + screenshots to App Store Connect (needs the ASC API key secrets).'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -168,46 +167,3 @@ jobs:
       - name: Cleanup keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/mas-signing.keychain-db" 2>/dev/null || true
-
-  # Pushes fastlane/metadata (descriptions, keywords, URLs, review notes) and
-  # fastlane/screenshots to the App Store Connect version. Separate job so a
-  # metadata typo never invalidates a finished binary upload.
-  metadata:
-    if: ${{ inputs.upload_metadata }}
-    needs: build-upload
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Push metadata with fastlane deliver
-        env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
-          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
-          # Required by the Deliverfile's app_review_information; kept out of
-          # the public repo on purpose.
-          CCTRANS_REVIEW_PHONE: ${{ secrets.CCTRANS_REVIEW_PHONE }}
-        run: |
-          if [[ -z "$ASC_API_KEY_ID" || -z "$ASC_API_ISSUER_ID" || -z "$ASC_API_KEY_P8" ]]; then
-            echo "Metadata upload needs the ASC API key secrets (app-specific passwords cannot edit metadata)." >&2
-            exit 1
-          fi
-          # fastlane api_key_path JSON wants the key inline, newlines escaped.
-          KEY_JSON="$RUNNER_TEMP/asc_api_key.json"
-          python3 - "$KEY_JSON" <<'PY'
-          import json, os, sys
-          json.dump({
-              "key_id": os.environ["ASC_API_KEY_ID"],
-              "issuer_id": os.environ["ASC_API_ISSUER_ID"],
-              "key": os.environ["ASC_API_KEY_P8"],
-              "in_house": False,
-          }, open(sys.argv[1], "w"))
-          PY
-          gem install fastlane --no-document
-          fastlane deliver --api_key_path "$KEY_JSON" \
-            --app_identifier as.kargn.cctrans \
-            --platform osx \
-            --app_version "${{ inputs.version }}" \
-            --skip_binary_upload true \
-            --force true
-          rm -f "$KEY_JSON"

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The Tauri helper is launched via NSWorkspace as a separate app, so it
+       cannot use com.apple.security.inherit; it must be a fully sandboxed
+       app of its own (see docs/mac-app-store.md). -->
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <!-- The toast/settings WebView loads only local assets, but the settings
+       surface talks to OpenRouter for the model list. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <!-- Must match the main app: launch arguments arrive as one-shot files in
+       this App Group (NSWorkspace argv is dropped for sandboxed callers),
+       and all shared state lives there. -->
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>6YQH3QFFK8.as.kargn.cctrans</string>
+  </array>
+</dict>
+</plist>

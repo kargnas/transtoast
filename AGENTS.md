@@ -29,12 +29,18 @@ CCTrans is a macOS menu-bar translator. Keep the app native-feeling, fast, and o
 swift test
 swift build
 ./scripts/run-dev.zsh --show-settings
+./scripts/build-mas.zsh
 npm install
 npm run check
 npm run build
 npm run tauri dev
 cd src-tauri && cargo test
 ```
+
+`build-mas.zsh` produces the sandboxed Mac App Store variant in `dist-mas/`
+(plan and signing env vars: `docs/mac-app-store.md`). It builds with
+`CCTRANS_MAS_BUILD=1` in the separate `.build-mas` scratch path so the
+Sparkle-free manifest never pollutes the normal `.build` cache.
 
 VS Code's `🚀 Run Dev App Bundle` launch configuration runs:
 
@@ -58,6 +64,10 @@ After completed development or documentation work is verified and committed, run
 - Default UI language: English.
 - Default translation target: Korean.
 - Default translation model: app-recommended local Hugging Face Hy-MT2.
+- The `appleTranslation` provider uses Apple's on-device Translation framework
+  through `AppleTranslationHost` (SwiftUI session host in the keep-alive
+  window). It is the only local provider in the MAS variant; the direct build
+  offers it alongside Hy-MT2.
 - OpenRouter handles non-local LLM translation and screenshot translation.
 - Preserve `Cmd+C` double press and `Shift+Cmd+2` shortcuts.
 - Every persisted setting is code-default plus user override:

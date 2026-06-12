@@ -1,7 +1,12 @@
 import AppKit
 import CCTransCore
 import CoreGraphics
+#if !MAS_BUILD
+// The Mac App Store build must not contain Sparkle: the store owns updates and
+// App Review rejects bundled self-updaters. Package.swift drops the dependency
+// when CCTRANS_MAS_BUILD=1.
 import Sparkle
+#endif
 import UserNotifications
 
 struct TranslationPreviewPayload: Encodable {
@@ -23,10 +28,10 @@ struct TranslationPreviewPayload: Encodable {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let credentialsProvider = CredentialsProvider()
-    private let translationService = TranslationService()
+    private let translationService = TranslationService(appleBackend: AppleTranslationHost.shared)
     private let requestLogStore = RequestLogStore()
     private let localModelWarmupNotifier = LocalModelWarmupNotifier()
     private var statusItem: NSStatusItem?
@@ -46,9 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private var isUserQuitting = false
     private var hasStarted = false
     private var lifetimeActivity: NSObjectProtocol?
+    #if !MAS_BUILD
     // Sparkle needs a strong reference for the whole app lifetime; menu-bar apps
     // must keep this in AppDelegate, not in a transient controller.
     private var updaterController: SPUStandardUpdaterController?
+    #endif
     private let githubStarPrompter = GitHubStarPrompter()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -60,6 +67,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return
         }
         hasStarted = true
+
+        #if MAS_BUILD
+        // The sandbox cannot run the external Python/uv local-model backend
+        // (child processes inherit the sandbox and lose the venv/HF caches),
+        // so the MAS build maps it to Apple Translation: also local/offline,
+        // and it works with zero setup.
+        if settingsStore.settings.provider == .localHyMT2 {
+            settingsStore.settings.provider = .appleTranslation
+        }
+        #endif
 
         lifetimeActivity = ProcessInfo.processInfo.beginActivity(
             options: [.automaticTerminationDisabled, .suddenTerminationDisabled],
@@ -103,8 +120,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         }
         if runsPopoverSmoke {
             showTranslationPopoverSmoke()
-        } else if !settingsStore.settings.hasCompletedLocalModelSelection {
-            showLocalModelSetup()
+        } else {
+            #if !MAS_BUILD
+            // First-run local-model onboarding only applies where the local
+            // backend exists; the MAS build starts on OpenRouter directly.
+            if !settingsStore.settings.hasCompletedLocalModelSelection {
+                showLocalModelSetup()
+            }
+            #endif
         }
     }
 
@@ -115,12 +138,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         // The persistent toast process has no Dock icon and survives window hide, so it would
         // linger as a zombie unless the menu-bar app kills it explicitly on quit.
-        if let appURL = resolveTauriHelperAppURL() {
-            terminateTauriHelper(appURL: appURL, matching: "--translation-preview")
-        }
+        terminateTauriHelper(matching: "--translation-preview")
     }
 
     private func startUpdaterIfBundled() {
+        #if !MAS_BUILD
         // Dev runs execute the bare SwiftPM binary outside an .app bundle, where
         // Sparkle cannot resolve the host bundle and would surface error alerts.
         guard Bundle.main.bundlePath.hasSuffix(".app") else {
@@ -131,23 +153,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             updaterDelegate: self,
             userDriverDelegate: nil
         )
+        #endif
     }
 
+    #if !MAS_BUILD
     @objc private func checkForUpdates() {
         // LSUIElement apps are background apps, so Sparkle's update window can
         // open behind other windows unless the app is activated first.
         NSApp.activate(ignoringOtherApps: true)
         updaterController?.checkForUpdates(self)
     }
-
-    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
-        // Sparkle terminates the app to install an update ("Install and Relaunch").
-        // applicationShouldTerminate cancels termination unless the user chose Quit,
-        // which would silently abort the install; treat Sparkle's relaunch as a quit.
-        MainActor.assumeIsolated {
-            isUserQuitting = true
-        }
-    }
+    #endif
 
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -242,6 +258,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         window.backgroundColor = .clear
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces]
+        // The Apple Translation host must live in an ordered-front window for
+        // SwiftUI to run its .translationTask; the keep-alive window is the
+        // app's only permanent window, so it doubles as that host.
+        window.contentView = AppleTranslationHost.shared.makeHostingView()
         // LSUIElement apps with only transient toast windows can be auto-terminated after the toast closes.
         window.orderFront(nil)
         keepAliveWindow = window
@@ -310,9 +330,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Cmd+, is the platform-standard settings shortcut; surfacing it in the menu
         // also teaches the binding even though status menus only fire it while open.
         menu.addItem(menuItem(title: "Settings...", action: #selector(showSettingsWindow), key: ",", target: self))
+        #if !MAS_BUILD
         if updaterController != nil {
             menu.addItem(actionItem(title: "Check for Updates...", action: #selector(checkForUpdates)))
         }
+        #endif
         menu.addItem(NSMenuItem.separator())
         menu.addItem(actionItem(title: "Quit", action: #selector(quit)))
 
@@ -515,7 +537,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             ))
         }
 
+        #if !MAS_BUILD
         menu.addItem(submenuItem(title: "Local Model", submenu: localMenu))
+        #endif
+        menu.addItem(checkableItem(
+            title: "Apple Translation · On-device",
+            checked: settings.provider == .appleTranslation,
+            action: #selector(setTranslationModel(_:)),
+            representedObject: "appleTranslation:"
+        ))
         menu.addItem(submenuItem(title: "OpenRouter LLM", submenu: openRouterMenu))
         return menu
     }
@@ -552,7 +582,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         guard let value = sender.representedObject as? String else {
             return
         }
-        let parts = value.split(separator: ":", maxSplits: 1).map(String.init)
+        // omittingEmptySubsequences keeps the trailing empty model id of
+        // model-less providers ("appleTranslation:") so the count guard holds.
+        let parts = value.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 2,
               let provider = TranslationProvider(rawValue: parts[0]) else {
             return
@@ -565,6 +597,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             settings.localModelID = parts[1]
         case .openRouter:
             settings.openRouterTextModel = parts[1]
+        case .appleTranslation:
+            break
         }
         settingsStore.settings = settings
         rebuildMenu()
@@ -739,6 +773,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         settings displaySettings: TranslatorSettings? = nil
     ) {
         let caretBounds: CGRect?
+        #if MAS_BUILD
+        // App Sandbox blocks the AXUIElement API that caret location relies on,
+        // so the toast always falls back to the user's toastPosition setting.
+        caretBounds = nil
+        if payload.mode == "loading" {
+            // A new loading frame is a new user request; bumping the sequence tells the persistent
+            // toast window to reposition and show, instead of only updating its text in place.
+            translationRequestSequence += 1
+        }
+        #else
         if payload.mode == "loading" {
             caretBounds = KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
             lastTranslationCaretBounds = caretBounds
@@ -749,6 +793,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             caretBounds = lastTranslationCaretBounds
                 ?? KeyboardCaretLocator.focusedTextBounds(for: payload.originalText)
         }
+        #endif
 
         var payload = payload
         payload.requestSequence = translationRequestSequence
@@ -832,6 +877,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             )?.title ?? settings.localModelID
         case .openRouter:
             OpenRouterModelCatalog.title(for: settings.openRouterTextModel)
+        case .appleTranslation:
+            "Apple Translation"
         }
     }
 
@@ -862,12 +909,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return false
         }
 
-        terminateTauriHelper(appURL: appURL, matching: match)
+        terminateTauriHelper(matching: match)
 
         var launchArguments = arguments
         if let workspaceRootURL = resolveWorkspaceRootURL() {
             launchArguments.append(contentsOf: ["--workspace-root", workspaceRootURL.path])
         }
+        #if MAS_BUILD
+        // The Svelte settings/permission surfaces hide sandbox-incompatible
+        // options (Python local models, Accessibility) based on this flag.
+        launchArguments.append(contentsOf: ["--app-variant", "mas"])
+        // Sandboxed callers cannot pass argv through NSWorkspace (macOS
+        // documents OpenConfiguration.arguments as ignored), so the helper
+        // claims a one-shot launch file from the App Group directory instead.
+        guard writeHelperLaunchFile(arguments: launchArguments) else {
+            print("Could not write helper launch file; not launching the Tauri helper.")
+            return false
+        }
+        #endif
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = activate
@@ -881,15 +940,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         return true
     }
 
-    private func terminateTauriHelper(appURL: URL, matching match: String) {
-        let executablePath = appURL
-            .appendingPathComponent("Contents/MacOS/cctrans-tauri")
-            .path
+    private func terminateTauriHelper(matching match: String) {
+        #if MAS_BUILD
+        // The sandbox forbids signaling other processes (pkill is a no-op)
+        // and helper argv is empty anyway, so match against the claimed
+        // launch files instead. Deleting the file doubles as the shutdown
+        // signal: the persistent toast watcher exits when its lease vanishes,
+        // and terminate() politely closes window surfaces.
+        let launchesDir = SharedAppStorage.directoryURL
+            .appendingPathComponent("helper-launches", isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: launchesDir, includingPropertiesForKeys: nil
+        )) ?? []
+        for file in files where file.lastPathComponent.hasPrefix("claimed-") {
+            guard let data = try? Data(contentsOf: file),
+                  let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let arguments = object["arguments"] as? [String],
+                  arguments.joined(separator: " ").contains(match) else {
+                continue
+            }
+            try? FileManager.default.removeItem(at: file)
+            if let pid = object["pid"] as? Int32,
+               let running = NSRunningApplication(processIdentifier: pid),
+               running.bundleIdentifier == "\(SharedAppStorage.appIdentifier).helper"
+                || running.bundleIdentifier == SharedAppStorage.appIdentifier {
+                running.terminate()
+            }
+        }
+        #else
+        // Match the helper binary name, not this bundle's absolute path: a helper left over
+        // from another checkout or an old install path (e.g. the pre-rebrand transtoast
+        // workspace) watches the same shared state file, so a path-scoped pkill would let it
+        // survive and render a second toast window for every translation.
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        process.arguments = ["-f", "\(executablePath).*\(match)"]
+        process.arguments = ["-f", "cctrans-tauri.*\(match)"]
         try? process.run()
+        #endif
     }
+
+    #if MAS_BUILD
+    // One file per launch under <shared>/helper-launches; the helper claims it
+    // by an atomic rename, so concurrent launches (persistent toast + a
+    // settings window) cannot adopt each other's arguments. File names embed
+    // epoch milliseconds so the helper claims the oldest request first.
+    private func writeHelperLaunchFile(arguments: [String]) -> Bool {
+        let launchesDir = SharedAppStorage.directoryURL
+            .appendingPathComponent("helper-launches", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: launchesDir, withIntermediateDirectories: true)
+        } catch {
+            print("Could not create \(launchesDir.path): \(error.localizedDescription)")
+            return false
+        }
+
+        // Purge stale pending requests (launches that never booted) so a
+        // macOS window-restore ghost cannot adopt one much later.
+        let now = Date().timeIntervalSince1970
+        let existing = (try? FileManager.default.contentsOfDirectory(
+            at: launchesDir, includingPropertiesForKeys: nil
+        )) ?? []
+        for file in existing where file.lastPathComponent.hasPrefix("pending-") {
+            guard let data = try? Data(contentsOf: file),
+                  let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let createdAt = object["createdAt"] as? Double else {
+                try? FileManager.default.removeItem(at: file)
+                continue
+            }
+            if now - createdAt > 60 {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+
+        let payload: [String: Any] = [
+            "arguments": arguments,
+            "createdAt": now,
+        ]
+        let fileURL = launchesDir.appendingPathComponent(
+            "pending-\(Int(now * 1000))-\(UUID().uuidString).json", isDirectory: false
+        )
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            try data.write(to: fileURL, options: .atomic)
+            return true
+        } catch {
+            print("Could not write \(fileURL.path): \(error.localizedDescription)")
+            return false
+        }
+    }
+    #endif
 
     private func resolveTauriHelperAppURL() -> URL? {
         let explicitAppPath = argumentValue(after: "--tauri-helper-app")
@@ -1052,3 +1191,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         return item
     }
 }
+
+#if !MAS_BUILD
+extension AppDelegate: SPUUpdaterDelegate {
+    nonisolated func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        // Sparkle terminates the app to install an update ("Install and Relaunch").
+        // applicationShouldTerminate cancels termination unless the user chose Quit,
+        // which would silently abort the install; treat Sparkle's relaunch as a quit.
+        MainActor.assumeIsolated {
+            isUserQuitting = true
+        }
+    }
+}
+#endif

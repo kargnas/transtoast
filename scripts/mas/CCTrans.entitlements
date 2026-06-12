@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Mandatory for every Mac App Store binary; automated ingest rejects
+       bundles where any nested executable lacks it (guideline 2.4.5). -->
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <!-- Outbound HTTPS only (OpenRouter). No server, so no network.server. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <!-- Shared state (settings, toast payload, request logs, helper launch
+       files) between the menu-bar app and the separately sandboxed Tauri
+       helper. Team-id-prefixed groups need no portal registration and no
+       provisioning-profile entry on macOS. -->
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>6YQH3QFFK8.as.kargn.cctrans</string>
+  </array>
+  <!-- build-mas.zsh appends com.apple.application-identifier and
+       com.apple.developer.team-identifier here (required to match the
+       embedded provisioning profile) when CCTRANS_TEAM_ID is set. They are
+       not committed because the team id is account-specific. -->
+</dict>
+</plist>

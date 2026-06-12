@@ -213,6 +213,10 @@ enum TranslationProvider {
     LocalHyMT2,
     #[serde(rename = "openRouter")]
     OpenRouter,
+    // Apple's on-device Translation framework; the only local provider the
+    // sandboxed Mac App Store variant can offer.
+    #[serde(rename = "appleTranslation")]
+    AppleTranslation,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -280,6 +284,11 @@ struct StoredSettings {
 
 #[derive(Clone, Debug, Serialize)]
 struct SettingsState {
+    // "mas" for the sandboxed Mac App Store bundle (Swift shell passes
+    // --app-variant mas), "direct" otherwise. The UI hides the Python-backed
+    // local provider and the Accessibility permission section on "mas".
+    #[serde(rename = "appVariant")]
+    app_variant: String,
     settings: Settings,
     defaults: Settings,
     overrides: BTreeMap<String, bool>,
@@ -904,6 +913,14 @@ fn start_translation_toast_watcher(app: AppHandle) {
             )> = None;
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(180));
+                // The claimed launch file is a lease: the sandboxed Swift
+                // shell cannot pkill this process, so it deletes the file to
+                // request shutdown (helper replacement, app quit).
+                if let Some(lease) = claimed_lease_path() {
+                    if !lease.exists() {
+                        std::process::exit(0);
+                    }
+                }
                 let state = match read_translation_preview_state(&app) {
                     Ok(Some(state)) => state,
                     // Skip transient parse failures from the writer's non-atomic mid-write window.
@@ -1054,6 +1071,15 @@ fn apply_toast_theme(window: &tauri::WebviewWindow) {
 }
 
 pub fn run() {
+    if sandbox_container_active() && effective_args().is_empty() {
+        // A bare sandboxed boot has no launch request: argv from the Swift
+        // shell never arrives under App Sandbox, and no pending launch file
+        // was claimed. This is a state-restore ghost (or a manual run);
+        // exiting beats defaulting to a settings window with the wrong
+        // variant, which is what a silent fallback used to produce.
+        eprintln!("cctrans-tauri: sandboxed boot without a launch request; exiting.");
+        std::process::exit(0);
+    }
     tauri::Builder::default()
         .setup(|app| {
             if let Some(request) = translation_preview_request() {
@@ -1200,22 +1226,169 @@ pub fn run() {
         .run(|_app, event| {
             // The persistent toast must survive dismissing its only window so the next translation
             // reuses the warm WebView; legacy throwaway processes are unaffected and exit normally.
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                if is_persistent_toast() {
-                    api.prevent_exit();
+            match event {
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    if is_persistent_toast() {
+                        api.prevent_exit();
+                    }
                 }
+                tauri::RunEvent::Exit => {
+                    // Free the claimed launch file so the Swift shell never
+                    // mistakes a dead helper for a live one.
+                    release_claimed_lease();
+                }
+                _ => {}
             }
         });
 }
 
+// ===== Mac App Store launch channel =====
+//
+// Under App Sandbox, NSWorkspace.OpenConfiguration.arguments from the Swift
+// shell are silently dropped (documented macOS behavior for sandboxed
+// callers), and the two bundle ids get separate sandbox containers, so argv
+// and the default app_data_dir both stop working as IPC. The Swift shell
+// instead writes a one-shot "pending-*.json" launch file into the shared App
+// Group directory; this process claims it atomically (rename) on startup and
+// treats its contents as argv. The claimed file doubles as a lease: the Swift
+// side deletes it to ask a persistent helper to exit.
+
+// Team-id-prefixed App Groups need no portal registration or provisioning
+// profile entry on macOS, unlike iOS "group.*" identifiers.
+const MAS_APP_GROUP_ID: &str = "6YQH3QFFK8.as.kargn.cctrans";
+
+fn sandbox_container_active() -> bool {
+    std::env::var_os("APP_SANDBOX_CONTAINER_ID").is_some()
+}
+
+fn mas_shared_data_dir() -> Option<PathBuf> {
+    if !sandbox_container_active() {
+        return None;
+    }
+    // Sandboxed HOME is ~/Library/Containers/<bundle-id>/Data; the real user
+    // home is four components up. The group container lives under the real
+    // home and the sandbox grants access purely by entitlement + path prefix.
+    let home = std::env::var_os("HOME").map(PathBuf::from)?;
+    let real_home = home.ancestors().nth(4)?.to_path_buf();
+    Some(
+        real_home
+            .join("Library/Group Containers")
+            .join(MAS_APP_GROUP_ID)
+            .join("Library/Application Support/as.kargn.cctrans"),
+    )
+}
+
+// Single source for every file shared with the Swift shell (settings
+// overrides, toast state, request logs). Mirrors SharedAppStorage.swift.
+fn shared_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(dir) = mas_shared_data_dir() {
+        return Ok(dir);
+    }
+    app.path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HelperLaunch {
+    arguments: Vec<String>,
+    created_at: f64,
+    #[serde(default)]
+    pid: Option<u32>,
+}
+
+fn helper_launches_dir() -> Option<PathBuf> {
+    mas_shared_data_dir().map(|dir| dir.join("helper-launches"))
+}
+
+static CLAIMED_LEASE: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+
+fn claimed_lease_path() -> Option<&'static PathBuf> {
+    CLAIMED_LEASE.get().and_then(|lease| lease.as_ref())
+}
+
+fn release_claimed_lease() {
+    if let Some(path) = claimed_lease_path() {
+        let _ = fs::remove_file(path);
+    }
+}
+
+fn claim_launch_file() -> Option<Vec<String>> {
+    let dir = helper_launches_dir()?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs_f64();
+    let mut pending: Vec<PathBuf> = fs::read_dir(&dir)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with("pending-") && name.ends_with(".json"))
+                .unwrap_or(false)
+        })
+        .collect();
+    // File names embed the epoch-millisecond write time, so a lexical sort is
+    // chronological and the oldest pending launch is claimed first.
+    pending.sort();
+
+    for path in pending {
+        let Ok(data) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(mut launch) = serde_json::from_str::<HelperLaunch>(&data) else {
+            let _ = fs::remove_file(&path);
+            continue;
+        };
+        // A pending file the launched process never claimed (crash, kill)
+        // must not arm a future unrelated boot, e.g. macOS window restore.
+        if now - launch.created_at > 30.0 {
+            let _ = fs::remove_file(&path);
+            continue;
+        }
+        let pid = std::process::id();
+        let claimed = dir.join(format!("claimed-{pid}.json"));
+        if fs::rename(&path, &claimed).is_err() {
+            // Another helper instance won the rename race; try the next file.
+            continue;
+        }
+        launch.pid = Some(pid);
+        if let Ok(serialized) = serde_json::to_string_pretty(&launch) {
+            let _ = fs::write(&claimed, serialized);
+        }
+        let _ = CLAIMED_LEASE.set(Some(claimed));
+        return Some(launch.arguments);
+    }
+    None
+}
+
+// argv when present (dev/direct builds), otherwise the claimed launch file
+// (sandboxed MAS builds). Every flag reader below must go through this.
+fn effective_args() -> &'static [String] {
+    static ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    ARGS.get_or_init(|| {
+        let argv: Vec<String> = std::env::args().skip(1).collect();
+        if !argv.is_empty() {
+            let _ = CLAIMED_LEASE.set(None);
+            return argv;
+        }
+        let claimed = claim_launch_file();
+        let _ = CLAIMED_LEASE.set(None); // no-op if claim_launch_file set it
+        claimed.unwrap_or_default()
+    })
+}
+
 fn startup_surface() -> Option<AppSurface> {
-    let mut args = std::env::args().skip(1);
+    let mut args = effective_args().iter();
     while let Some(arg) = args.next() {
         if let Some(value) = arg.strip_prefix("--surface=") {
             return AppSurface::from_key(value);
         }
-        if arg == "--surface" {
-            return args.next().and_then(|value| AppSurface::from_key(&value));
+        if arg.as_str() == "--surface" {
+            return args.next().and_then(|value| AppSurface::from_key(value));
         }
     }
     None
@@ -1227,10 +1400,10 @@ fn translation_preview_request() -> Option<TranslationPreviewRequest> {
     let mut debug = false;
     let mut caret_override = None;
 
-    for arg in std::env::args().skip(1) {
-        if arg == "--translation-preview" {
+    for arg in effective_args() {
+        if arg.as_str() == "--translation-preview" {
             enabled = true;
-        } else if arg == "--translation-preview-debug" {
+        } else if arg.as_str() == "--translation-preview-debug" {
             enabled = true;
             debug = true;
         } else if let Some(value) = arg.strip_prefix("--translation-preview-state=") {
@@ -1250,7 +1423,7 @@ fn translation_preview_request() -> Option<TranslationPreviewRequest> {
 }
 
 fn is_persistent_toast() -> bool {
-    std::env::args().skip(1).any(|arg| arg == "--persistent")
+    effective_args().iter().any(|arg| arg.as_str() == "--persistent")
 }
 
 fn persistent_translation_url(debug: bool) -> String {
@@ -1561,10 +1734,7 @@ fn write_translation_preview_state(
 }
 
 fn translation_preview_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("translation-preview.json"))
-        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+    shared_data_dir(app).map(|dir| dir.join("translation-preview.json"))
 }
 
 fn sample_translation_preview(settings: &Settings) -> TranslationPreviewState {
@@ -1620,6 +1790,8 @@ fn apply_preview_model_selection(
     match &settings.provider {
         TranslationProvider::LocalHyMT2 => settings.local_model_id = model_id.to_string(),
         TranslationProvider::OpenRouter => settings.open_router_text_model = model_id.to_string(),
+        // Single-model provider; there is no model id to store.
+        TranslationProvider::AppleTranslation => {}
     }
     Ok(normalize_settings(settings))
 }
@@ -1656,6 +1828,7 @@ fn provider_title(provider: &TranslationProvider) -> &'static str {
     match provider {
         TranslationProvider::LocalHyMT2 => "Local Model",
         TranslationProvider::OpenRouter => "OpenRouter LLM",
+        TranslationProvider::AppleTranslation => "Apple Translation",
     }
 }
 
@@ -1667,6 +1840,7 @@ fn selected_model_title(settings: &Settings) -> String {
         TranslationProvider::OpenRouter => {
             model_title(&settings.open_router_text_model, &settings.provider)
         }
+        TranslationProvider::AppleTranslation => "Apple Translation".to_string(),
     }
 }
 
@@ -1694,12 +1868,31 @@ fn state_from_disk(app: &AppHandle) -> Result<SettingsState, String> {
     let storage_path = settings_path(app)?.display().to_string();
 
     Ok(SettingsState {
+        app_variant: app_variant().to_string(),
         overrides: override_map(&settings, &defaults),
         settings,
         defaults,
         options: settings_options(),
         permissions: permission_status(),
         storage_path,
+    })
+}
+
+// Distribution variant of the host app. The Swift shell launches this helper
+// with `--app-variant mas` in Mac App Store bundles; everything else is the
+// direct (DMG/brew/dev) build.
+fn app_variant() -> &'static str {
+    static VARIANT: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+    VARIANT.get_or_init(|| {
+        let args = effective_args();
+        let is_mas = args
+            .windows(2)
+            .any(|pair| pair[0] == "--app-variant" && pair[1] == "mas");
+        if is_mas {
+            "mas"
+        } else {
+            "direct"
+        }
     })
 }
 
@@ -1876,10 +2069,7 @@ impl StoredSettings {
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("settings-overrides.json"))
-        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+    shared_data_dir(app).map(|dir| dir.join("settings-overrides.json"))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1891,10 +2081,7 @@ struct WindowGeometry {
 }
 
 fn window_state_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("window-state.json"))
-        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+    shared_data_dir(app).map(|dir| dir.join("window-state.json"))
 }
 
 fn save_main_window_geometry(app: &AppHandle, window: &tauri::WebviewWindow) -> Result<(), String> {
@@ -2061,11 +2248,17 @@ fn override_map(settings: &Settings, defaults: &Settings) -> BTreeMap<String, bo
 }
 
 fn settings_options() -> SettingsOptions {
+    let mut providers = vec![
+        option("Local Model", "localHyMT2", None),
+        option("Apple Translation", "appleTranslation", Some("On-device")),
+        option("OpenRouter LLM", "openRouter", None),
+    ];
+    if app_variant() == "mas" {
+        // The sandbox cannot run the external Python local backend.
+        providers.retain(|provider| provider.value != "localHyMT2");
+    }
     SettingsOptions {
-        providers: vec![
-            option("Local Model", "localHyMT2", None),
-            option("OpenRouter LLM", "openRouter", None),
-        ],
+        providers,
         local_models: vec![
             option(
                 "Hy-MT2 1.8B 4-bit (MLX)",
@@ -2386,6 +2579,7 @@ fn provider_arg(provider: &TranslationProvider) -> &'static str {
     match provider {
         TranslationProvider::LocalHyMT2 => "local",
         TranslationProvider::OpenRouter => "openrouter",
+        TranslationProvider::AppleTranslation => "apple",
     }
 }
 
@@ -2570,14 +2764,14 @@ fn workspace_root_env() -> Option<PathBuf> {
 }
 
 fn workspace_root_arg() -> Option<PathBuf> {
-    let mut args = std::env::args().skip(1);
+    let mut args = effective_args().iter();
     while let Some(arg) = args.next() {
         if let Some(value) = arg.strip_prefix("--workspace-root=") {
             if !value.trim().is_empty() {
                 return Some(PathBuf::from(value));
             }
         }
-        if arg == "--workspace-root" {
+        if arg.as_str() == "--workspace-root" {
             return args
                 .next()
                 .filter(|value| !value.trim().is_empty())
@@ -2639,10 +2833,7 @@ fn write_request_log_file(app: &AppHandle, file: &RequestLogFile) -> Result<(), 
 }
 
 fn request_logs_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("request-logs.json"))
-        .map_err(|error| format!("Could not resolve app data directory: {error}"))
+    shared_data_dir(app).map(|dir| dir.join("request-logs.json"))
 }
 
 fn request_log_summary(entries: &[RequestLogEntryState]) -> RequestLogSummaryState {

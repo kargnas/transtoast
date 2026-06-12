@@ -79,9 +79,11 @@ public enum TranslationError: LocalizedError, Sendable {
 public final class TranslationService: @unchecked Sendable {
     private let session: URLSession
     private let localBackendGate = LocalBackendExecutionGate()
+    private let appleBackend: (any AppleTranslationBacking)?
 
-    public init(session: URLSession = .shared) {
+    public init(session: URLSession = .shared, appleBackend: (any AppleTranslationBacking)? = nil) {
         self.session = session
+        self.appleBackend = appleBackend
     }
 
     public func translateText(
@@ -110,6 +112,11 @@ public final class TranslationService: @unchecked Sendable {
                 credentials: credentials,
                 languages: languages
             )
+        case .appleTranslation:
+            return try await translateWithAppleTranslation(
+                text: trimmed,
+                languages: languages
+            )
         case .openRouter:
             return try await translateWithOpenRouterText(
                 text: trimmed,
@@ -120,6 +127,41 @@ public final class TranslationService: @unchecked Sendable {
                 onPartial: onPartial
             )
         }
+    }
+
+    private func translateWithAppleTranslation(
+        text: String,
+        languages: ResolvedTranslationLanguages
+    ) async throws -> TranslationResult {
+        guard let appleBackend else {
+            throw TranslationError.localModelUnavailable(
+                "Apple Translation needs the running CCTrans app; this context has no translation host."
+            )
+        }
+        // The resolver already detected the source, but an unknown name (or
+        // Auto without detection) maps to nil so Apple's own detection runs.
+        let sourceCode = TranslationLanguage.options
+            .first { $0.name == languages.sourceLanguage }?.code
+        guard let targetCode = TranslationLanguage.options
+            .first(where: { $0.name == languages.targetLanguage })?.code else {
+            throw TranslationError.localModelUnavailable(
+                "Apple Translation does not support \(languages.targetLanguage) as a target language."
+            )
+        }
+
+        let translated = try await appleBackend.translate(
+            text: text,
+            sourceLanguageCode: sourceCode,
+            targetLanguageCode: targetCode
+        )
+        return TranslationResult(
+            text: translated,
+            providerTitle: TranslationProvider.appleTranslation.title,
+            model: "apple/translation",
+            sourceLanguage: languages.sourceLanguage,
+            targetLanguage: languages.targetLanguage,
+            detectedSourceLanguage: languages.detectedSourceLanguage
+        )
     }
 
     public func translateImage(

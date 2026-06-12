@@ -1,9 +1,19 @@
 # Mac App Store Release Plan
 
-Status: **plan only — nothing submitted yet.** This documents what a Mac App
-Store (MAS) build of CCTrans requires, what breaks under the mandatory App
-Sandbox, and the exact submission pipeline. Direct distribution (DMG + brew +
-Sparkle) stays the primary channel; MAS would be a second, reduced variant.
+Status: **all code prep is done on the `mas-prep` branch (2026-06); nothing
+submitted yet.** Done and verified: CGEventTap port (§3.2, both builds),
+`MAS_BUILD` flag with Sparkle/caret/local-provider gates (§3.1/3.4), sandbox
+entitlements + `scripts/build-mas.zsh` (§2/§4), the Apple Translation
+framework provider (§3.3 — sandboxed end-to-end translation confirmed from the
+`dist-mas` bundle), permission-helper trim and Tauri settings gating via
+`--app-variant mas` (§3.5), and the App Group launch channel (§3.6 — GUI
+toast + settings verified live from a sandboxed `dist-mas` launch).
+Remaining before submission: only the
+account-side work in §1/§5 (Apple Distribution + Mac Installer Distribution
+certificates, Mac App Store provisioning profile, App Store Connect record,
+metadata/review notes), which only the account holder can do, plus a TestFlight
+QA pass of the .pkg. Direct distribution (DMG + brew + Sparkle) stays the
+primary channel.
 
 ## TL;DR
 
@@ -41,7 +51,7 @@ in CI). Additionally needed, all from the same account:
      Connect. Neither exists in the current keychain/CI; Developer ID certs
      cannot be reused for MAS.
 2. **App ID**: register `as.kargn.cctrans` explicitly (and
-   `as.kargn.cctrans.tauri-helper` for the nested helper) with the App Sandbox
+   `as.kargn.cctrans.helper` for the nested helper) with the App Sandbox
    capability.
 3. **Provisioning profile**: type "Mac App Store", tied to the App ID and the
    Apple Distribution cert. Must be embedded as
@@ -109,6 +119,31 @@ Notes:
    user setting.
 5. **Permission helper**: Accessibility section does not apply; Input
    Monitoring (for the event tap) and Screen Recording remain.
+6. **App Group launch channel** (discovered during pre-submission QA,
+   2026-06-12): two sandbox walls silently broke every Tauri surface in the
+   MAS build —
+   - `NSWorkspace.OpenConfiguration.arguments` is ignored when the caller is
+     sandboxed, so the helper booted with empty argv: no surface flag, no
+     `--app-variant mas`. The persistent toast process degraded into a bare
+     settings window showing direct-build providers.
+   - The app and the helper have different bundle ids, hence different
+     sandbox containers; `~/Library/Application Support` is not shared, so
+     toast payloads, settings, and request logs never crossed processes.
+
+   Fix: both sides use the team-prefixed App Group
+   `6YQH3QFFK8.as.kargn.cctrans` (no portal registration or profile entry
+   needed for team-prefixed groups on macOS). The Swift shell writes each
+   launch as a one-shot `helper-launches/pending-*.json`; the helper claims
+   it by atomic rename and treats the stored arguments as argv
+   (`effective_args()` in `src-tauri/src/lib.rs`). The claimed file is also a
+   lease and pid registry: deleting it asks the persistent toast to exit
+   (sandboxed apps cannot pkill), and a bare sandboxed boot with nothing to
+   claim exits instead of showing a ghost settings window. Local QA of the
+   sandboxed bundle must be signed with a real team identity (e.g. Developer
+   ID); ad-hoc signing makes macOS 15 prompt "access data from other apps"
+   on every group-container file access, and re-signing in place requires
+   deleting `~/Library/Containers/as.kargn.cctrans*` (container identity is
+   bound to the code signature).
 
 ## 4. Build + package pipeline (`scripts/build-mas.zsh`, new)
 

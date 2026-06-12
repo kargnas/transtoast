@@ -1,7 +1,9 @@
 .build/
+.build-mas/
 .swiftpm/
 DerivedData/
 dist/
+dist-mas/
 dist-web/
 models/
 node_modules/
