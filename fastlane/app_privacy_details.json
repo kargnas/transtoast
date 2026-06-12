@@ -1,4 +1,0 @@
-{
-  "//": "Input for fastlane's upload_app_privacy_details_to_app_store action. CCTrans collects nothing: no analytics, no accounts, no developer servers. OpenRouter traffic is user-initiated, user-keyed, and never touches developer infrastructure, which per Apple's definitions is not developer 'collection'.",
-  "data_protections": ["DATA_NOT_COLLECTED"]
-}

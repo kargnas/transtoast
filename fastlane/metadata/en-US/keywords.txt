@@ -1,1 +1,0 @@
-translate,translator,translation,clipboard,copy,menu bar,korean,japanese,chinese,dictionary
