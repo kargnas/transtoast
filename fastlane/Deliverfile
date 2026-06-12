@@ -15,4 +15,22 @@ skip_binary_upload true
 submit_for_review false
 automatic_release false
 
-price_tier 0
+# Pricing is NOT managed here: deliver's price_tier path uses legacy ASC
+# endpoints that Apple removed (availableInNewTerritories). The free price
+# schedule was set once through the App Store Connect API directly.
+
+# App Review contact. The ASC API rejects review details without a phone
+# number, and a personal number must not live in this public repo, so it
+# comes from the environment (CCTRANS_REVIEW_PHONE secret in CI, exported
+# locally for manual runs). Other contact fields are public anyway.
+review_phone = ENV["CCTRANS_REVIEW_PHONE"].to_s
+raise "Set CCTRANS_REVIEW_PHONE (e.g. +82 10 1234 5678) for the App Review contact" if review_phone.strip.empty?
+app_review_information(
+  first_name: "Sangrak",
+  last_name: "Choi",
+  phone_number: review_phone,
+  email_address: "kars@kargn.as",
+  # Deliverfile is eval'd, so __dir__ points at the CWD (repo root), not this
+  # file; keep the path repo-root-relative like metadata_path above.
+  notes: File.read("./fastlane/metadata/review_information/notes.txt")
+)

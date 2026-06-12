@@ -184,6 +184,9 @@ jobs:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          # Required by the Deliverfile's app_review_information; kept out of
+          # the public repo on purpose.
+          CCTRANS_REVIEW_PHONE: ${{ secrets.CCTRANS_REVIEW_PHONE }}
         run: |
           if [[ -z "$ASC_API_KEY_ID" || -z "$ASC_API_ISSUER_ID" || -z "$ASC_API_KEY_P8" ]]; then
             echo "Metadata upload needs the ASC API key secrets (app-specific passwords cannot edit metadata)." >&2
