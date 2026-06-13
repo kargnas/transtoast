@@ -2681,13 +2681,19 @@ fn resolve_permission_app_bundle(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn app_bundle_ancestor(path: &Path) -> Option<PathBuf> {
+    // MUST take the OUTERMOST `.app`, not innermost (`.last()`, not `.find()`).
+    // This runs inside the nested Tauri helper (.../CCTrans.app/Contents/Resources/
+    // CCTransTauri.app/...), whose bundle id is `as.kargn.cctrans.helper`. Input
+    // Monitoring grants must hit the outer `as.kargn.cctrans` that creates the
+    // CGEventTap; targeting the helper leaves Cmd+C dead after a "granted" prompt.
     path.ancestors()
-        .find(|ancestor| {
+        .filter(|ancestor| {
             ancestor
                 .extension()
                 .and_then(|extension| extension.to_str())
                 .is_some_and(|extension| extension.eq_ignore_ascii_case("app"))
         })
+        .last()
         .map(Path::to_path_buf)
 }
 
@@ -3439,6 +3445,18 @@ mod tests {
     #[test]
     fn app_bundle_ancestor_finds_containing_bundle() {
         let path = PathBuf::from("/Applications/CCTrans.app/Contents/MacOS/CCTrans");
+
+        assert_eq!(
+            app_bundle_ancestor(&path).as_deref(),
+            Some(Path::new("/Applications/CCTrans.app"))
+        );
+    }
+
+    #[test]
+    fn app_bundle_ancestor_returns_outer_app_for_nested_helper() {
+        let path = PathBuf::from(
+            "/Applications/CCTrans.app/Contents/Resources/CCTransTauri.app/Contents/MacOS/cctrans-tauri",
+        );
 
         assert_eq!(
             app_bundle_ancestor(&path).as_deref(),
