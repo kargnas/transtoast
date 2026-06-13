@@ -117,7 +117,13 @@
             <span class:ready={settingsState.permissions.keyboard} class="status-pill">
               {settingsState.permissions.keyboard ? "Ready" : "Not granted"}
             </span>
-            <span class="reset-row spacer"></span>
+            {#if !settingsState.permissions.keyboard}
+              <button class="small-button inline-btn" onclick={() => action("openInputMonitoring")}>
+                <Keyboard size={12} />Open Settings
+              </button>
+            {:else}
+              <span class="reset-row spacer"></span>
+            {/if}
           </div>
           {#if settingsState.appVariant !== "mas"}
             <div class="setting-row">
@@ -128,7 +134,13 @@
               <span class:ready={settingsState.permissions.accessibility} class="status-pill">
                 {settingsState.permissions.accessibility ? "Ready" : "Not granted"}
               </span>
-              <span class="reset-row spacer"></span>
+              {#if !settingsState.permissions.accessibility}
+                <button class="small-button inline-btn" onclick={() => action("openAccessibility")}>
+                  <Accessibility size={12} />Open Settings
+                </button>
+              {:else}
+                <span class="reset-row spacer"></span>
+              {/if}
             </div>
           {/if}
           <div class="setting-row">
@@ -136,7 +148,13 @@
             <span class:ready={settingsState.permissions.screen} class="status-pill">
               {settingsState.permissions.screen ? "Ready" : "Not granted"}
             </span>
-            <span class="reset-row spacer"></span>
+            {#if !settingsState.permissions.screen}
+              <button class="small-button inline-btn" onclick={() => action("openScreenRecording")}>
+                <Monitor size={12} />Open Settings
+              </button>
+            {:else}
+              <span class="reset-row spacer"></span>
+            {/if}
           </div>
         </section>
 
@@ -159,3 +177,22 @@
 {:else}
   <div class="loading">Loading permissions...</div>
 {/if}
+
+<style>
+  /* Ensure the button overlaps nicely over the empty space in column 2,
+     keeping the 3-column grid structure perfectly aligned. */
+  .inline-btn {
+    grid-column: 3;
+    justify-self: end;
+    gap: 4px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
+    border-radius: 6px;
+    background: var(--surface-1);
+  }
+  .inline-btn:active {
+    background: var(--surface-2);
+  }
+</style>
