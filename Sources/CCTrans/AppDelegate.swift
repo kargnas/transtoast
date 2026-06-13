@@ -129,6 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             #endif
         }
+        if !runsPopoverSmoke, !CommandLine.arguments.contains("--show-permission-helper") {
+            autoShowPermissionHelperIfNeeded()
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -330,6 +333,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Cmd+, is the platform-standard settings shortcut; surfacing it in the menu
         // also teaches the binding even though status menus only fire it while open.
         menu.addItem(menuItem(title: "Settings...", action: #selector(showSettingsWindow), key: ",", target: self))
+        menu.addItem(actionItem(title: "Permission Helper...", action: #selector(showPermissionHelper)))
         #if !MAS_BUILD
         if updaterController != nil {
             menu.addItem(actionItem(title: "Check for Updates...", action: #selector(checkForUpdates)))
@@ -1129,6 +1133,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showPermissionHelper() {
         _ = openTauriSurface("permission-helper")
+    }
+
+    private func autoShowPermissionHelperIfNeeded() {
+        // macOS relaunches the app without our CLI flags after each privacy grant,
+        // so re-open the helper on every launch while a required keyboard permission
+        // is still missing. This carries the user through the multi-permission grant
+        // flow instead of the helper vanishing after the first toggle.
+        guard requiredKeyboardPermissionsMissing() else {
+            return
+        }
+        showPermissionHelper()
+    }
+
+    private func requiredKeyboardPermissionsMissing() -> Bool {
+        #if MAS_BUILD
+        return !CGPreflightListenEventAccess()
+        #else
+        return !CGPreflightListenEventAccess() || !AXIsProcessTrusted()
+        #endif
     }
 
     private func reportKeyboardPermissionStatus(requestIfMissing: Bool) {
