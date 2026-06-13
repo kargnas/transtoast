@@ -21,7 +21,8 @@
     Settings as SettingsIcon,
     ShieldCheck,
     SlidersHorizontal,
-    Star
+    Star,
+    TriangleAlert
   } from "@lucide/svelte";
   import {
     cloneFallbackState,
@@ -60,6 +61,11 @@
     key: "inputPrice",
     direction: "asc"
   });
+
+  let isOpenRouterTextOnly = $derived(
+    settingsState?.settings.provider === "openRouter" &&
+    !(settingsState?.options.openRouterModels.find((m) => m.value === settingsState?.settings.openRouterTextModel)?.modalities.includes("image") ?? false)
+  );
 
   $effect(() => {
     void activeSection;
@@ -744,6 +750,17 @@
               </button>
             </div>
 
+            {#if isOpenRouterTextOnly}
+              <div class="setting-row warning-row">
+                <div class="warning-content">
+                  <TriangleAlert size={14} />
+                  <div>
+                    <strong>Text-only model:</strong> This model can't read images, so screen context (a screenshot of your screen) won't be sent with translations. Pick a Text + Image model to enable screen context.
+                  </div>
+                </div>
+              </div>
+            {/if}
+
             <label class="setting-row">
               <span class="setting-copy">
                 <strong>Source Language</strong>
@@ -1162,3 +1179,25 @@
 {:else}
   <div class="loading">Loading settings...</div>
 {/if}
+
+<style>
+  .warning-row {
+    grid-template-columns: 1fr;
+    background: rgba(255, 149, 0, 0.05);
+  }
+  .warning-content {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    color: var(--favorite-ink);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .warning-content strong {
+    font-weight: 650;
+  }
+  :global(.warning-content svg) {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+</style>
