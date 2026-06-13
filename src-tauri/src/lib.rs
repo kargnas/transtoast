@@ -2981,10 +2981,26 @@ fn open_external_url(url: &str) -> std::io::Result<()> {
 fn request_keyboard_prompt() -> Result<ActionResult, String> {
     #[cfg(target_os = "macos")]
     {
-        let granted = unsafe { CGRequestListenEventAccess() };
+        let input_granted = unsafe { CGRequestListenEventAccess() };
+        let accessibility = unsafe { AXIsProcessTrusted() };
+        if !accessibility {
+            // Input Monitoring shows a real system prompt, but Accessibility (caret
+            // popovers) cannot be granted by a prompt — macOS only exposes it as a
+            // manual toggle. Open that pane so the still-missing piece is actionable
+            // instead of reporting "available" off Input Monitoring alone.
+            let _ = open_privacy_url(
+                "Accessibility",
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            );
+            return Ok(action_result(
+                "Keyboard Prompt",
+                "Accessibility (caret popovers) still needs enabling — opened Accessibility settings.",
+                true,
+            ));
+        }
         return Ok(action_result(
             "Keyboard Prompt",
-            if granted {
+            if input_granted {
                 "Keyboard monitoring is available."
             } else {
                 "Keyboard permission prompt requested."
