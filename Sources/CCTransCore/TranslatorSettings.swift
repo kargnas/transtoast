@@ -75,7 +75,7 @@ public struct ToastCustomPosition: Codable, Equatable, Sendable {
 
 public struct TranslatorSettings: Codable, Equatable, Sendable {
     public static let defaultOpenRouterTextModel = "deepseek/deepseek-v4-flash"
-    public static let defaultOpenRouterVisionModel = "~google/gemini-flash-lite-latest"
+    public static let defaultOpenRouterVisionModel = "google/gemini-3.1-flash-lite"
     public static let defaultOpenRouterModel = defaultOpenRouterTextModel
 
     public var provider: TranslationProvider

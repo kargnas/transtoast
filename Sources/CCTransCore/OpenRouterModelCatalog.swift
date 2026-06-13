@@ -79,8 +79,8 @@ public enum OpenRouterModelCatalog {
             isReasoning: true
         ),
         OpenRouterModelSpec(
-            id: "~google/gemini-flash-lite-latest",
-            title: "Google Gemini Flash Lite Latest",
+            id: "google/gemini-3.1-flash-lite",
+            title: "Gemini 3.1 Flash Lite",
             promptPricePerMillion: 0.25,
             completionPricePerMillion: 1.50,
             inputModalities: ["text", "image", "video", "pdf", "audio"],

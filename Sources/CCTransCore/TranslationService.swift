@@ -276,9 +276,11 @@ public final class TranslationService: @unchecked Sendable {
         onPartial: (@Sendable (String) -> Void)? = nil
     ) async throws -> TranslationResult {
         let key = try require(credentials.openRouterAPIKey, named: "OPENROUTER_API_KEY")
-        let model = contextImagePNGData == nil
-            ? settings.openRouterTextModel
-            : settings.openRouterVisionModel
+        // Text translation always uses the selected text model. A screen-context
+        // image is only attached upstream when that model is vision-capable
+        // (AppDelegate.contextImagePNGDataIfNeeded), so the chosen model handles the
+        // image itself instead of silently switching to a different vision model.
+        let model = settings.openRouterTextModel
         // Stream only the plain-text path: a copied selection with no attached screen image, and only
         // when a caller wants incremental output. Vision/disambiguation requests still use structured
         // JSON so the contextual "description" field survives. CLI/preview callers (onPartial == nil)
@@ -358,7 +360,7 @@ public final class TranslationService: @unchecked Sendable {
             body.removeValue(forKey: "model")
             body["models"] = [
                 model,
-                "~google/gemini-flash-lite-latest",
+                "google/gemini-3.1-flash-lite",
                 "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
             ].uniqued()
         }

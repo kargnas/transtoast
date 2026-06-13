@@ -93,7 +93,7 @@ export const fallbackState: SettingsState = {
     localHyMT2BackendPath: null,
     customLocalModelsPath: null,
     openRouterTextModel: "deepseek/deepseek-v4-flash",
-    openRouterVisionModel: "~google/gemini-flash-lite-latest",
+    openRouterVisionModel: "google/gemini-3.1-flash-lite",
     favoriteLocalModelIDs: ["hymt2-mlx-1.8b-4bit"],
     favoriteOpenRouterModels: ["deepseek/deepseek-v4-flash"],
     includeScreenContextForLLM: false,
@@ -110,7 +110,7 @@ export const fallbackState: SettingsState = {
     localHyMT2BackendPath: null,
     customLocalModelsPath: null,
     openRouterTextModel: "deepseek/deepseek-v4-flash",
-    openRouterVisionModel: "~google/gemini-flash-lite-latest",
+    openRouterVisionModel: "google/gemini-3.1-flash-lite",
     favoriteLocalModelIDs: ["hymt2-mlx-1.8b-4bit"],
     favoriteOpenRouterModels: ["deepseek/deepseek-v4-flash"],
     includeScreenContextForLLM: false,
@@ -201,8 +201,8 @@ export const fallbackState: SettingsState = {
         isRecommended: false
       },
       {
-        label: "Google Gemini Flash Lite Latest",
-        value: "~google/gemini-flash-lite-latest",
+        label: "Gemini 3.1 Flash Lite",
+        value: "google/gemini-3.1-flash-lite",
         promptPricePerMillion: 0.25,
         completionPricePerMillion: 1.5,
         modalities: ["text", "image", "video", "pdf", "audio"],

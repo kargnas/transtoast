@@ -468,7 +468,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func contextImagePNGDataIfNeeded(settings: TranslatorSettings) async -> ScreenContextCaptureResult {
-        guard settings.provider == .openRouter else {
+        // Only attach a screen-context screenshot when the selected text model can
+        // accept images. Text-only models (e.g. DeepSeek) would otherwise force a
+        // silent switch to a different vision model and the request would fail.
+        guard settings.provider == .openRouter,
+              OpenRouterModelCatalog.model(id: settings.openRouterTextModel)?.supportsVision == true else {
             return ScreenContextCaptureResult(pngData: nil, diagnostic: nil)
         }
 
